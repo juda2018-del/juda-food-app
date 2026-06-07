@@ -1,0 +1,17 @@
+{
+  "name": "مطاعم فيروز",
+  "short_name": "فيروز",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#120018",
+  "theme_color": "#120018",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
