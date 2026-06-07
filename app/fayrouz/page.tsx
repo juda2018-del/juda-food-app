@@ -126,9 +126,9 @@ ${orderText}
     await addDoc(collection(db, "orders"), newOrder);
 
     window.open(
-      `https://wa.me/9647833778077?text=${encodeURIComponent(message)}`,
-      "_blank"
-    );
+  `https://wa.me/9647733778077?text=${encodeURIComponent(message)}`,
+  "_blank"
+); 
   };
 
   return (
