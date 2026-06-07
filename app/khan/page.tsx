@@ -107,10 +107,10 @@ ${orderText}
 عدد الأصناف: ${cartCount}
 المجموع: ${total} د.ع`;
 
-    window.open(
-      `https://wa.me/9647833778077?text=${encodeURIComponent(message)}`,
-      "_blank"
-    );
+   window.open(
+  `https://wa.me/9647733778077?text=${encodeURIComponent(message)}`,
+  "_blank"
+); 
   };
 
   return (
