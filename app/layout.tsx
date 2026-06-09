@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "جودة فود",
-  description: "تطبيق جودة فود لطلب الطعام",
+  title: "FUSE",
+  description: "تطبيق FUSE لطلب وتوصيل الطعام",
   manifest: "/manifest.json",
 };
 
@@ -29,7 +29,7 @@ export default function RootLayout({
       dir="rtl"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-black">
         {children}
       </body>
     </html>
