@@ -1,5 +1,6 @@
-import { initializeApp } from "firebase/app";
+ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0",
@@ -13,3 +14,11 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+export let messaging: any = null;
+
+isSupported().then((supported) => {
+  if (supported) {
+    messaging = getMessaging(app);
+  }
+});
