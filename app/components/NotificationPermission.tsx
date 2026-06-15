@@ -72,9 +72,14 @@ export default function NotificationPermission({
 
       setDone(true);
       alert("تم تفعيل الإشعارات بنجاح");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("صار خطأ بتفعيل الإشعارات");
+
+      alert(
+        error?.message ||
+          JSON.stringify(error) ||
+          "صار خطأ بتفعيل الإشعارات"
+      );
     } finally {
       setLoading(false);
     }
