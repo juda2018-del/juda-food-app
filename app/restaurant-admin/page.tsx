@@ -89,8 +89,17 @@ export default function RestaurantAdminPage() {
   const [activeFilter, setActiveFilter] = useState("الكل");
   const [newOrderAlert, setNewOrderAlert] = useState(false);
 
-  const previousNewOrdersCount = useRef(0);
+  const notifiedOrders = useRef<string[]>([]);
   const firstLoad = useRef(true);
+
+  function playNewOrderSound() {
+    const audio = new Audio("/sounds/new-order.mp3.wav");
+    audio.volume = 1;
+
+    audio.play().catch((error) => {
+      console.log("Audio Error:", error);
+    });
+  }
 
   useEffect(() => {
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
@@ -105,23 +114,31 @@ export default function RestaurantAdminPage() {
         (order) => order.restaurant === restaurantName
       );
 
-      const newCount = restaurantOrders.filter(
-        (order) => (order.status || "جديد") === "جديد"
-      ).length;
+      if (firstLoad.current) {
+        const oldNewOrders = restaurantOrders
+          .filter((order) => (order.status || "جديد") === "جديد")
+          .map((order) => order.docId);
 
-      if (!firstLoad.current && newCount > previousNewOrdersCount.current) {
-        setNewOrderAlert(true);
-
-        const audio = new Audio("/sounds/new-order.mp3.wav");
-        audio.play().catch(() => {});
-
-        setTimeout(() => {
-          setNewOrderAlert(false);
-        }, 8000);
+        notifiedOrders.current = oldNewOrders;
+        firstLoad.current = false;
+        setOrders(restaurantOrders);
+        return;
       }
 
-      previousNewOrdersCount.current = newCount;
-      firstLoad.current = false;
+      restaurantOrders.forEach((order) => {
+        const status = order.status || "جديد";
+
+        if (status === "جديد" && !notifiedOrders.current.includes(order.docId)) {
+          notifiedOrders.current.push(order.docId);
+
+          setNewOrderAlert(true);
+          playNewOrderSound();
+
+          setTimeout(() => {
+            setNewOrderAlert(false);
+          }, 8000);
+        }
+      });
 
       setOrders(restaurantOrders);
     });
