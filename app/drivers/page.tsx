@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../firebase";
-import NotificationPermission from "../components/NotificationPermission";
 
 type Order = {
   id: string;
@@ -144,10 +143,6 @@ export default function DriversPage() {
         <p className="mt-2 text-center text-gray-300">
           متابعة السائقين وطلباتهم في FUSE
         </p>
-
-        <div className="mx-auto mt-4 max-w-md">
-          <NotificationPermission userType="admin" userId="fuse-admin" />
-        </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           <Card title="عدد السائقين" value={drivers.length} />
