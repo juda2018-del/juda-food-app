@@ -1,9 +1,9 @@
  "use client";
 
 import { useState } from "react";
-import { getToken } from "firebase/messaging";
+import { getMessaging, getToken } from "firebase/messaging";
 import { doc, setDoc } from "firebase/firestore";
-import { db, messaging } from "../firebase";
+import { app, db } from "../firebase";
 
 const vapidKey =
   "BMPj4adpalvtSTsdOc85iO4YYeSXGRzYH4YIPHvwS4WhmNxWNBsxXx2Q9La5nPMpMhqxlGu-NBA4rKQbfEOLowI";
@@ -22,13 +22,13 @@ export default function NotificationPermission({
     try {
       setLoading(true);
 
-      if (!("serviceWorker" in navigator)) {
-        alert("المتصفح لا يدعم Service Worker");
+      if (!("Notification" in window)) {
+        alert("هذا المتصفح لا يدعم الإشعارات");
         return;
       }
 
-      if (!messaging) {
-        alert("الإشعارات غير مدعومة على هذا المتصفح");
+      if (!("serviceWorker" in navigator)) {
+        alert("المتصفح لا يدعم Service Worker");
         return;
       }
 
@@ -45,6 +45,8 @@ export default function NotificationPermission({
       );
 
       await navigator.serviceWorker.ready;
+
+      const messaging = getMessaging(app);
 
       const token = await getToken(messaging, {
         vapidKey,
@@ -79,18 +81,20 @@ export default function NotificationPermission({
   }
 
   return (
-    <button
-      onClick={enableNotifications}
-      disabled={loading || done}
-      className={`mt-3 w-full rounded-2xl py-3 font-black text-white ${
-        done ? "bg-green-600" : "bg-purple-700"
-      }`}
-    >
-      {done
-        ? "✅ الإشعارات مفعّلة"
-        : loading
-        ? "جاري تفعيل الإشعارات..."
-        : "🔔 تفعيل الإشعارات"}
-    </button>
+    <div className="fixed bottom-4 left-4 right-4 z-[9999] mx-auto max-w-md">
+      <button
+        onClick={enableNotifications}
+        disabled={loading || done}
+        className={`w-full rounded-2xl py-3 font-black text-white shadow-2xl ${
+          done ? "bg-green-600" : "bg-purple-700"
+        }`}
+      >
+        {done
+          ? "✅ الإشعارات مفعّلة"
+          : loading
+          ? "جاري تفعيل الإشعارات..."
+          : "🔔 تفعيل الإشعارات"}
+      </button>
+    </div>
   );
 }
