@@ -36,7 +36,8 @@ const filters = [
   "جديد",
   "قيد التحضير",
   "جاهز للتوصيل",
-  "قيد التوصيل",
+  "استلم السائق الطلب",
+  "بالطريق",
   "تم التسليم",
   "مرفوض",
 ];
@@ -44,7 +45,8 @@ const filters = [
 function getStatusColor(status?: string) {
   if (status === "قيد التحضير") return "bg-blue-600 text-white";
   if (status === "جاهز للتوصيل") return "bg-green-600 text-white";
-  if (status === "قيد التوصيل") return "bg-purple-600 text-white";
+  if (status === "استلم السائق الطلب") return "bg-purple-600 text-white";
+  if (status === "بالطريق") return "bg-orange-500 text-white";
   if (status === "تم التسليم") return "bg-black text-white";
   if (status === "مرفوض") return "bg-red-600 text-white";
   return "bg-yellow-400 text-black";
@@ -88,8 +90,10 @@ export default function RestaurantAdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeFilter, setActiveFilter] = useState("الكل");
   const [newOrderAlert, setNewOrderAlert] = useState(false);
+  const [driverAlert, setDriverAlert] = useState("");
 
   const notifiedOrders = useRef<string[]>([]);
+  const statusHistory = useRef<Record<string, string>>({});
   const firstLoad = useRef(true);
 
   function playNewOrderSound() {
@@ -99,6 +103,15 @@ export default function RestaurantAdminPage() {
     audio.play().catch((error) => {
       console.log("Audio Error:", error);
     });
+  }
+
+  function showDriverAlert(message: string) {
+    setDriverAlert(message);
+    playNewOrderSound();
+
+    setTimeout(() => {
+      setDriverAlert("");
+    }, 6000);
   }
 
   useEffect(() => {
@@ -120,6 +133,13 @@ export default function RestaurantAdminPage() {
           .map((order) => order.docId);
 
         notifiedOrders.current = oldNewOrders;
+
+        const initialHistory: Record<string, string> = {};
+        restaurantOrders.forEach((order) => {
+          initialHistory[order.docId] = order.status || "جديد";
+        });
+        statusHistory.current = initialHistory;
+
         firstLoad.current = false;
         setOrders(restaurantOrders);
         return;
@@ -127,6 +147,7 @@ export default function RestaurantAdminPage() {
 
       restaurantOrders.forEach((order) => {
         const status = order.status || "جديد";
+        const oldStatus = statusHistory.current[order.docId];
 
         if (status === "جديد" && !notifiedOrders.current.includes(order.docId)) {
           notifiedOrders.current.push(order.docId);
@@ -138,6 +159,22 @@ export default function RestaurantAdminPage() {
             setNewOrderAlert(false);
           }, 8000);
         }
+
+        if (oldStatus && oldStatus !== status) {
+          if (status === "استلم السائق الطلب") {
+            showDriverAlert("📦 السائق استلم الطلب");
+          }
+
+          if (status === "بالطريق") {
+            showDriverAlert("🛵 السائق بالطريق");
+          }
+
+          if (status === "تم التسليم") {
+            showDriverAlert("✅ تم تسليم الطلب");
+          }
+        }
+
+        statusHistory.current[order.docId] = status;
       });
 
       setOrders(restaurantOrders);
@@ -163,8 +200,12 @@ export default function RestaurantAdminPage() {
     (order) => order.status === "جاهز للتوصيل"
   ).length;
 
-  const deliveringOrdersCount = orders.filter(
-    (order) => order.status === "قيد التوصيل"
+  const pickedOrdersCount = orders.filter(
+    (order) => order.status === "استلم السائق الطلب"
+  ).length;
+
+  const onWayOrdersCount = orders.filter(
+    (order) => order.status === "بالطريق"
   ).length;
 
   const deliveredOrdersCount = orders.filter(
@@ -289,10 +330,18 @@ ${itemsText}
       );
     }
 
-    if (status === "قيد التوصيل") {
+    if (status === "استلم السائق الطلب") {
       return (
         <div className="mt-4 rounded-2xl bg-purple-100 p-3 text-center font-bold text-purple-800">
-          الطلب مع السائق 🚚
+          السائق استلم الطلب 📦
+        </div>
+      );
+    }
+
+    if (status === "بالطريق") {
+      return (
+        <div className="mt-4 rounded-2xl bg-orange-100 p-3 text-center font-bold text-orange-800">
+          السائق بالطريق 🛵
         </div>
       );
     }
@@ -309,6 +358,12 @@ ${itemsText}
           </div>
         )}
 
+        {driverAlert && (
+          <div className="mb-5 rounded-3xl bg-green-600 p-4 text-center text-xl font-black text-white shadow-2xl">
+            {driverAlert}
+          </div>
+        )}
+
         <h1 className="text-center text-3xl font-black text-yellow-400">
           لوحة مطعم {restaurantName}
         </h1>
@@ -322,13 +377,15 @@ ${itemsText}
           <InfoCard title="طلبات جديدة" value={newOrdersCount} />
           <InfoCard title="قيد التحضير" value={preparingOrdersCount} />
           <InfoCard title="جاهزة للتوصيل" value={readyOrdersCount} />
-          <InfoCard title="قيد التوصيل" value={deliveringOrdersCount} />
+          <InfoCard title="استلمها السائق" value={pickedOrdersCount} />
+          <InfoCard title="بالطريق" value={onWayOrdersCount} />
           <InfoCard title="تم التسليم" value={deliveredOrdersCount} />
           <InfoCard title="مرفوض" value={rejectedOrdersCount} />
+
           <div className="col-span-2 rounded-3xl bg-white/10 p-4 text-center md:col-span-2">
             <p className="text-sm text-gray-300">مبيعات اليوم</p>
             <p className="mt-1 text-3xl font-black text-yellow-400">
-              {todaySales} د.ع
+              {todaySales.toLocaleString()} د.ع
             </p>
           </div>
         </div>
@@ -405,6 +462,7 @@ ${itemsText}
                       <a
                         href={`https://wa.me/${phoneForWhatsapp}`}
                         target="_blank"
+                        rel="noopener noreferrer"
                         className="rounded-2xl bg-green-500 py-3 text-center text-sm font-bold text-white"
                       >
                         واتساب
@@ -442,7 +500,7 @@ ${itemsText}
                   </div>
 
                   <div className="mt-4 text-lg font-black">
-                    المجموع: {order.total || 0} د.ع
+                    المجموع: {(order.total || 0).toLocaleString()} د.ع
                   </div>
 
                   {renderActionButtons(order, status)}
