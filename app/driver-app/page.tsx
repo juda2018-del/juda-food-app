@@ -36,9 +36,11 @@ export default function DriverAppPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [locationStatus, setLocationStatus] = useState("لم يتم تشغيل الموقع بعد");
+  const [newOrderAlert, setNewOrderAlert] = useState(false);
+  const [statusAlert, setStatusAlert] = useState("");
 
   const firstLoadRef = useRef(true);
-  const previousCountRef = useRef(0);
+  const notifiedOrdersRef = useRef<string[]>([]);
 
   async function setDriverOnline(name: string, phoneNumber: string) {
     await setDoc(
@@ -120,13 +122,26 @@ export default function DriverAppPage() {
     setPhone("");
     setPassword("");
     setLocationStatus("لم يتم تشغيل الموقع بعد");
+    setNewOrderAlert(false);
+    setStatusAlert("");
     firstLoadRef.current = true;
-    previousCountRef.current = 0;
+    notifiedOrdersRef.current = [];
   }
 
   function playNewOrderSound() {
     const audio = new Audio("/sounds/new-order.mp3.wav");
-    audio.play().catch(() => {});
+    audio.volume = 1;
+    audio.play().catch((error) => {
+      console.log("Audio Error:", error);
+    });
+  }
+
+  function showStatusAlert(message: string) {
+    setStatusAlert(message);
+
+    setTimeout(() => {
+      setStatusAlert("");
+    }, 5000);
   }
 
   useEffect(() => {
@@ -178,7 +193,7 @@ export default function DriverAppPage() {
     if (!driverName) return;
 
     firstLoadRef.current = true;
-    previousCountRef.current = 0;
+    notifiedOrdersRef.current = [];
 
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
 
@@ -201,16 +216,29 @@ export default function DriverAppPage() {
         (order) => !isDelivered(order.status) && !isRejected(order.status)
       );
 
-      if (
-        !firstLoadRef.current &&
-        activeOrdersNow.length > previousCountRef.current
-      ) {
-        playNewOrderSound();
-        alert("🔔 وصل طلب جديد");
+      if (firstLoadRef.current) {
+        notifiedOrdersRef.current = activeOrdersNow.map(
+          (order) => order.documentId
+        );
+
+        firstLoadRef.current = false;
+        setAllOrders(myOrders);
+        return;
       }
 
-      firstLoadRef.current = false;
-      previousCountRef.current = activeOrdersNow.length;
+      activeOrdersNow.forEach((order) => {
+        if (!notifiedOrdersRef.current.includes(order.documentId)) {
+          notifiedOrdersRef.current.push(order.documentId);
+
+          setNewOrderAlert(true);
+          playNewOrderSound();
+
+          setTimeout(() => {
+            setNewOrderAlert(false);
+          }, 8000);
+        }
+      });
+
       setAllOrders(myOrders);
     });
 
@@ -224,7 +252,22 @@ export default function DriverAppPage() {
         return;
       }
 
-      await updateDoc(order.ref, { status });
+      await updateDoc(order.ref, {
+        status,
+        driverLastUpdate: Date.now(),
+      });
+
+      if (status === "استلم السائق الطلب") {
+        showStatusAlert("✅ تم استلام الطلب، المطعم والزبون يشوفون التحديث");
+      }
+
+      if (status === "بالطريق") {
+        showStatusAlert("🚗 تم تحديث الطلب: السائق بالطريق");
+      }
+
+      if (status === "تم التسليم") {
+        showStatusAlert("✅ تم تسليم الطلب بنجاح");
+      }
     } catch (error) {
       console.error(error);
       alert("صار خطأ بتحديث حالة الطلب");
@@ -301,6 +344,18 @@ export default function DriverAppPage() {
   return (
     <main dir="rtl" className="min-h-screen bg-black px-4 py-6 text-white">
       <section className="mx-auto max-w-3xl">
+        {newOrderAlert && (
+          <div className="mb-5 rounded-3xl bg-yellow-400 p-4 text-center text-xl font-black text-black shadow-2xl">
+            🔔 وصل طلب جديد مخصص لك
+          </div>
+        )}
+
+        {statusAlert && (
+          <div className="mb-5 rounded-3xl bg-green-600 p-4 text-center text-lg font-black text-white shadow-2xl">
+            {statusAlert}
+          </div>
+        )}
+
         <h1 className="text-center text-4xl font-black text-yellow-400">
           تطبيق السائق
         </h1>
