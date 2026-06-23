@@ -24,7 +24,7 @@
           ls -la
           ls -la out || true
           ls -la ios/App/App || true
-          npx -p @capacitor/cli@5.7.8 cap sync ios --verbose
+          npx --yes -p @capacitor/cli@5.7.8 cap sync ios --verbose
 
       - name: Install iOS pods
         script: |
