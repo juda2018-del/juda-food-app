@@ -39,8 +39,6 @@
           </widget>
           EOF
 
-          ls -la ios/App/App
-
       - name: Build iOS app
         script: |
           cd ios/App
@@ -53,6 +51,5 @@
             CODE_SIGNING_ALLOWED=NO | tee ../../xcodebuild.log
 
     artifacts:
+      - /Users/builder/Library/Developer/Xcode/DerivedData/**/Build/Products/Release-iphoneos/*.app
       - xcodebuild.log
-      - ios/App/build/**
-      - build/ios/**
