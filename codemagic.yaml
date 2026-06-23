@@ -1,4 +1,4 @@
-workflows:
+ workflows:
   fuse-ios-build:
     name: FUSE iOS Build
     max_build_duration: 60
@@ -20,7 +20,7 @@ workflows:
 
       - name: Sync Capacitor iOS
         script: |
-          npx cap sync ios
+          npx cap@5.7.8 sync ios
 
       - name: Install iOS pods
         script: |
