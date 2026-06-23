@@ -21,7 +21,8 @@
       - name: Install iOS pods
         script: |
           cd ios/App
-          pod install
+          pod repo update
+          pod install --repo-update
 
       - name: Build iOS app
         script: |
