@@ -7,7 +7,6 @@
     environment:
       node: 20
       xcode: latest
-      cocoapods: default
 
     scripts:
       - name: Install dependencies
@@ -18,16 +17,16 @@
         script: |
           npm run build
 
-      - name: Install iOS pods
+      - name: Copy web assets to iOS
         script: |
-          cd ios/App
-          pod repo update
-          pod install --repo-update
+          rm -rf ios/App/App/public
+          mkdir -p ios/App/App/public
+          cp -R out/* ios/App/App/public/
 
       - name: Build iOS app
         script: |
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
