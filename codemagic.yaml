@@ -22,8 +22,24 @@
           rm -rf ios/App/App/public
           mkdir -p ios/App/App/public
           cp -R out/* ios/App/App/public/
-          cp capacitor.config.json ios/App/App/capacitor.config.json
-          echo '<widget id="com.fuseiraq.app" version="1.0.0"></widget>' > ios/App/App/config.xml
+
+          cat > ios/App/App/capacitor.config.json <<'EOF'
+          {
+            "appId": "com.fuseiraq.app",
+            "appName": "Fuse Iraq",
+            "webDir": "public",
+            "packageClassList": []
+          }
+          EOF
+
+          cat > ios/App/App/config.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <widget id="com.fuseiraq.app" version="1.0.0">
+            <name>Fuse Iraq</name>
+          </widget>
+          EOF
+
+          ls -la ios/App/App
 
       - name: Build iOS app
         script: |
@@ -37,6 +53,6 @@
             CODE_SIGNING_ALLOWED=NO | tee ../../xcodebuild.log
 
     artifacts:
+      - xcodebuild.log
       - ios/App/build/**
       - build/ios/**
-      - xcodebuild.log
