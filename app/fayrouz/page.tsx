@@ -2,12 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  collection,
-  addDoc,
-  onSnapshot,
-  doc,
-} from "firebase/firestore";
+import { collection, addDoc, onSnapshot, doc } from "firebase/firestore";
 import { db } from "../firebase";
 
 const LocationMap = dynamic(() => import("../components/LocationMap"), {
@@ -23,9 +18,7 @@ type MenuItem = {
   active?: boolean;
 };
 
-type CartItem = MenuItem & {
-  qty: number;
-};
+type CartItem = MenuItem & { qty: number };
 
 type OrderTrack = {
   documentId: string;
@@ -36,43 +29,41 @@ type OrderTrack = {
   total?: number;
   status?: string;
   driverName?: string;
-  createdAt?: any;
 };
 
 type DriverStatus = {
   name?: string;
   phone?: string;
-  status?: string;
   latitude?: number;
   longitude?: number;
-  lastSeen?: number;
 };
 
 const categories = ["الكل", "الفطور", "كاهي وبورك", "مشروبات", "سيت منيو"];
 
 export default function Fayrouz() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("الكل");
+
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [locationLink, setLocationLink] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
   const [position, setPosition] = useState<[number, number]>([33.3152, 44.3661]);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("الكل");
 
   const [lastOrderId, setLastOrderId] = useState("");
   const [trackingOrder, setTrackingOrder] = useState<OrderTrack | null>(null);
   const [driverStatus, setDriverStatus] = useState<DriverStatus | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   useEffect(() => {
-    const savedOrderId = localStorage.getItem("lastFayrouzOrderId") || "";
-    setLastOrderId(savedOrderId);
+    setLastOrderId(localStorage.getItem("lastFayrouzOrderId") || "");
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "menuItems"), (snapshot) => {
+    const unsub = onSnapshot(collection(db, "menuItems"), (snapshot) => {
       const data = snapshot.docs
         .map((doc) => doc.data() as MenuItem)
         .filter((item) => item.active !== false)
@@ -81,22 +72,19 @@ export default function Fayrouz() {
       setMenuItems(data);
     });
 
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
   useEffect(() => {
     if (!lastOrderId) return;
 
-    const unsubscribe = onSnapshot(doc(db, "orders", lastOrderId), (snap) => {
+    const unsub = onSnapshot(doc(db, "orders", lastOrderId), (snap) => {
       if (snap.exists()) {
-        setTrackingOrder({
-          documentId: snap.id,
-          ...snap.data(),
-        } as OrderTrack);
+        setTrackingOrder({ documentId: snap.id, ...snap.data() } as OrderTrack);
       }
     });
 
-    return () => unsubscribe();
+    return () => unsub();
   }, [lastOrderId]);
 
   useEffect(() => {
@@ -105,34 +93,15 @@ export default function Fayrouz() {
       return;
     }
 
-    const unsubscribe = onSnapshot(
+    const unsub = onSnapshot(
       doc(db, "driversStatus", trackingOrder.driverName),
       (snap) => {
-        if (snap.exists()) {
-          setDriverStatus(snap.data() as DriverStatus);
-        }
+        if (snap.exists()) setDriverStatus(snap.data() as DriverStatus);
       }
     );
 
-    return () => unsubscribe();
+    return () => unsub();
   }, [trackingOrder?.driverName]);
-
-  const updateLocation = (newLat: number, newLng: number) => {
-    setPosition([newLat, newLng]);
-
-    const link = `https://www.google.com/maps?q=${newLat},${newLng}`;
-    setLocationLink(link);
-
-    setAddress((old) =>
-      old
-        ? `${old.split(" - موقع الخريطة")[0]} - موقع الخريطة: ${link}`
-        : `موقع الخريطة: ${link}`
-    );
-  };
-
-  const handleMapChange = (pos: [number, number]) => {
-    updateLocation(pos[0], pos[1]);
-  };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -144,23 +113,35 @@ export default function Fayrouz() {
     return byCategory && bySearch;
   });
 
+  const getQty = (name: string) =>
+    cart.find((item) => item.name === name)?.qty || 0;
+
   const addToCart = (item: MenuItem) => {
-    setCart((oldCart) => {
-      const found = oldCart.find((x) => x.name === item.name);
+    setCart((old) => {
+      const found = old.find((x) => x.name === item.name);
       if (found) {
-        return oldCart.map((x) =>
+        return old.map((x) =>
           x.name === item.name ? { ...x, qty: x.qty + 1 } : x
         );
       }
-      return [...oldCart, { ...item, qty: 1 }];
+      return [...old, { ...item, qty: 1 }];
     });
   };
 
   const removeOne = (name: string) => {
-    setCart((oldCart) =>
-      oldCart
-        .map((x) => (x.name === name ? { ...x, qty: x.qty - 1 } : x))
-        .filter((x) => x.qty > 0)
+    setCart((old) =>
+      old.map((x) => (x.name === name ? { ...x, qty: x.qty - 1 } : x)).filter((x) => x.qty > 0)
+    );
+  };
+
+  const updateLocation = (lat: number, lng: number) => {
+    setPosition([lat, lng]);
+    const link = `https://www.google.com/maps?q=${lat},${lng}`;
+    setLocationLink(link);
+    setAddress((old) =>
+      old
+        ? `${old.split(" - موقع الخريطة")[0]} - موقع الخريطة: ${link}`
+        : `موقع الخريطة: ${link}`
     );
   };
 
@@ -176,17 +157,12 @@ export default function Fayrouz() {
       (pos) => {
         updateLocation(pos.coords.latitude, pos.coords.longitude);
         setLocationLoading(false);
-        alert("تم تحديد موقعك بنجاح");
       },
       () => {
         setLocationLoading(false);
         alert("ما قدرنا نحدد الموقع. فعّل صلاحية الموقع وجرب مرة ثانية");
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-      }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
@@ -204,9 +180,7 @@ export default function Fayrouz() {
     const orderText = cart
       .map(
         (item) =>
-          `• ${item.name} × ${item.qty} = ${(
-            item.price * item.qty
-          ).toLocaleString()} د.ع`
+          `• ${item.name} × ${item.qty} = ${(item.price * item.qty).toLocaleString()} د.ع`
       )
       .join("\n");
 
@@ -223,28 +197,24 @@ ${orderText}
 عدد الأصناف: ${cartCount}
 المجموع: ${total.toLocaleString()} د.ع`;
 
-    const newOrder = {
+    const docRef = await addDoc(collection(db, "orders"), {
       id: Date.now(),
       restaurant: "فيروز",
       customerName,
       phone,
       address,
       locationLink,
-      location: {
-        lat: position[0],
-        lng: position[1],
-      },
+      location: { lat: position[0], lng: position[1] },
       items: cart,
       total,
       status: "جديد",
       createdAt: new Date().toLocaleString("ar-IQ"),
-    };
-
-    const docRef = await addDoc(collection(db, "orders"), newOrder);
+    });
 
     localStorage.setItem("lastFayrouzOrderId", docRef.id);
     setLastOrderId(docRef.id);
     setCart([]);
+    setCheckoutOpen(false);
 
     window.open(
       `https://wa.me/9647733778077?text=${encodeURIComponent(message)}`,
@@ -253,299 +223,568 @@ ${orderText}
   };
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#120018] text-white p-4 pb-28">
-      <a
-        href="/"
-        className="fixed top-4 left-4 bg-white text-black px-4 py-2 rounded-xl font-bold shadow-lg z-50"
-      >
-        🏠 الرئيسية
-      </a>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
 
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-gradient-to-l from-yellow-500 via-orange-400 to-purple-700 p-6 rounded-3xl mb-5 shadow-2xl">
-          <h1 className="text-4xl font-extrabold">مطعم فيروز</h1>
-          <p className="text-lg mt-2">اطلب مباشرة من فيروز عبر الواتساب</p>
-        </div>
+        * { box-sizing: border-box; }
 
-        {trackingOrder && (
-          <OrderTracking
-            order={trackingOrder}
-            driverStatus={driverStatus}
-          />
-        )}
+        body {
+          margin: 0;
+          font-family: "Cairo", sans-serif;
+          background: #efe8df;
+        }
 
-        <div className="bg-white/10 p-4 rounded-2xl mb-5 border border-white/10">
-          <h2 className="text-yellow-300 text-xl font-bold mb-3">
-            بيانات الزبون
-          </h2>
+        .app {
+          width: 100%;
+          max-width: 430px;
+          min-height: 100vh;
+          margin: 0 auto;
+          padding-bottom: 105px;
+          direction: rtl;
+          background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
+          color: #151515;
+        }
 
-          <input
-            type="text"
-            placeholder="اسم الزبون"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="w-full p-3 mb-2 bg-white text-black rounded-xl font-bold"
-          />
+        .hero {
+          height: 310px;
+          position: relative;
+          overflow: hidden;
+          border-bottom-left-radius: 34px;
+          border-bottom-right-radius: 34px;
+        }
 
-          <input
-            type="text"
-            placeholder="رقم الهاتف"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="w-full p-3 mb-2 bg-white text-black rounded-xl font-bold"
-          />
+        .hero img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
 
-          <textarea
-            placeholder="العنوان أو أقرب نقطة دالة"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="w-full p-3 mb-2 bg-white text-black rounded-xl font-bold min-h-[90px]"
-          />
+        .hero::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to top, rgba(0,0,0,.70), rgba(0,0,0,.10));
+        }
 
-          <button
-            onClick={getCurrentLocation}
-            disabled={locationLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 px-4 py-3 rounded-xl font-bold mb-3"
-          >
-            {locationLoading
-              ? "جاري تحديد الموقع..."
-              : "📍 تحديد موقعي على الخريطة"}
-          </button>
+        .topbar {
+          position: absolute;
+          top: 18px;
+          left: 18px;
+          right: 18px;
+          z-index: 3;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
 
-          {locationLink && (
-            <a
-              href={locationLink}
-              target="_blank"
-              className="block mb-3 bg-green-600 text-center px-4 py-3 rounded-xl font-bold"
-            >
-              فتح الموقع على Google Maps
-            </a>
-          )}
+        .topbtn {
+          width: 44px;
+          height: 44px;
+          border-radius: 16px;
+          border: 0;
+          background: rgba(255,255,255,.92);
+          color: #151515;
+          display: grid;
+          place-items: center;
+          text-decoration: none;
+          font-weight: 900;
+          box-shadow: 0 12px 26px rgba(0,0,0,.16);
+        }
 
-          <LocationMap position={position} setPosition={handleMapChange} />
-        </div>
+        .hero-info {
+          position: absolute;
+          z-index: 3;
+          right: 18px;
+          left: 18px;
+          bottom: 20px;
+          color: white;
+        }
 
-        <div className="bg-black/60 p-4 rounded-2xl mb-5 sticky top-2 z-10 border border-yellow-400/40 shadow-xl">
-          <div className="text-yellow-300 text-xl font-extrabold mb-3">
-            🛒 السلة: {cartCount} صنف | المجموع: {total.toLocaleString()} د.ع
+        .status {
+          display: inline-flex;
+          background: #ff4d00;
+          color: white;
+          padding: 8px 13px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 900;
+          margin-bottom: 10px;
+        }
+
+        .hero-info h1 {
+          margin: 0;
+          font-size: 42px;
+          font-weight: 900;
+          letter-spacing: -1px;
+        }
+
+        .hero-info p {
+          margin: 8px 0 14px;
+          color: rgba(255,255,255,.86);
+          font-size: 14px;
+          font-weight: 700;
+        }
+
+        .stats {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .stats span {
+          background: rgba(255,255,255,.92);
+          color: #151515;
+          padding: 8px 12px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .content {
+          padding: 18px;
+        }
+
+        .tracking, .checkout {
+          background: white;
+          border-radius: 26px;
+          padding: 16px;
+          box-shadow: 0 14px 34px rgba(0,0,0,.07);
+          margin-bottom: 18px;
+        }
+
+        .tracking h2, .checkout h2 {
+          margin: 0 0 12px;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .track-status {
+          background: #fff3e9;
+          border-radius: 20px;
+          padding: 13px;
+          font-weight: 900;
+          margin-bottom: 12px;
+          color: #ff4d00;
+        }
+
+        .search {
+          height: 54px;
+          border-radius: 21px;
+          background: white;
+          box-shadow: 0 12px 28px rgba(0,0,0,.06);
+          display: flex;
+          align-items: center;
+          padding: 0 16px;
+          color: #999;
+          margin-bottom: 14px;
+        }
+
+        .search input {
+          width: 100%;
+          border: 0;
+          outline: none;
+          background: transparent;
+          font-family: inherit;
+          font-weight: 800;
+          color: #151515;
+        }
+
+        .tabs {
+          display: flex;
+          gap: 10px;
+          overflow-x: auto;
+          padding-bottom: 8px;
+          margin-bottom: 16px;
+          scrollbar-width: none;
+        }
+
+        .tabs::-webkit-scrollbar { display: none; }
+
+        .tab {
+          flex: 0 0 auto;
+          border: 0;
+          border-radius: 999px;
+          padding: 11px 18px;
+          background: white;
+          color: #151515;
+          font-family: inherit;
+          font-weight: 900;
+          box-shadow: 0 10px 24px rgba(0,0,0,.06);
+        }
+
+        .tab.active {
+          background: #ff4d00;
+          color: white;
+          box-shadow: 0 12px 26px rgba(255,77,0,.25);
+        }
+
+        .section-title {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 10px 0 14px;
+        }
+
+        .section-title h2 {
+          margin: 0;
+          font-size: 22px;
+          font-weight: 900;
+        }
+
+        .section-title span {
+          color: #ff4d00;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .items {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .item {
+          background: white;
+          border-radius: 25px;
+          padding: 12px;
+          display: grid;
+          grid-template-columns: 102px 1fr;
+          gap: 13px;
+          box-shadow: 0 12px 30px rgba(0,0,0,.07);
+        }
+
+        .item-img {
+          width: 102px;
+          height: 102px;
+          border-radius: 22px;
+          overflow: hidden;
+          background: #f5f1eb;
+          display: grid;
+          place-items: center;
+          font-size: 34px;
+        }
+
+        .item-img img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .item h3 {
+          margin: 0;
+          font-size: 17px;
+          font-weight: 900;
+          line-height: 1.35;
+        }
+
+        .item .cat-name {
+          margin: 4px 0 8px;
+          font-size: 12px;
+          color: #888;
+          font-weight: 800;
+        }
+
+        .price-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .price {
+          color: #ff4d00;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .add {
+          min-width: 42px;
+          height: 36px;
+          border: 0;
+          border-radius: 14px;
+          background: #ff4d00;
+          color: white;
+          font-size: 20px;
+          font-weight: 900;
+        }
+
+        .qty {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #ff4d00;
+          color: white;
+          border-radius: 14px;
+          padding: 5px 7px;
+          font-weight: 900;
+        }
+
+        .qty button {
+          width: 28px;
+          height: 28px;
+          border: 0;
+          border-radius: 10px;
+          background: white;
+          color: #151515;
+          font-size: 18px;
+          font-weight: 900;
+        }
+
+        .input, .textarea {
+          width: 100%;
+          border: 0;
+          outline: none;
+          border-radius: 18px;
+          background: #f8f3ee;
+          padding: 14px 15px;
+          font-family: inherit;
+          font-weight: 800;
+          margin-bottom: 10px;
+          color: #151515;
+        }
+
+        .textarea {
+          min-height: 84px;
+          resize: none;
+        }
+
+        .orange-btn {
+          width: 100%;
+          border: 0;
+          border-radius: 18px;
+          background: #ff4d00;
+          color: white;
+          padding: 14px;
+          font-family: inherit;
+          font-weight: 900;
+          margin-bottom: 10px;
+          box-shadow: 0 12px 26px rgba(255,77,0,.22);
+        }
+
+        .map {
+          overflow: hidden;
+          border-radius: 22px;
+          margin-top: 10px;
+        }
+
+        .cartbar {
+          position: fixed;
+          left: 50%;
+          bottom: 14px;
+          transform: translateX(-50%);
+          width: calc(100% - 32px);
+          max-width: 398px;
+          background: #151515;
+          color: white;
+          border-radius: 26px;
+          padding: 13px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          box-shadow: 0 20px 45px rgba(0,0,0,.28);
+          z-index: 80;
+        }
+
+        .cartbar p {
+          margin: 0;
+          font-size: 12px;
+          color: #aaa;
+          font-weight: 800;
+        }
+
+        .cartbar b {
+          font-size: 16px;
+          font-weight: 900;
+        }
+
+        .cartbar button {
+          border: 0;
+          border-radius: 18px;
+          background: #ff4d00;
+          color: white;
+          padding: 13px 18px;
+          font-family: inherit;
+          font-weight: 900;
+        }
+      `}</style>
+
+      <main className="app">
+        <section className="hero">
+          <img src="/images/fayrouz.jpg" alt="فيروز" />
+
+          <div className="topbar">
+            <a href="/" className="topbtn">‹</a>
+            <button className="topbtn">♡</button>
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setCart([])}
-              className="bg-red-600 px-4 py-2 rounded-xl font-bold"
-            >
-              🗑️ تفريغ
-            </button>
-
-            <button
-              onClick={sendOrder}
-              className="bg-green-600 px-4 py-2 rounded-xl font-bold"
-            >
-              📱 إرسال الطلب
-            </button>
-          </div>
-        </div>
-
-        {cart.length > 0 && (
-          <div className="bg-zinc-900 p-4 rounded-2xl mb-6 border border-purple-400/30">
-            <h2 className="text-xl font-bold text-yellow-400 mb-3">طلباتك</h2>
-
-            <div className="space-y-3">
-              {cart.map((item, index) => (
-                <div
-                  key={`cart-${item.name}-${index}`}
-                  className="bg-purple-900 p-4 rounded-2xl flex items-center justify-between gap-3 border border-purple-500"
-                >
-                  <div>
-                    <div className="font-bold text-white">{item.name}</div>
-                    <div className="text-sm text-yellow-300 font-bold">
-                      {(item.price * item.qty).toLocaleString()} د.ع
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => removeOne(item.name)}
-                      className="bg-red-600 w-8 h-8 rounded-full font-bold"
-                    >
-                      -
-                    </button>
-
-                    <span className="font-bold">{item.qty}</span>
-
-                    <button
-                      onClick={() => addToCart(item)}
-                      className="bg-green-600 w-8 h-8 rounded-full font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
+          <div className="hero-info">
+            <div className="status">مفتوح الآن</div>
+            <h1>فيروز</h1>
+            <p>كاهي، قيمر، بورك وفطور عراقي أصيل</p>
+            <div className="stats">
+              <span>⭐ 4.8</span>
+              <span>25-35 د</span>
+              <span>توصيل سريع</span>
             </div>
-          </div>
-        )}
-
-        <input
-          type="text"
-          placeholder="ابحث عن صنف..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full p-4 mb-4 bg-white text-black rounded-2xl font-bold border-2 border-yellow-400"
-        />
-
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-5">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl font-extrabold whitespace-nowrap ${
-                selectedCategory === cat
-                  ? "bg-yellow-400 text-black"
-                  : "bg-black/60 text-white border border-yellow-400"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <section className="mb-7">
-          <h2 className="text-2xl font-extrabold text-yellow-400 mb-3">
-            {selectedCategory === "الكل" ? "كل المنيو" : selectedCategory}
-          </h2>
-
-          <div className="grid gap-3">
-            {filteredItems.map((item, index) => (
-              <div
-                key={`menu-${item.name}-${item.category}-${index}`}
-                className="bg-gradient-to-l from-purple-700 to-purple-900 p-4 rounded-2xl shadow-lg border border-purple-500 flex items-center justify-between gap-3"
-              >
-                <div>
-                  {item.image && (
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-24 h-20 object-cover rounded-xl mb-2 bg-white"
-                    />
-                  )}
-
-                  <h3 className="text-xl font-bold text-white">{item.name}</h3>
-
-                  <p className="text-yellow-300 font-bold mt-1">
-                    {item.price.toLocaleString()} د.ع
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => addToCart(item)}
-                  className="bg-green-600 hover:bg-green-700 px-5 py-2 rounded-xl font-bold"
-                >
-                  أضف
-                </button>
-              </div>
-            ))}
           </div>
         </section>
-      </div>
-    </main>
-  );
-}
 
-function OrderTracking({
-  order,
-  driverStatus,
-}: {
-  order: OrderTrack;
-  driverStatus: DriverStatus | null;
-}) {
-  const status = order.status || "جديد";
-
-  const steps = [
-    { title: "تم استلام الطلب", active: true },
-    { title: "قيد التحضير", active: status.includes("قيد") || status.includes("جاهز") || status.includes("استلم") || status.includes("بالطريق") || status.includes("تم التسليم") },
-    { title: "جاهز للتوصيل", active: status.includes("جاهز") || status.includes("استلم") || status.includes("بالطريق") || status.includes("تم التسليم") },
-    { title: "السائق استلم الطلب", active: status.includes("استلم") || status.includes("بالطريق") || status.includes("تم التسليم") },
-    { title: "السائق بالطريق", active: status.includes("بالطريق") || status.includes("تم التسليم") },
-    { title: "تم التسليم", active: status.includes("تم التسليم") },
-  ];
-
-  return (
-    <div className="bg-white text-black p-4 rounded-3xl mb-5 shadow-2xl">
-      <h2 className="text-2xl font-black mb-2">تتبع طلبك</h2>
-
-      <div className="bg-yellow-100 rounded-2xl p-4 mb-4">
-        <p className="font-black">الحالة الحالية:</p>
-        <p className="text-2xl font-black text-purple-700">{status}</p>
-        <p className="mt-1 text-sm text-gray-700">
-          المجموع: {(order.total || 0).toLocaleString()} د.ع
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        {steps.map((step, index) => (
-          <div
-            key={index}
-            className={`p-3 rounded-2xl font-bold ${
-              step.active
-                ? "bg-green-600 text-white"
-                : "bg-gray-100 text-gray-500"
-            }`}
-          >
-            {step.active ? "✅" : "⏳"} {step.title}
-          </div>
-        ))}
-      </div>
-
-      {order.driverName && (
-        <div className="mt-4 bg-gray-100 rounded-2xl p-4">
-          <p className="font-black">السائق:</p>
-          <p className="text-xl font-black">{order.driverName}</p>
-
-          {driverStatus?.phone && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <a
-                href={`tel:${driverStatus.phone}`}
-                className="bg-black text-white text-center rounded-xl py-3 font-bold"
-              >
-                اتصال بالسائق
-              </a>
-
-              <a
-                href={`https://wa.me/964${driverStatus.phone.slice(1)}`}
-                target="_blank"
-                className="bg-green-600 text-white text-center rounded-xl py-3 font-bold"
-              >
-                واتساب السائق
-              </a>
+        <section className="content">
+          {trackingOrder && (
+            <div className="tracking">
+              <h2>تتبع طلبك</h2>
+              <div className="track-status">{trackingOrder.status || "جديد"}</div>
+              <p>المجموع: {(trackingOrder.total || 0).toLocaleString()} د.ع</p>
+              {trackingOrder.driverName && <p>السائق: {trackingOrder.driverName}</p>}
+              {driverStatus?.latitude && driverStatus?.longitude && (
+                <a
+                  href={`https://www.google.com/maps?q=${driverStatus.latitude},${driverStatus.longitude}`}
+                  target="_blank"
+                  className="orange-btn"
+                  style={{ display: "block", textAlign: "center", textDecoration: "none" }}
+                >
+                  فتح موقع السائق
+                </a>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {driverStatus?.latitude && driverStatus?.longitude && (
-        <div className="mt-4">
-          <h3 className="text-xl font-black mb-2">موقع السائق المباشر</h3>
+          {checkoutOpen && (
+            <div className="checkout">
+              <h2>بيانات الطلب</h2>
 
-          <div className="overflow-hidden rounded-3xl border">
-            <iframe
-              title="موقع السائق"
-              className="w-full h-[320px]"
-              loading="lazy"
-              src={`https://maps.google.com/maps?q=${driverStatus.latitude},${driverStatus.longitude}&z=16&output=embed`}
+              <input
+                className="input"
+                placeholder="اسم الزبون"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+              />
+
+              <input
+                className="input"
+                placeholder="رقم الهاتف"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+
+              <textarea
+                className="textarea"
+                placeholder="العنوان أو أقرب نقطة دالة"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+
+              <button
+                className="orange-btn"
+                onClick={getCurrentLocation}
+                disabled={locationLoading}
+              >
+                {locationLoading ? "جاري تحديد الموقع..." : "تحديد موقعي"}
+              </button>
+
+              {locationLink && (
+                <a
+                  href={locationLink}
+                  target="_blank"
+                  className="orange-btn"
+                  style={{ display: "block", textAlign: "center", textDecoration: "none" }}
+                >
+                  فتح الموقع على Google Maps
+                </a>
+              )}
+
+              <div className="map">
+                <LocationMap
+                  position={position}
+                  setPosition={(pos: [number, number]) =>
+                    updateLocation(pos[0], pos[1])
+                  }
+                />
+              </div>
+
+              <button className="orange-btn" onClick={sendOrder}>
+                تأكيد وإرسال الطلب
+              </button>
+            </div>
+          )}
+
+          <div className="search">
+            <input
+              placeholder="ابحث عن صنف..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <a
-            href={`https://www.google.com/maps?q=${driverStatus.latitude},${driverStatus.longitude}`}
-            target="_blank"
-            className="mt-3 block bg-purple-700 text-white text-center rounded-xl py-3 font-bold"
-          >
-            فتح موقع السائق على Google Maps
-          </a>
-        </div>
-      )}
-    </div>
+          <div className="tabs">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={selectedCategory === cat ? "tab active" : "tab"}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="section-title">
+            <span>{filteredItems.length} صنف</span>
+            <h2>{selectedCategory === "الكل" ? "قائمة الطعام" : selectedCategory}</h2>
+          </div>
+
+          <section className="items">
+            {filteredItems.map((item, index) => {
+              const qty = getQty(item.name);
+
+              return (
+                <div className="item" key={`${item.name}-${index}`}>
+                  <div className="item-img">
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} />
+                    ) : (
+                      "🍽️"
+                    )}
+                  </div>
+
+                  <div>
+                    <h3>{item.name}</h3>
+                    <p className="cat-name">{item.category}</p>
+
+                    <div className="price-row">
+                      <div className="price">{item.price.toLocaleString()} د.ع</div>
+
+                      {qty > 0 ? (
+                        <div className="qty">
+                          <button onClick={() => removeOne(item.name)}>-</button>
+                          <span>{qty}</span>
+                          <button onClick={() => addToCart(item)}>+</button>
+                        </div>
+                      ) : (
+                        <button className="add" onClick={() => addToCart(item)}>
+                          +
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        </section>
+
+        {cartCount > 0 && (
+          <div className="cartbar">
+            <div>
+              <p>السلة</p>
+              <b>{cartCount} صنف • {total.toLocaleString()} د.ع</b>
+            </div>
+
+            <button onClick={() => setCheckoutOpen(true)}>إتمام الطلب</button>
+          </div>
+        )}
+      </main>
+    </>
   );
 }

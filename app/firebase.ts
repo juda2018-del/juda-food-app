@@ -1,6 +1,7 @@
  import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0",
@@ -13,7 +14,10 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
+
 export const db = getFirestore(app);
+
+export const auth = getAuth(app);
 
 export let messaging: any = null;
 
