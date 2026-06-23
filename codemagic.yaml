@@ -17,23 +17,26 @@
         script: |
           npm run build
 
-      - name: Copy web assets to iOS
+      - name: Prepare iOS files
         script: |
           rm -rf ios/App/App/public
           mkdir -p ios/App/App/public
           cp -R out/* ios/App/App/public/
+          cp capacitor.config.json ios/App/App/capacitor.config.json
+          echo '<widget id="com.fuseiraq.app" version="1.0.0"></widget>' > ios/App/App/config.xml
 
       - name: Build iOS app
         script: |
+          cd ios/App
           set -o pipefail
           xcodebuild \
-            -project ios/App/App.xcodeproj \
+            -project App.xcodeproj \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build/ios \
-            CODE_SIGNING_ALLOWED=NO | tee xcodebuild.log
+            CODE_SIGNING_ALLOWED=NO | tee ../../xcodebuild.log
 
     artifacts:
+      - ios/App/build/**
       - build/ios/**
       - xcodebuild.log
