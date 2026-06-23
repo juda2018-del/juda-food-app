@@ -1,10 +1,44 @@
-       - name: Build iOS app
+ workflows:
+  fuse-ios-build:
+    name: FUSE iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+
+      - name: Build Next.js app
+        script: |
+          npm run build
+
+      - name: Copy web assets to iOS
+        script: |
+          npx cap copy ios
+
+      - name: Install iOS pods
+        script: |
+          cd ios/App
+          pod repo update
+          pod install --repo-update
+
+      - name: Build iOS app
         script: |
           set -o pipefail
           xcodebuild \
-            -project ios/App/App.xcodeproj \
+            -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build/ios \
             CODE_SIGNING_ALLOWED=NO | tee xcodebuild.log
+
+    artifacts:
+      - build/ios/**
+      - xcodebuild.log
