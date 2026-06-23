@@ -18,14 +18,6 @@
         script: |
           npm run build
 
-      - name: Sync Capacitor iOS
-        script: |
-          pwd
-          ls -la
-          ls -la out || true
-          ls -la ios/App/App || true
-          npx --yes -p @capacitor/cli@5.7.8 cap sync ios --verbose
-
       - name: Install iOS pods
         script: |
           cd ios/App
@@ -43,5 +35,4 @@
 
     artifacts:
       - build/ios/Build/Products/Release-iphoneos/*.app
-      - ios/App/build/**/*.ipa
       - /tmp/xcodebuild_logs/*.log
