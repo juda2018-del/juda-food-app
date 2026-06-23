@@ -20,7 +20,7 @@
 
       - name: Sync Capacitor iOS
         script: |
-          npx cap@5.7.8 sync ios
+          npx -p @capacitor/cli@5.7.8 cap sync ios
 
       - name: Install iOS pods
         script: |
