@@ -4,18 +4,22 @@
     max_build_duration: 60
     instance_type: mac_mini_m2
 
+    integrations:
+      app_store_connect: Codemagic
+
     environment:
       node: 20
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.fuseiraq.app
 
     scripts:
       - name: Install dependencies
-        script: |
-          npm ci
+        script: npm ci
 
       - name: Build Next.js app
-        script: |
-          npm run build
+        script: npm run build
 
       - name: Prepare iOS files
         script: |
@@ -23,40 +27,16 @@
           mkdir -p ios/App/App/public
           cp -R out/* ios/App/App/public/
 
-          cat > ios/App/exportOptions.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>teamID</key>
-            <string>388QYRH3Q4</string>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Build signed IPA
+      - name: Set up iOS signing
         script: |
-          cd ios/App
+          xcode-project use-profiles
 
-          xcodebuild \
-            -project App.xcodeproj \
-            -scheme App \
-            -configuration Release \
-            -archivePath build/App.xcarchive \
-            DEVELOPMENT_TEAM=388QYRH3Q4 \
-            CODE_SIGN_STYLE=Automatic \
-            archive
-
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist exportOptions.plist
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App
 
     artifacts:
-      - ios/App/build/ipa/*.ipa
-      - xcodebuild.log
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
