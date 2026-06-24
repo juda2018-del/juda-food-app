@@ -1,42 +1,21 @@
- workflows:
-  fuse-ios-build:
-    name: FUSE iOS Build
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-
-    integrations:
-      app_store_connect: Codemagic
-
-    environment:
-      node: 20
-      xcode: latest
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.fuseiraq.app
-
-    scripts:
-      - name: Install dependencies
-        script: npm ci
-
-      - name: Build Next.js app
-        script: npm run build
-
-      - name: Prepare iOS files
+       - name: Prepare iOS files
         script: |
           rm -rf ios/App/App/public
           mkdir -p ios/App/App/public
           cp -R out/* ios/App/App/public/
 
-      - name: Set up iOS signing
-        script: |
-          xcode-project use-profiles
+          cat > ios/App/App/capacitor.config.json <<'EOF'
+          {
+            "appId": "com.fuseiraq.app",
+            "appName": "Fuse Iraq",
+            "webDir": "public",
+            "packageClassList": []
+          }
+          EOF
 
-      - name: Build IPA
-        script: |
-          xcode-project build-ipa \
-            --project ios/App/App.xcodeproj \
-            --scheme App
-
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
+          cat > ios/App/App/config.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <widget id="com.fuseiraq.app" version="1.0.0">
+            <name>Fuse Iraq</name>
+          </widget>
+          EOF
