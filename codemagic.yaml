@@ -39,17 +39,109 @@
           </widget>
           EOF
 
-      - name: Build iOS app
+          cat > ios/App/exportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build signed IPA
         script: |
           cd ios/App
-          set -o pipefail
+
           xcodebuild \
             -project App.xcodeproj \
             -scheme App \
             -configuration Release \
-            -sdk iphoneos \
-            CODE_SIGNING_ALLOWED=NO | tee ../../xcodebuild.log
+            -archivePath build/App.xcarchive \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist
 
     artifacts:
-      - /Users/builder/Library/Developer/Xcode/DerivedData/**/Build/Products/Release-iphoneos/*.app
+      - ios/App/build/ipa/*.ipa
+      - xcodebuild.logworkflows:
+  fuse-ios-build:
+    name: FUSE iOS Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20
+      xcode: latest
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+
+      - name: Build Next.js app
+        script: |
+          npm run build
+
+      - name: Prepare iOS files
+        script: |
+          rm -rf ios/App/App/public
+          mkdir -p ios/App/App/public
+          cp -R out/* ios/App/App/public/
+
+          cat > ios/App/App/capacitor.config.json <<'EOF'
+          {
+            "appId": "com.fuseiraq.app",
+            "appName": "Fuse Iraq",
+            "webDir": "public",
+            "packageClassList": []
+          }
+          EOF
+
+          cat > ios/App/App/config.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <widget id="com.fuseiraq.app" version="1.0.0">
+            <name>Fuse Iraq</name>
+          </widget>
+          EOF
+
+          cat > ios/App/exportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build signed IPA
+        script: |
+          cd ios/App
+
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/ipa \
+            -exportOptionsPlist exportOptions.plist
+
+    artifacts:
+      - ios/App/build/ipa/*.ipa
       - xcodebuild.log
