@@ -1,432 +1,717 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   addDoc,
   collection,
   doc,
   onSnapshot,
-  orderBy,
   query,
+  serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-type Driver = {
-  id: string;
+type OrderItem = {
+  name?: string;
+  title?: string;
+  qty?: number;
+  quantity?: number;
+  price?: number;
+};
+
+type OrderDoc = {
+  documentId: string;
+  orderId?: string;
+  customerName?: string;
+  customer?: string;
   name?: string;
   phone?: string;
-  status?: string;
-  latitude?: number;
-  longitude?: number;
-  accuracy?: number;
-  lastSeen?: number;
-  rating?: number;
-};
-
-type Order = {
-  id: string;
-  customerName?: string;
+  customerPhone?: string;
+  address?: string;
   restaurant?: string;
-  total?: number;
+  restaurantName?: string;
   status?: string;
+  total?: number;
+  amount?: number;
   driverId?: string;
   driverName?: string;
-  restaurantLat?: number;
-  restaurantLng?: number;
-  createdAt?: any;
+  driverPhone?: string;
+  createdAt?: unknown;
+  items?: OrderItem[];
 };
 
-const defaultRestaurantLocation = {
-  lat: 33.2965,
-  lng: 44.4445,
+type DriverDoc = {
+  documentId: string;
+  name?: string;
+  driverName?: string;
+  phone?: string;
+  driverPhone?: string;
+  status?: string;
+  online?: boolean;
+  available?: boolean;
+  rating?: number;
+  orders?: number;
+  completedOrders?: number;
+  area?: string;
 };
 
-function isOnline(driver: Driver) {
-  if (driver.status !== "متصل") return false;
-  if (!driver.lastSeen) return true;
-  return Date.now() - driver.lastSeen < 1000 * 60 * 3;
-}
+const fallbackDrivers: DriverDoc[] = [
+  {
+    documentId: "fallback-driver-1",
+    name: "kkkkkk",
+    phone: "07800000000",
+    status: "متصل",
+    online: true,
+    available: true,
+    rating: 4.8,
+    orders: 0,
+    area: "زيونة",
+  },
+];
 
-function hasGps(driver: Driver) {
-  return (
-    typeof driver.latitude === "number" &&
-    typeof driver.longitude === "number"
-  );
-}
+function toDate(value: unknown): Date | null {
+  try {
+    if (!value) return null;
 
-function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const r = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toDate" in value &&
+      typeof (value as { toDate?: unknown }).toDate === "function"
+    ) {
+      return (value as { toDate: () => Date }).toDate();
+    }
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    if (value instanceof Date) return value;
 
-  return r * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
-
-function dispatchScore(driver: Driver, distance: number) {
-  let score = 100;
-
-  score -= distance * 8;
-
-  if (driver.lastSeen) {
-    const minutes = (Date.now() - driver.lastSeen) / 1000 / 60;
-    score -= minutes * 3;
-  } else {
-    score -= 15;
+    const date = new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
   }
-
-  if (driver.accuracy && driver.accuracy > 50) score -= 8;
-  if (driver.accuracy && driver.accuracy > 100) score -= 12;
-
-  if (driver.rating) score += driver.rating * 2;
-
-  return Math.max(1, Math.min(100, Math.round(score)));
 }
 
-function formatMoney(value?: number) {
-  return `${Number(value || 0).toLocaleString("ar-IQ")} د.ع`;
-}
+function formatDate(value: unknown) {
+  const date = toDate(value);
 
-function formatTime(value?: number) {
-  if (!value) return "لا يوجد تحديث";
-  return new Date(value).toLocaleString("ar-IQ", {
+  if (!date) return "بدون وقت";
+
+  return date.toLocaleString("ar-IQ", {
     hour: "2-digit",
     minute: "2-digit",
     day: "2-digit",
     month: "2-digit",
+    year: "numeric",
   });
 }
 
+function getCustomer(order: OrderDoc) {
+  return order.customerName || order.customer || order.name || "زبون";
+}
+
+function getPhone(order: OrderDoc) {
+  return order.phone || order.customerPhone || "";
+}
+
+function getRestaurant(order: OrderDoc) {
+  return order.restaurant || order.restaurantName || "مطعم";
+}
+
+function getTotal(order: OrderDoc) {
+  return Number(order.total || order.amount || 0);
+}
+
+function normalizeStatus(status?: string) {
+  if (!status) return "جديد";
+  if (status === "جاهز") return "جاهز للتوصيل";
+  if (status === "ready") return "جاهز للتوصيل";
+  if (status === "ready_for_delivery") return "جاهز للتوصيل";
+  return status;
+}
+
+function isDeliveredOrClosed(order: OrderDoc) {
+  const status = normalizeStatus(order.status);
+  return status === "تم التسليم" || status === "مرفوض" || status === "ملغي";
+}
+
+function isAssigned(order: OrderDoc) {
+  const driverName = (order.driverName || "").trim();
+  const driverId = (order.driverId || "").trim();
+
+  return Boolean(driverId) || (Boolean(driverName) && driverName !== "غير محدد");
+}
+
+function canDispatch(order: OrderDoc) {
+  if (isDeliveredOrClosed(order)) return false;
+  if (isAssigned(order)) return false;
+
+  const status = normalizeStatus(order.status);
+
+  return (
+    status === "جاهز للتوصيل" ||
+    status === "جاهز" ||
+    status === "جديد" ||
+    status === "قيد التحضير"
+  );
+}
+
+function driverName(driver: DriverDoc) {
+  return driver.name || driver.driverName || "سائق";
+}
+
+function driverPhone(driver: DriverDoc) {
+  return driver.phone || driver.driverPhone || "";
+}
+
+function isDriverOnline(driver: DriverDoc) {
+  if (driver.online === true) return true;
+  if (driver.available === true) return true;
+  return driver.status === "متصل" || driver.status === "online";
+}
+
+function driverScore(driver: DriverDoc) {
+  const rating = Number(driver.rating || 4.5);
+  const completed = Number(driver.completedOrders || driver.orders || 0);
+  const onlineBoost = isDriverOnline(driver) ? 35 : 0;
+
+  return Math.round(rating * 10 + completed + onlineBoost);
+}
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background:
+      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
+    color: "white",
+    padding: "26px 16px",
+    fontFamily: "Arial, sans-serif",
+  },
+  shell: {
+    width: "100%",
+    maxWidth: 1220,
+    margin: "0 auto",
+  },
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    alignItems: "center",
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  nav: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  pill: {
+    border: "1px solid rgba(255,255,255,0.13)",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.05)",
+    padding: "11px 16px",
+    color: "rgba(255,255,255,0.82)",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 900,
+  },
+  activePill: {
+    border: "1px solid rgba(255,122,0,0.35)",
+    borderRadius: 999,
+    background: "#FF7A00",
+    padding: "11px 16px",
+    color: "#000",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  hero: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 34,
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.12))",
+    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+    padding: 22,
+    marginBottom: 16,
+  },
+  heroGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) repeat(4, minmax(130px, 0.22fr))",
+    gap: 12,
+    alignItems: "stretch",
+  },
+  card: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 28,
+    background: "rgba(0,0,0,0.36)",
+    padding: 20,
+  },
+  statCard: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 24,
+    background: "rgba(0,0,0,0.34)",
+    padding: 16,
+    minHeight: 118,
+  },
+  eyebrow: {
+    margin: 0,
+    color: "#FF7A00",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  title: {
+    margin: "8px 0 0",
+    fontSize: "clamp(38px, 6vw, 64px)",
+    lineHeight: 1.06,
+    fontWeight: 950,
+  },
+  orange: {
+    color: "#FF7A00",
+  },
+  muted: {
+    color: "rgba(255,255,255,0.60)",
+    lineHeight: 1.85,
+    fontSize: 14,
+  },
+  statLabel: {
+    margin: 0,
+    color: "rgba(255,255,255,0.54)",
+    fontSize: 13,
+    fontWeight: 850,
+  },
+  statValue: {
+    margin: "9px 0 0",
+    fontSize: 30,
+    fontWeight: 950,
+  },
+  layout: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(330px, 0.42fr)",
+    gap: 14,
+    alignItems: "start",
+  },
+  section: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 30,
+    background: "rgba(255,255,255,0.045)",
+    padding: 18,
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: 28,
+    fontWeight: 950,
+  },
+  select: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    background: "#070707",
+    color: "white",
+    padding: "14px 15px",
+    outline: "none",
+    fontSize: 14,
+    marginTop: 14,
+  },
+  orderBox: {
+    border: "1px solid rgba(255,122,0,0.24)",
+    borderRadius: 24,
+    background: "rgba(255,122,0,0.08)",
+    padding: 16,
+    marginTop: 14,
+  },
+  driverCard: {
+    border: "1px solid rgba(255,122,0,0.38)",
+    borderRadius: 26,
+    background:
+      "linear-gradient(135deg, rgba(0,0,0,0.38), rgba(255,122,0,0.08))",
+    padding: 16,
+  },
+  driverGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: 10,
+    marginTop: 14,
+  },
+  miniBox: {
+    border: "1px solid rgba(255,255,255,0.09)",
+    borderRadius: 18,
+    background: "rgba(255,255,255,0.04)",
+    padding: 12,
+  },
+  badge: {
+    display: "inline-flex",
+    border: "1px solid rgba(34,197,94,0.42)",
+    borderRadius: 999,
+    background: "rgba(34,197,94,0.12)",
+    color: "#86EFAC",
+    padding: "7px 11px",
+    fontSize: 12,
+    fontWeight: 950,
+  },
+  offlineBadge: {
+    display: "inline-flex",
+    border: "1px solid rgba(239,68,68,0.42)",
+    borderRadius: 999,
+    background: "rgba(239,68,68,0.12)",
+    color: "#FCA5A5",
+    padding: "7px 11px",
+    fontSize: 12,
+    fontWeight: 950,
+  },
+  mainButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: 18,
+    background: "#FF7A00",
+    color: "#000",
+    padding: "15px 16px",
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 950,
+    marginTop: 14,
+  },
+  disabledButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: 18,
+    background: "rgba(255,255,255,0.09)",
+    color: "rgba(255,255,255,0.38)",
+    padding: "15px 16px",
+    fontSize: 14,
+    fontWeight: 950,
+    marginTop: 14,
+  },
+  messageOk: {
+    border: "1px solid rgba(34,197,94,0.30)",
+    borderRadius: 18,
+    background: "rgba(34,197,94,0.10)",
+    color: "#86EFAC",
+    padding: 14,
+    marginTop: 14,
+    fontSize: 14,
+    fontWeight: 900,
+  },
+};
+
 export default function AutoDispatchPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [orders, setOrders] = useState<OrderDoc[]>([]);
+  const [drivers, setDrivers] = useState<DriverDoc[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [isAssigning, setIsAssigning] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState("");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const unsubscribeOrders = onSnapshot(
+      query(collection(db, "orders")),
+      (snapshot) => {
+        const data = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<OrderDoc, "documentId">),
+          documentId: item.id,
+        }));
 
-    const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      })) as Order[];
+        data.sort((a, b) => {
+          const ad = toDate(a.createdAt)?.getTime() || 0;
+          const bd = toDate(b.createdAt)?.getTime() || 0;
+          return bd - ad;
+        });
 
-      setOrders(data);
+        setOrders(data);
+      },
+      () => setOrders([])
+    );
 
-      const firstReady = data.find(
-        (order) =>
-          (order.status === "جاهز" || order.status === "جاهز للتوصيل") &&
-          !order.driverId
-      );
+    const unsubscribeDrivers = onSnapshot(
+      query(collection(db, "drivers")),
+      (snapshot) => {
+        const data = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<DriverDoc, "documentId">),
+          documentId: item.id,
+        }));
 
-      if (!selectedOrderId && firstReady) {
-        setSelectedOrderId(firstReady.id);
-      }
-    });
+        setDrivers(data);
+      },
+      () => setDrivers([])
+    );
 
-    return () => unsub();
-  }, [selectedOrderId]);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "driversStatus"), (snapshot) => {
-      const data = snapshot.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      })) as Driver[];
-
-      setDrivers(data);
-    });
-
-    return () => unsub();
+    return () => {
+      unsubscribeOrders();
+      unsubscribeDrivers();
+    };
   }, []);
 
-  const readyOrders = orders.filter(
-    (order) =>
-      (order.status === "جاهز" || order.status === "جاهز للتوصيل") &&
-      !order.driverId
-  );
+  const dispatchOrders = useMemo(() => orders.filter((order) => !isDeliveredOrClosed(order)), [orders]);
+  const activeDrivers = useMemo(() => {
+    const source = drivers.length ? drivers : fallbackDrivers;
+    return source.sort((a, b) => driverScore(b) - driverScore(a));
+  }, [drivers]);
 
-  const selectedOrder =
-    readyOrders.find((order) => order.id === selectedOrderId) || readyOrders[0];
+  const selectedOrder = useMemo(() => {
+    return dispatchOrders.find((order) => order.documentId === selectedOrderId) || dispatchOrders[0] || null;
+  }, [dispatchOrders, selectedOrderId]);
 
-  const rankedDrivers = useMemo(() => {
-    if (!selectedOrder) return [];
+  const bestDriver = activeDrivers[0] || null;
+  const selectedDriver =
+    activeDrivers.find((driver) => driver.documentId === selectedDriverId) || bestDriver;
 
-    const restaurantLat =
-      selectedOrder.restaurantLat || defaultRestaurantLocation.lat;
-    const restaurantLng =
-      selectedOrder.restaurantLng || defaultRestaurantLocation.lng;
+  useEffect(() => {
+    if (!selectedOrderId && dispatchOrders[0]) {
+      setSelectedOrderId(dispatchOrders[0].documentId);
+    }
+  }, [dispatchOrders, selectedOrderId]);
 
-    return drivers
-      .filter((driver) => isOnline(driver) && hasGps(driver))
-      .map((driver) => {
-        const distance = distanceKm(
-          restaurantLat,
-          restaurantLng,
-          Number(driver.latitude),
-          Number(driver.longitude)
-        );
+  useEffect(() => {
+    if (!selectedDriverId && activeDrivers[0]) {
+      setSelectedDriverId(activeDrivers[0].documentId);
+    }
+  }, [activeDrivers, selectedDriverId]);
 
-        return {
-          ...driver,
-          distance,
-          score: dispatchScore(driver, distance),
-          eta: Math.max(4, Math.round(distance * 5 + 3)),
-        };
-      })
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return a.distance - b.distance;
-      });
-  }, [drivers, selectedOrder]);
+  async function assignOrder(driver: DriverDoc | null) {
+    setMessage("");
 
-  const bestDriver = rankedDrivers[0];
-
-  async function assignBestDriver() {
-    if (!selectedOrder || !bestDriver) {
-      alert("لا يوجد طلب جاهز أو سائق مناسب حالياً");
+    if (!selectedOrder) {
+      setMessage("ماكو طلب جاهز للتوزيع.");
       return;
     }
 
-    setIsAssigning(true);
+    if (!driver) {
+      setMessage("ماكو سائق متاح.");
+      return;
+    }
+
+    setSaving(true);
 
     try {
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        status: "تم تعيين سائق",
-        driverId: bestDriver.id,
-        driverName: bestDriver.name || bestDriver.id,
-        driverPhone: bestDriver.phone || "",
-        assignedAt: Date.now(),
-        dispatchScore: bestDriver.score,
-        dispatchDistanceKm: Number(bestDriver.distance.toFixed(2)),
+      const dName = driverName(driver);
+      const dPhone = driverPhone(driver);
+
+      await updateDoc(doc(db, "orders", selectedOrder.documentId), {
+        status: "قيد التوصيل",
+        driverId: driver.documentId,
+        driverName: dName,
+        driverPhone: dPhone,
+        assignedDriverName: dName,assignedDriverPhone: dPhone,
+        assignedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       await addDoc(collection(db, "notifications"), {
-        title: "🛵 طلب جديد قريب منك",
-        body: `تم تعيين طلب من ${selectedOrder.restaurant || "مطعم"} إلى ${
-          bestDriver.name || bestDriver.id
-        }`,
-        type: "driver",
-        target: "driver",
-        driverId: bestDriver.id,
-        orderId: selectedOrder.id,
-        isRead: false,
-        createdAt: Date.now(),
+        type: "dispatch",
+        title: "تم ربط الطلب بسائق",
+        message: `تم ربط طلب ${getCustomer(selectedOrder)} مع السائق ${dName}.`,
+        orderId: selectedOrder.orderId || selectedOrder.documentId,
+        restaurant: getRestaurant(selectedOrder),
+        driverName: dName,
+        driverPhone: dPhone,
+        read: false,
+        createdAt: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "notifications"), {
-        title: "🤖 Auto Dispatch",
-        body: `تم تعيين السائق ${
-          bestDriver.name || bestDriver.id
-        } للطلب ${selectedOrder.id} تلقائياً.`,
-        type: "ai",
-        target: "admin",
-        orderId: selectedOrder.id,
-        isRead: false,
-        createdAt: Date.now(),
-      });
-
-      alert("تم توزيع الطلب تلقائياً بنجاح");
+      setMessage(`تم ربط طلب ${getCustomer(selectedOrder)} مع السائق ${dName}.`);
     } catch (error) {
-      console.error(error);
-      alert("صار خطأ أثناء توزيع الطلب");
+      setMessage(error instanceof Error ? error.message : "تعذر ربط الطلب بالسائق.");
     } finally {
-      setIsAssigning(false);
+      setSaving(false);
     }
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-slate-950 text-white p-6">
-      <div className="max-w-7xl mx-auto">
+    <main dir="rtl" style={styles.page}>
+      <section style={styles.shell}>
+        <header style={styles.topBar}>
+          <nav style={styles.nav}>
+            <Link href="/" style={styles.pill}>
+              الرئيسية
+            </Link>
+            <Link href="/driver-app" style={styles.pill}>
+              تطبيق السائق
+            </Link>
+            <Link href="/drivers-admin" style={styles.pill}>
+              إدارة السائقين
+            </Link>
+            <Link href="/restaurant-admin" style={styles.pill}>
+              لوحة المطعم
+            </Link>
+            <Link href="/live-orders" style={styles.pill}>
+              الطلبات المباشرة
+            </Link>
+          </nav>
 
-        <div className="text-center">
-          <h1 className="text-5xl md:text-6xl font-black text-yellow-400">
-            🛵 Auto Dispatch AI
-          </h1>
+          <Link href="/fuse-admin" style={styles.activePill}>
+            لوحة الإدارة
+          </Link>
+        </header>
 
-          <p className="text-slate-400 mt-3 text-lg">
-            توزيع الطلبات تلقائياً على أفضل سائق حسب GPS والذكاء التشغيلي
-          </p>
-        </div>
+        <section style={styles.hero}>
+          <div style={styles.heroGrid}>
+            <div style={styles.card}>
+              <p style={styles.eyebrow}>التوزيع التلقائي</p>
+              <h1 style={styles.title}>
+                فيوز يختار
+                <br />
+                <span style={styles.orange}>أفضل سائق</span>
+              </h1>
+              <p style={styles.muted}>
+                يعرض كل الطلبات النشطة، حتى سمير والطلبات المربوطة سابقاً، وتكدر تربطها أو تعيد ربطها بالسائق.
+              </p>
+            </div>
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-5">
-          <Stat title="طلبات جاهزة" value={readyOrders.length} color="text-yellow-400" />
-          <Stat title="سائقين متاحين" value={rankedDrivers.length} color="text-green-400" />
-          <Stat title="أفضل Score" value={bestDriver ? `${bestDriver.score}/100` : "0"} color="text-purple-400" />
-          <Stat title="أقرب مسافة" value={bestDriver ? `${bestDriver.distance.toFixed(2)} كم` : "لا يوجد"} color="text-cyan-400" />
-        </div>
+            <div style={styles.statCard}>
+              <p style={styles.statLabel}>طلبات تحتاج سائق</p>
+              <p style={{ ...styles.statValue, color: "#FFB56B" }}>{dispatchOrders.length}</p>
+              <p style={styles.muted}>نشطة</p>
+            </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div style={styles.statCard}>
+              <p style={styles.statLabel}>سائقين</p>
+              <p style={{ ...styles.statValue, color: "#86EFAC" }}>{activeDrivers.length}</p>
+              <p style={styles.muted}>متاحين بالنظام</p>
+            </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
-            <h2 className="text-3xl font-black text-yellow-400">
-              📦 الطلبات الجاهزة
-            </h2>
+            <div style={styles.statCard}>
+              <p style={styles.statLabel}>نشطة</p>
+              <p style={{ ...styles.statValue, color: "#7DD3FC" }}>
+                {orders.filter((order) => !isDeliveredOrClosed(order)).length}
+              </p>
+              <p style={styles.muted}>داخل التشغيل</p>
+            </div>
 
-            <div className="mt-6 space-y-4">
-              {readyOrders.length === 0 ? (
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center text-slate-400">
-                  لا توجد طلبات جاهزة للتوزيع
-                </div>
-              ) : (
-                readyOrders.map((order) => (
-                  <button
-                    key={order.id}
-                    onClick={() => setSelectedOrderId(order.id)}
-                    className={`w-full text-right rounded-2xl border p-5 duration-300 ${
-                      selectedOrder?.id === order.id
-                        ? "bg-yellow-400 text-black border-yellow-300"
-                        : "bg-slate-950 text-white border-slate-800 hover:border-yellow-400"
-                    }`}
-                  >
-                    <h3 className="text-xl font-black">#{order.id}</h3>
-                    <p className="mt-2">
-                      🍽️ {order.restaurant || "مطعم"} — 👤{" "}
-                      {order.customerName || "زبون"}
-                    </p>
-                    <p className="mt-2 font-black">
-                      💰 {formatMoney(order.total)}
-                    </p>
-                  </button>
-                ))
-              )}
+            <div style={styles.statCard}>
+              <p style={styles.statLabel}>الأفضل</p>
+              <p style={{ ...styles.statValue, color: "#D8B4FE" }}>
+                {bestDriver ? driverScore(bestDriver) : "--"}
+              </p>
+              <p style={styles.muted}>Score</p>
             </div>
           </div>
+        </section>
 
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6">
-            <h2 className="text-3xl font-black text-green-400">
-              🚗 السائق الأفضل
-            </h2>
+        <section style={styles.layout}>
+          <section style={styles.section}>
+            <h2 style={styles.sectionTitle}>السائقين المتصلين</h2>
 
-            {!selectedOrder ? (
-              <div className="mt-6 bg-slate-950 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
-                اختر طلب جاهز حتى يظهر أفضل سائق
-              </div>
-            ) : bestDriver ? (
-              <div className="mt-6 bg-yellow-400 rounded-3xl p-8 text-black text-center">
-                <p className="font-black opacity-80">
-                  الطلب المختار: #{selectedOrder.id}
-                </p>
-
-                <h3 className="mt-3 text-5xl font-black">
-                  {bestDriver.name || bestDriver.id}
-                </h3>
-
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Mini label="المسافة" value={`${bestDriver.distance.toFixed(2)} كم`} />
-                  <Mini label="الوصول" value={`${bestDriver.eta} دقيقة`} />
-                  <Mini label="AI Score" value={`${bestDriver.score}/100`} />
-                  <Mini label="التقييم" value={`⭐ ${bestDriver.rating || 0}`} />
-                </div>
-
-                <p className="mt-5">
-                  🎯 دقة GPS:{" "}
-                  {bestDriver.accuracy
-                    ? `${Math.round(bestDriver.accuracy)} متر`
-                    : "غير محددة"}
-                </p>
-
-                <p className="mt-2">
-                  🕒 آخر تحديث: {formatTime(bestDriver.lastSeen)}
-                </p>
-
-                <button
-                  onClick={assignBestDriver}
-                  disabled={isAssigning}
-                  className="mt-6 w-full rounded-2xl bg-black py-5 text-xl font-black text-white disabled:opacity-50"
-                >
-                  {isAssigning ? "جاري التوزيع..." : "🤖 وزّع الطلب تلقائياً"}
-                </button>
-              </div>
-            ) : (
-              <div className="mt-6 bg-red-500/15 border border-red-500/30 rounded-2xl p-8 text-center text-red-300 font-black">
-                لا يوجد سائق متصل مع GPS حالياً
-              </div>
-            )}
-          </div>
-
-        </div>
-
-        <div className="mt-8 bg-slate-900 border border-slate-800 rounded-3xl p-6">
-          <h2 className="text-3xl font-black text-purple-400">
-            ⚡ ترتيب السائقين
-          </h2>
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {rankedDrivers.length === 0 ? (
-              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 text-center text-slate-400 md:col-span-2">
-                لا توجد بيانات سائقين حالياً
-              </div>
-            ) : (
-              rankedDrivers.slice(0, 10).map((driver, index) => (
-                <div
-                  key={driver.id}
-                  className="bg-slate-950 border border-slate-800 rounded-2xl p-5"
-                >
-                  <div className="flex justify-between gap-4">
-                    <h3 className="text-xl font-black">
-                      #{index + 1} {driver.name || driver.id}
+            {activeDrivers.map((driver) => (
+              <article key={driver.documentId} style={{ ...styles.driverCard, marginTop: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 24, fontWeight: 950 }}>
+                      {driverName(driver)}
                     </h3>
-
-                    <span className="text-yellow-400 font-black">
-                      {driver.score}/100
-                    </span>
+                    <p style={{ ...styles.muted, margin: "8px 0 0", direction: "ltr" }}>
+                      {driverPhone(driver) || "بدون رقم"}
+                    </p>
                   </div>
 
-                  <p className="mt-3 text-slate-300">
-                    📍 {driver.distance.toFixed(2)} كم — ⏱️ {driver.eta} دقيقة
-                  </p>
-
-                  <p className="mt-2 text-slate-400">
-                    🕒 {formatTime(driver.lastSeen)}
-                  </p>
+                  <span style={isDriverOnline(driver) ? styles.badge : styles.offlineBadge}>
+                    {isDriverOnline(driver) ? "متصل" : "غير متصل"}
+                  </span>
                 </div>
-              ))
+
+                <div style={styles.driverGrid}>
+                  <div style={styles.miniBox}>
+                    <p style={styles.statLabel}>Score</p>
+                    <p style={styles.statValue}>{driverScore(driver)}</p>
+                  </div>
+
+                  <div style={styles.miniBox}>
+                    <p style={styles.statLabel}>طلبات</p>
+                    <p style={styles.statValue}>{Number(driver.orders || driver.completedOrders || 0)}</p>
+                  </div>
+
+                  <div style={styles.miniBox}>
+                    <p style={styles.statLabel}>تقييم</p>
+                    <p style={styles.statValue}>{Number(driver.rating || 4.5).toFixed(1)}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => assignOrder(driver)}
+                  disabled={saving || !selectedOrder}
+                  style={saving || !selectedOrder ? styles.disabledButton : styles.mainButton}
+                >
+                  ربط هذا السائق
+                </button>
+              </article>
+            ))}
+          </section>
+
+          <aside style={styles.section}>
+            <h2 style={styles.sectionTitle}>الطلب المراد توزيعه</h2>
+
+            <select
+              value={selectedOrder?.documentId || ""}
+              onChange={(event) => setSelectedOrderId(event.target.value)}
+              style={styles.select}
+            >
+              {dispatchOrders.length === 0 ? (
+                <option value="">لا توجد طلبات تحتاج سائق</option>
+              ) : (
+                dispatchOrders.map((order) => (
+                  <option key={order.documentId} value={order.documentId}>
+                    {getCustomer(order)} — {getRestaurant(order)} — {getTotal(order).toLocaleString()} د.ع — {order.orderId || order.documentId}
+                  </option>
+                ))
+              )}
+            </select>
+
+            {selectedOrder ? (
+              <div style={styles.orderBox}>
+                <p style={styles.statLabel}>الطلب المختار</p>
+                <h3 style={{ margin: "10px 0 0", fontSize: 26, fontWeight: 950 }}>
+                  {getCustomer(selectedOrder)}
+                </h3>
+
+                <p style={styles.muted}>
+                  {getRestaurant(selectedOrder)} — {formatDate(selectedOrder.createdAt)}
+                </p>
+
+                <p style={{ ...styles.muted, direction: "ltr" }}>
+                  {getPhone(selectedOrder)}
+                </p>
+
+                <p style={{ margin: "12px 0 0", color: "#FFB56B", fontSize: 24, fontWeight: 950 }}>
+                  {getTotal(selectedOrder).toLocaleString()} د.ع
+                </p>
+
+                <p style={styles.muted}>
+                  الحالة الحالية: {normalizeStatus(selectedOrder.status)}
+                </p>
+              </div>
+            ) : (
+              <div style={styles.orderBox}>
+                <h3 style={{ margin: 0 }}>ماكو طلب جاهز للتوزيع</h3>
+                <p style={styles.muted}>
+                  حول الطلب من لوحة المطعم إلى جاهز للتوصيل حتى يظهر هنا.
+                </p>
+              </div>
             )}
-          </div>
-        </div>
 
-      </div>
+            <select
+              value={selectedDriver?.documentId || ""}
+              onChange={(event) => setSelectedDriverId(event.target.value)}
+              style={styles.select}
+            >
+              {activeDrivers.map((driver) => (
+                <option key={driver.documentId} value={driver.documentId}>
+                  {driverName(driver)} — Score {driverScore(driver)}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => assignOrder(selectedDriver || bestDriver)}
+              disabled={saving || !selectedOrder || !selectedDriver}
+              style={saving || !selectedOrder || !selectedDriver ? styles.disabledButton : styles.mainButton}
+            >
+              {saving ? "جاري الربط..." : "توزيع تلقائي على الأفضل"}
+            </button>
+
+            {message ? <div style={styles.messageOk}>{message}</div> : null}
+          </aside>
+        </section>
+      </section>
     </main>
-  );
-}
-
-function Stat({
-  title,
-  value,
-  color,
-}: {
-  title: string;
-  value: string | number;
-  color: string;
-}) {
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 text-center">
-      <p className="text-slate-400 text-sm">{title}</p>
-      <p className={`mt-3 text-2xl font-black ${color}`}>{value}</p>
-    </div>
-  );
-}
-
-function Mini({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="bg-black/10 rounded-2xl p-4">
-      <p className="text-sm opacity-70">{label}</p>
-      <p className="mt-2 font-black">{value}</p>
-    </div>
   );
 }

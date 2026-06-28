@@ -191,7 +191,7 @@ function Card({
       <p
         style={{
           margin: 0,
-          color: "#a1a1aa",
+          color: "#0909b9",
           fontWeight: 800,
         }}
       >
@@ -201,7 +201,7 @@ function Card({
       <p
         style={{
           marginTop: 10,
-          color: "#ffb347",
+          color: "#e8af5f",
           fontSize: 28,
           fontWeight: 950,
         }}

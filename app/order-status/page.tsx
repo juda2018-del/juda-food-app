@@ -1,380 +1,560 @@
-"use client";
+﻿"use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { collection, onSnapshot, query } from "firebase/firestore";
+import { db } from "../firebase";
 
-type OrderStatus =
-  | "جديد"
-  | "قيد التحضير"
-  | "جاهز للتوصيل"
-  | "السائق استلم الطلب"
-  | "السائق بالطريق"
-  | "تم التسليم";
-
-type Step = {
-  title: OrderStatus;
-  icon: string;
-  desc: string;
+type OrderItem = {
+  name?: string;
+  title?: string;
+  qty?: number;
+  quantity?: number;
+  price?: number;
 };
 
-const steps: Step[] = [
-  { title: "جديد", icon: "🧾", desc: "تم استلام طلبك بنجاح" },
-  { title: "قيد التحضير", icon: "👨‍🍳", desc: "المطعم يحضر الطلب" },
-  { title: "جاهز للتوصيل", icon: "✅", desc: "الطلب جاهز وينتظر السائق" },
-  { title: "السائق استلم الطلب", icon: "🛵", desc: "السائق استلم الطلب من المطعم" },
-  { title: "السائق بالطريق", icon: "📍", desc: "السائق قريب منك" },
-  { title: "تم التسليم", icon: "🎉", desc: "تم تسليم الطلب بنجاح" },
-];
+type OrderDoc = {
+  documentId: string;
+  orderId?: string;
+  customerName?: string;
+  customer?: string;
+  name?: string;
+  phone?: string;
+  customerPhone?: string;
+  address?: string;
+  restaurant?: string;
+  restaurantName?: string;
+  total?: number;
+  amount?: number;
+  subtotal?: number;
+  deliveryFee?: number;
+  status?: string;
+  driverName?: string;
+  driverPhone?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
+  createdAt?: unknown;
+  items?: OrderItem[];
+};
+
+function toDate(value: unknown): Date | null {
+  try {
+    if (!value) return null;
+
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toDate" in value &&
+      typeof (value as { toDate?: unknown }).toDate === "function"
+    ) {
+      return (value as { toDate: () => Date }).toDate();
+    }
+
+    if (value instanceof Date) return value;
+
+    const date = new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+function formatDate(value: unknown) {
+  const date = toDate(value);
+
+  if (!date) return "بدون وقت";
+
+  return date.toLocaleString("ar-IQ", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function normalizeDigits(value: string) {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+}
+
+function cleanSearch(value: string) {
+  return normalizeDigits(value).replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function normalizeStatus(status?: string) {
+  if (!status) return "جديد";
+  if (status === "جاهز") return "جاهز للتوصيل";
+  if (status === "السائق استلم") return "قيد التوصيل";
+  return status;
+}
+
+function getCustomer(order: OrderDoc) {
+  return order.customerName || order.customer || order.name || "زبون";
+}
+
+function getPhone(order: OrderDoc) {
+  return order.phone || order.customerPhone || "";
+}
+
+function getRestaurant(order: OrderDoc) {
+  return order.restaurant || order.restaurantName || "مطعم";
+}
+
+function getDriverName(order: OrderDoc) {
+  const assigned = (order.assignedDriverName || "").trim();
+  const direct = (order.driverName || "").trim();
+  const phone = (order.assignedDriverPhone || order.driverPhone || "").trim();
+
+  if (assigned) return assigned;
+  if (direct && direct !== "FUSE إدارة" && direct !== "إدارة FUSE") return direct;
+  if (phone === "07800000000") return "kkkkkk";
+
+  return "غير محدد";
+}
+
+function getTotal(order: OrderDoc) {
+  return Number(order.total || order.amount || 0);
+}
+
+function statusIndex(status?: string) {
+  const clean = normalizeStatus(status);
+  const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
+  const index = steps.indexOf(clean);
+  return index === -1 ? 0 : index;
+}
+
+function statusColor(status?: string) {
+  const clean = normalizeStatus(status);
+
+  if (clean === "تم التسليم") return "#86EFAC";
+  if (clean === "قيد التوصيل") return "#D8B4FE";
+  if (clean === "جاهز للتوصيل") return "#7DD3FC";
+  if (clean === "قيد التحضير") return "#FDE68A";
+  if (clean === "مرفوض") return "#FCA5A5";
+
+  return "#FFB56B";
+}
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background:
+      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
+    color: "white",
+    padding: "26px 16px",
+    fontFamily: "Arial, sans-serif",
+  },
+  shell: {
+    width: "100%",
+    maxWidth: 1120,
+    margin: "0 auto",
+  },
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  nav: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  pill: {
+    border: "1px solid rgba(255,255,255,0.13)",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.05)",
+    padding: "11px 16px",
+    color: "rgba(255,255,255,0.82)",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 900,
+  },
+  activePill: {
+    border: "1px solid rgba(255,122,0,0.35)",
+    borderRadius: 999,
+    background: "#FF7A00",
+    padding: "11px 16px",
+    color: "#000",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  hero: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 34,
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.12))",
+    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+    padding: 22,
+    marginBottom: 16,
+  },
+  heroGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(240px, 0.36fr)",
+    gap: 14,
+    alignItems: "stretch",
+  },
+  card: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 28,
+    background: "rgba(0,0,0,0.36)",
+    padding: 20,
+  },
+  eyebrow: {
+    margin: 0,
+    color: "#FF7A00",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  title: {
+    margin: "8px 0 0",
+    fontSize: "clamp(38px, 6vw, 68px)",
+    lineHeight: 1.06,
+    fontWeight: 950,
+  },
+  orange: {
+    color: "#FF7A00",
+  },
+  muted: {
+    color: "rgba(255,255,255,0.60)",
+    lineHeight: 1.85,
+    fontSize: 14,
+  },
+  statusLive: {
+    margin: "8px 0 0",
+    fontSize: 34,
+    fontWeight: 950,
+  },
+  searchBox: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 28,
+    background: "rgba(255,255,255,0.045)",
+    padding: 18,
+    marginBottom: 16,
+  },
+  input: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    background: "#070707",
+    color: "white",
+    padding: "15px 16px",
+    outline: "none",
+    fontSize: 15,
+  },
+  layout: {
+    display: "grid",
+    gap: 14,
+  },
+  orderCard: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 30,
+    background:
+      "linear-gradient(135deg, rgba(255,122,0,0.09), rgba(255,255,255,0.035))",
+    padding: 20,
+  },
+  orderTop: {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 0.4fr) minmax(0, 1fr)",
+    gap: 12,
+    alignItems: "stretch",
+  },
+  totalBox: {
+    border: "1px solid rgba(255,122,0,0.30)",
+    borderRadius: 24,
+    background: "rgba(255,122,0,0.10)",
+    padding: 18,
+  },
+  total: {
+    margin: "8px 0 0",
+    color: "#FF7A00",
+    fontSize: 34,
+    fontWeight: 950,
+  },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+    gap: 10,
+  },
+  miniBox: {
+    border: "1px solid rgba(255,255,255,0.09)",
+    borderRadius: 18,
+    background: "rgba(0,0,0,0.26)",
+    padding: 12,
+  },
+  label: {
+    margin: 0,
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 12,
+    fontWeight: 850,
+  },
+  value: {
+    margin: "8px 0 0",
+    color: "white",
+    fontSize: 16,
+    fontWeight: 950,
+  },
+  progress: {
+    display: "grid",
+    gridTemplateColumns: "repeat(5, 1fr)",
+    gap: 8,
+    marginTop: 18,
+  },
+  step: {
+    minHeight: 8,
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.13)",
+  },
+  stepActive: {
+    minHeight: 8,
+    borderRadius: 999,
+    background: "#FF7A00",
+  },
+  stepLabels: {
+    display: "grid",
+    gridTemplateColumns: "repeat(5, 1fr)",
+    gap: 8,
+    marginTop: 8,
+  },
+  stepText: {
+    textAlign: "center",
+    color: "rgba(255,255,255,0.58)",
+    fontSize: 11,
+    fontWeight: 850,
+  },
+  details: {
+    border: "1px solid rgba(255,255,255,0.09)",
+    borderRadius: 22,
+    background: "rgba(0,0,0,0.26)",
+    padding: 16,
+    marginTop: 16,
+  },
+  itemRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    borderBottom: "1px solid rgba(255,255,255,0.08)",
+    padding: "10px 0",
+    color: "rgba(255,255,255,0.76)",
+  },
+  empty: {
+    border: "1px dashed rgba(255,255,255,0.16)",
+    borderRadius: 24,
+    background: "rgba(255,255,255,0.035)",
+    padding: 26,
+    textAlign: "center",
+  },
+};
 
 export default function OrderStatusPage() {
-  const [status] = useState<OrderStatus>("السائق بالطريق");
+  const [orders, setOrders] = useState<OrderDoc[]>([]);
+  const [search, setSearch] = useState("");
+  const [loadedFromUrl, setLoadedFromUrl] = useState(false);
 
-  const activeIndex = useMemo(
-    () => steps.findIndex((step) => step.title === status),
-    [status]
-  );
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromPhone = params.get("phone") || "";
+    const fromOrder = params.get("orderId") || params.get("order") || "";
+    const value = fromPhone || fromOrder;
 
-  const progressPercent = Math.round(((activeIndex + 1) / steps.length) * 100);
+    if (value) setSearch(value);
+
+    setLoadedFromUrl(true);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      query(collection(db, "orders")),
+      (snapshot) => {
+        const data = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<OrderDoc, "documentId">),
+          documentId: item.id,
+        }));
+
+        data.sort((a, b) => {
+          const ad = toDate(a.createdAt)?.getTime() || 0;
+          const bd = toDate(b.createdAt)?.getTime() || 0;
+          return bd - ad;
+        });
+
+        setOrders(data);
+      },
+      () => setOrders([])
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const matches = useMemo(() => {
+    const clean = cleanSearch(search);
+
+    if (!clean) return [];
+
+    return orders.filter((order) => {
+      const phone = cleanSearch(getPhone(order));
+      const orderId = cleanSearch(order.orderId || "");
+      const customer = cleanSearch(getCustomer(order));
+
+      return phone.includes(clean) || clean.includes(phone) || orderId.includes(clean) || customer.includes(clean);
+    });
+  }, [orders, search]);
+
+  const current = matches[0] || null;
+  const currentIndex = statusIndex(current?.status);
+  const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
+    <main dir="rtl" style={styles.page}>
+      <section style={styles.shell}>
+        <header style={styles.topBar}>
+          <Link href="/" style={styles.pill}>
+            الرئيسية
+          </Link>
 
-        * { box-sizing: border-box; }
-
-        body {
-          margin: 0;
-          font-family: "Cairo", sans-serif;
-          background: #efe8df;
-        }
-
-        .app {
-          width: 100%;
-          max-width: 430px;
-          min-height: 100vh;
-          margin: 0 auto;
-          direction: rtl;
-          padding: 18px 18px 32px;
-          background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
-          color: #151515;
-        }
-
-        .top {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 22px;
-        }
-
-        .back {
-          width: 44px;
-          height: 44px;
-          border-radius: 16px;
-          background: white;
-          color: #151515;
-          text-decoration: none;
-          display: grid;
-          place-items: center;
-          font-size: 26px;
-          font-weight: 900;
-          box-shadow: 0 12px 28px rgba(0,0,0,.07);
-        }
-
-        .title {
-          text-align: center;
-        }
-
-        .title h1 {
-          margin: 0;
-          font-size: 28px;
-          font-weight: 900;
-        }
-
-        .title p {
-          margin: 4px 0 0;
-          color: #888;
-          font-size: 13px;
-          font-weight: 800;
-        }
-
-        .card {
-          background: white;
-          border-radius: 28px;
-          padding: 18px;
-          box-shadow: 0 14px 34px rgba(0,0,0,.07);
-          margin-bottom: 16px;
-        }
-
-        .order-head {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .muted {
-          color: #888;
-          font-size: 12px;
-          font-weight: 800;
-        }
-
-        .order-id {
-          margin: 4px 0 0;
-          font-size: 22px;
-          font-weight: 900;
-        }
-
-        .badge {
-          background: #ff4d00;
-          color: white;
-          padding: 10px 14px;
-          border-radius: 999px;
-          font-size: 12px;
-          font-weight: 900;
-          box-shadow: 0 12px 26px rgba(255,77,0,.22);
-        }
-
-        .progress-wrap {
-          margin-top: 22px;
-        }
-
-        .progress-text {
-          display: flex;
-          justify-content: space-between;
-          color: #777;
-          font-size: 12px;
-          font-weight: 900;
-          margin-bottom: 8px;
-        }
-
-        .progress {
-          height: 12px;
-          background: #f1e9e0;
-          border-radius: 99px;
-          overflow: hidden;
-        }
-
-        .bar {
-          height: 100%;
-          background: linear-gradient(90deg, #ff4d00, #ff8a00);
-          border-radius: 99px;
-          transition: .4s;
-        }
-
-        .steps {
-          margin-top: 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .step {
-          display: grid;
-          grid-template-columns: 52px 1fr;
-          gap: 12px;
-          padding: 13px;
-          border-radius: 22px;
-          background: #f8f3ee;
-          border: 1px solid transparent;
-        }
-
-        .step.done {
-          background: #fff3e9;
-        }
-
-        .step.active {
-          background: #151515;
-          color: white;
-          border-color: #ff4d00;
-          box-shadow: 0 14px 30px rgba(0,0,0,.16);
-        }
-
-        .icon {
-          width: 52px;
-          height: 52px;
-          border-radius: 18px;
-          background: white;
-          display: grid;
-          place-items: center;
-          font-size: 24px;
-          box-shadow: 0 10px 22px rgba(0,0,0,.06);
-        }
-
-        .step.active .icon {
-          background: #ff4d00;
-        }
-
-        .step h3 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 900;
-        }
-
-        .step p {
-          margin: 4px 0 0;
-          color: #777;
-          font-size: 12px;
-          font-weight: 800;
-        }
-
-        .step.active p {
-          color: #ddd;
-        }
-
-        .driver-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 12px;
-        }
-
-        .info {
-          background: #f8f3ee;
-          border-radius: 20px;
-          padding: 13px;
-        }
-
-        .info h3 {
-          margin: 4px 0 0;
-          font-size: 16px;
-          font-weight: 900;
-        }
-
-        .actions {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 12px;
-        }
-
-        .action {
-          text-decoration: none;
-          text-align: center;
-          border-radius: 18px;
-          padding: 13px;
-          font-weight: 900;
-          color: white;
-        }
-
-        .call { background: #151515; }
-        .whatsapp { background: #ff4d00; }
-
-        .map {
-          height: 190px;
-          border-radius: 24px;
-          background:
-            radial-gradient(circle at 40% 45%, rgba(255,77,0,.18), transparent 24%),
-            linear-gradient(135deg, #f8f3ee, #ffffff);
-          display: grid;
-          place-items: center;
-          text-align: center;
-          color: #777;
-          font-weight: 900;
-          margin-top: 12px;
-          border: 1px solid #f1e9e0;
-        }
-
-        .map div:first-child {
-          font-size: 45px;
-          margin-bottom: 8px;
-        }
-      `}</style>
-
-      <main className="app">
-        <header className="top">
-          <a className="back" href="/">‹</a>
-
-          <div className="title">
-            <h1>تتبع الطلب</h1>
-            <p>تابع طلبك لحظة بلحظة</p>
-          </div>
-
-          <div style={{ width: 44 }} />
+          <Link href="/live-orders" style={styles.pill}>
+            الطلبات المباشرة
+          </Link>
         </header>
 
-        <section className="card">
-          <div className="order-head">
-            <div>
-              <div className="muted">رقم الطلب</div>
-              <div className="order-id">#FUSE-1024</div>
+        <section style={styles.hero}>
+          <div style={styles.heroGrid}>
+            <div style={styles.card}>
+              <p style={styles.eyebrow}>حالة الطلب</p>
+              <h1 style={styles.title}>
+                تابع طلبك
+                <br />
+                <span style={styles.orange}>لحظة بلحظة</span>
+              </h1>
+              <p style={styles.muted}>
+                اكتب رقم الهاتف أو رقم الطلب. إذا دخلت من رابط فيه رقم الهاتف راح يظهر طلبك تلقائياً.
+              </p>
             </div>
 
-            <div className="badge">{status}</div>
+            <div style={styles.card}>
+              <p style={styles.eyebrow}>الحالة</p>
+              <p style={{ ...styles.statusLive, color: current ? statusColor(current.status) : "#86EFAC" }}>
+                {current ? normalizeStatus(current.status) : "مباشر"}
+              </p>
+              <p style={styles.muted}>
+                {current ? `طلب ${getCustomer(current)} من ${getRestaurant(current)}` : "متصل بقاعدة الطلبات"}
+              </p>
+            </div>
           </div>
+        </section>
 
-          <div className="progress-wrap">
-            <div className="progress-text">
-              <span>تقدم الطلب</span>
-              <span>{progressPercent}%</span>
+        <section style={styles.searchBox}>
+          <label style={{ display: "grid", gap: 8 }}>
+            <span style={styles.label}>رقم الهاتف أو رقم الطلب</span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              style={styles.input}
+              placeholder="0770... أو FUSE-751080"
+              dir="ltr"
+            />
+          </label>
+        </section>
+
+        <section style={styles.layout}>
+          {!loadedFromUrl ? (
+            <div style={styles.empty}>
+              <h2 style={{ margin: 0 }}>جاري تحميل الحالة...</h2>
             </div>
-
-            <div className="progress">
-              <div className="bar" style={{ width: `${progressPercent}%` }} />
+          ) : !search.trim() ? (
+            <div style={styles.empty}>
+              <h2 style={{ margin: 0 }}>اكتب رقم الهاتف</h2>
+              <p style={styles.muted}>راح تظهر حالة الطلب هنا مباشرة.</p>
             </div>
-          </div>
+          ) : !current ? (
+            <div style={styles.empty}>
+              <h2 style={{ margin: 0 }}>ما لقينا طلب مطابق</h2>
+              <p style={styles.muted}>تأكد من رقم الهاتف أو استخدم نفس رقم الطلب الموجود برسالة التأكيد.</p>
+            </div>
+          ) : (
+            <article style={styles.orderCard}>
+              <div style={styles.orderTop}>
+                <div style={styles.totalBox}>
+                  <p style={styles.label}>المجموع</p>
+                  <p style={styles.total}>{getTotal(current).toLocaleString()} د.ع</p>
+                  <p style={styles.muted}>رقم الطلب: {current.orderId || current.documentId}</p>
+                </div>
 
-          <div className="steps">
-            {steps.map((step, index) => {
-              const isDone = index <= activeIndex;
-              const isActive = index === activeIndex;
+                <div style={styles.infoGrid}>
+                  <div style={styles.miniBox}>
+                    <p style={styles.label}>الزبون</p>
+                    <p style={styles.value}>{getCustomer(current)}</p>
+                  </div>
 
-              return (
-                <div
-                  key={step.title}
-                  className={`step ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}
-                >
-                  <div className="icon">{step.icon}</div>
+                  <div style={styles.miniBox}>
+                    <p style={styles.label}>المطعم</p>
+                    <p style={styles.value}>{getRestaurant(current)}</p>
+                  </div>
 
-                  <div>
-                    <h3>{step.title}</h3>
-                    <p>{step.desc}</p>
+                  <div style={styles.miniBox}>
+                    <p style={styles.label}>الهاتف</p>
+                    <p style={{ ...styles.value, direction: "ltr" }}>{getPhone(current)}</p>
+                  </div>
+
+                  <div style={styles.miniBox}>
+                    <p style={styles.label}>العنوان</p>
+                    <p style={styles.value}>{current.address || "غير محدد"}</p>
+                  </div>
+
+                  <div style={styles.miniBox}>
+                    <p style={styles.label}>السائق</p>
+                    <p style={styles.value}>{getDriverName(current)}</p>
+                  </div>
+
+                  <div style={styles.miniBox}>
+                    <p style={styles.label}>الوقت</p>
+                    <p style={styles.value}>{formatDate(current.createdAt)}</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div style={styles.progress}>
+                {steps.map((step, index) => (
+                  <div
+                    key={step}
+                    style={index <= currentIndex ? styles.stepActive : styles.step}
+                  />
+                ))}
+              </div>
+
+              <div style={styles.stepLabels}>
+                {steps.map((step) => (
+                  <div key={step} style={styles.stepText}>
+                    {step}
+                  </div>
+                ))}
+              </div>
+
+              <div style={styles.details}>
+                <p style={styles.eyebrow}>تفاصيل الطلب</p>
+
+                {current.items?.length ? (
+                  current.items.map((item, index) => (
+                    <div key={`${item.name || item.title}-${index}`} style={styles.itemRow}>
+                      <span>{item.name || item.title || "صنف"}</span>
+                      <strong>
+                        {item.qty || item.quantity || 1}x — {Number(item.price || 0).toLocaleString()} د.ع
+                      </strong>
+                    </div>
+                  ))
+                ) : (
+                  <p style={styles.muted}>ماكو تفاصيل أصناف محفوظة.</p>
+                )}
+              </div>
+            </article>
+          )}
         </section>
-
-        <section className="card">
-          <div className="section-title">
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
-              معلومات السائق
-            </h2>
-          </div>
-
-          <div className="driver-grid">
-            <div className="info">
-              <div className="muted">اسم السائق</div>
-              <h3>علي حسن</h3>
-            </div>
-
-            <div className="info">
-              <div className="muted">الوصول المتوقع</div>
-              <h3 style={{ color: "#ff4d00" }}>12 دقيقة</h3>
-            </div>
-          </div>
-
-          <div className="actions">
-            <a className="action call" href="tel:07700000000">اتصال</a>
-            <a className="action whatsapp" href="https://wa.me/9647700000000" target="_blank">
-              واتساب
-            </a>
-          </div>
-        </section>
-
-        <section className="card">
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900 }}>
-            موقع السائق
-          </h2>
-
-          <div className="map">
-            <div>
-              <div>🗺️</div>
-              الخريطة المباشرة نربطها بالمرحلة الجاية
-            </div>
-          </div>
-        </section>
-      </main>
-    </>
+      </section>
+    </main>
   );
 }

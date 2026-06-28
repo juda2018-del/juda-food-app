@@ -1,622 +1,922 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { collection, onSnapshot, query } from "firebase/firestore";
+import { db } from "./firebase";
+import {
+  FUSE_COOKIE_EMAIL,
+  FUSE_COOKIE_NAME,
+  FUSE_COOKIE_PHONE,
+  FUSE_COOKIE_RESTAURANT,
+  FUSE_COOKIE_ROLE,
+  FUSE_LOCAL_SESSION,
+  parseFuseRole,
+  roleHome,
+  roleTitle,
+  type FuseRole,
+  type FuseSession,
+} from "@/lib/fuse-auth";
 
-const restaurants = [
+type RestaurantDoc = {
+  documentId: string;
+  name?: string;
+  title?: string;
+  restaurant?: string;
+  description?: string;
+  cuisine?: string;
+  area?: string;
+  address?: string;
+  status?: string;
+  open?: boolean;
+  isOpen?: boolean;
+  distanceKm?: number;
+  km?: number;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+};
+
+type MenuDoc = {
+  documentId: string;
+  name?: string;
+  title?: string;
+  restaurant?: string;
+  restaurantName?: string;
+  category?: string;
+  price?: number;
+  available?: boolean;
+  isAvailable?: boolean;
+};
+
+type QuickLink = {
+  title: string;
+  desc: string;
+  href: string;
+  icon: string;
+  adminOnly?: boolean;
+};
+
+const fallbackRestaurants: RestaurantDoc[] = [
   {
+    documentId: "fallback-fayrouz",
     name: "فيروز",
-    desc: "فطور عراقي، كاهي، قيمر وبورك",
-    href: "/fayrouz",
-    image: "/images/fayrouz.jpg",
-    rating: "4.8",
-    time: "25-35 د",
+    description: "فطور عراقي، كاهي، بورك، وأكلات صباحية.",
+    cuisine: "فطور عراقي",
+    area: "زيونة",
+    distanceKm: 2.4,
+    open: true,
   },
   {
+    documentId: "fallback-shalteta",
     name: "شلتتة",
-    desc: "مشلتت وفطائر حار وحلو",
-    href: "/ahram",
-    image: "/images/ahram.jpg",
-    rating: "4.7",
-    time: "30-40 د",
+    description: "مشلتت وفطائر حلوة ومالحة.",
+    cuisine: "فطائر ومشلتت",
+    area: "بغداد",
+    distanceKm: 3.1,
+    open: true,
   },
   {
+    documentId: "fallback-khan",
     name: "خان قدوري",
-    desc: "أكلات عراقية بطعم أصيل",
-    href: "/khan",
-    image: "/images/khan.jpg",
-    rating: "4.6",
-    time: "35-45 د",
+    description: "أكلات عراقية شعبية ووجبات يومية.",
+    cuisine: "أكل عراقي",
+    area: "بغداد",
+    distanceKm: 5.8,
+    open: true,
+  },
+  {
+    documentId: "fallback-alforn",
+    name: "الفرن",
+    description: "مناقيش، معجنات، كريب ووافل.",
+    cuisine: "معجنات",
+    area: "بغداد",
+    distanceKm: 6.6,
+    open: true,
   },
 ];
 
-const categories = [
-  { name: "بركر", image: "/images/1.jpg" },
-  { name: "بيتزا", image: "/images/3.jpg" },
-  { name: "مشاوي", image: "/images/4.jpg" },
-  { name: "فطور", image: "/images/fayrouz.jpg" },
-  { name: "مشروبات", image: "/images/5.1.jpg" },
-];
+function clearCookie(name: string) {
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+}
 
-const popular = [
-  { name: "بركر لحم", price: "8,500", image: "/images/1.jpg" },
-  { name: "بيتزا مارغريتا", price: "7,000", image: "/images/3.jpg" },
-  { name: "دجاج مشوي", price: "9,000", image: "/images/4.jpg" },
-  { name: "عصير برتقال", price: "3,000", image: "/images/5.1.jpg" },
-];
+function readSession(): FuseSession | null {
+  try {
+    const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
+    if (!raw) return null;
 
-export default function Home() {
+    const parsed = JSON.parse(raw) as FuseSession;
+    const role = parseFuseRole(parsed.role);
+
+    if (!parsed.email || !role) return null;
+
+    return { ...parsed, role };
+  } catch {
+    return null;
+  }
+}
+
+function getRestaurantName(item: RestaurantDoc) {
+  const safe = item as RestaurantDoc & { name?: string; title?: string; restaurantName?: string };
+  return safe.name || safe.title || safe.restaurantName || "مطعم";
+}
+
+function getDescription(item: RestaurantDoc) {
+  return item.description || item.cuisine || "مطعم قريب منك ضمن شبكة FUSE.";
+}
+
+function isOpen(item: RestaurantDoc) {
+  return item.open !== false && item.isOpen !== false && item.status !== "مغلق";
+}
+
+function menuAvailable(item: MenuDoc) {
+  return item.available !== false && item.isAvailable !== false;
+}
+
+function getLat(item: RestaurantDoc) {
+  return Number(item.lat ?? item.latitude ?? 0);
+}
+
+function getLng(item: RestaurantDoc) {
+  return Number(item.lng ?? item.longitude ?? 0);
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const r = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+
+  return r * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function restaurantDistance(item: RestaurantDoc, userLocation: { lat: number; lng: number } | null) {
+  const itemLat = getLat(item);
+  const itemLng = getLng(item);
+
+  if (userLocation && itemLat && itemLng) {
+    return haversineKm(userLocation.lat, userLocation.lng, itemLat, itemLng);
+  }
+
+  return Number(item.distanceKm ?? item.km ?? 3.5);
+}
+
+function restaurantSlug(name: string) {
+  if (name.includes("فيروز")) return "fayrouz";
+  if (name.includes("شلتتة")) return "shalteta";
+  if (name.includes("خان")) return "khan";
+  if (name.includes("الفرن")) return "alforn";
+  return "fayrouz";
+}
+
+function roleLinks(role: FuseRole | null): QuickLink[] {
+  if (role === "admin") {
+    return [
+      { title: "الطلبات المباشرة", desc: "متابعة كل الطلبات", href: "/live-orders", icon: "📡" },
+      { title: "لوحة المطعم", desc: "طلبات ومنيو المطاعم", href: "/restaurant-admin", icon: "🍽️" },
+      { title: "تطبيق السائق", desc: "طلبات السائق والحالة", href: "/driver-app", icon: "🛵" },
+      { title: "تقييم الطلب", desc: "تقييم المطعم والسائق", href: "/ratings", icon: "⭐" },
+      { title: "حالة الطلب", desc: "بحث وتتبع حالة الطلب", href: "/order-status", icon: "📦" },
+      { title: "لوحة الإدارة", desc: "مركز قيادة FUSE", href: "/fuse-admin", icon: "👑" },
+      { title: "التوزيع التلقائي", desc: "ربط الطلب بالسائق", href: "/auto-dispatch", icon: "⚡" },
+      { title: "أدوات النظام", desc: "تنظيف وفحص البيانات", href: "/system-tools", icon: "🧰" },
+    ];
+  }
+
+  if (role === "restaurant") {
+    return [
+      { title: "لوحة المطعم", desc: "طلبات ومنيو المطعم", href: "/restaurant-admin", icon: "🍽️" },
+      { title: "الطلبات المباشرة", desc: "طلبات مطعمك مباشرة", href: "/live-orders", icon: "📡" },
+      { title: "الإشعارات", desc: "تنبيهات الطلبات", href: "/notification-center", icon: "🔔" },
+      { title: "التقارير", desc: "مبيعات وأداء المطعم", href: "/reports", icon: "📊" },
+    ];
+  }
+
+  if (role === "driver") {
+    return [
+      { title: "تطبيق السائق", desc: "طلباتي وحالتي", href: "/driver-app", icon: "🛵" },
+      { title: "الطلبات المباشرة", desc: "طلبات قيد التوصيل", href: "/live-orders", icon: "📡" },
+    ];
+  }
+
+  return [
+    { title: "الطلبات المباشرة", desc: "متابعة الطلبات والتحديثات", href: "/live-orders", icon: "📡" },
+    { title: "حالة الطلب", desc: "بحث وتتبع حالة الطلب", href: "/order-status", icon: "📦" },
+    { title: "تقييم الطلب", desc: "قيّم تجربتك بعد الطلب", href: "/ratings", icon: "⭐" },
+  ];
+}
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background:
+      "radial-gradient(circle at top right, rgba(255,122,0,0.18), transparent 34%), #050505",
+    color: "white",
+    padding: "26px 16px",
+    fontFamily: "Arial, sans-serif",
+  },
+  shell: {
+    width: "100%",
+    maxWidth: 1180,
+    margin: "0 auto",
+  },
+  topBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 14,
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+  },
+  logo: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    background: "#FF7A00",
+    color: "#050505",
+    display: "grid",
+    placeItems: "center",
+    fontWeight: 950,
+    fontSize: 24,
+  },
+  pill: {
+    border: "1px solid rgba(255,255,255,0.13)",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.05)",
+    padding: "11px 16px",
+    color: "rgba(255,255,255,0.82)",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 900,
+  },
+  activePill: {
+    border: "1px solid rgba(255,122,0,0.35)",
+    borderRadius: 999,
+    background: "#FF7A00",
+    padding: "11px 16px",
+    color: "#000",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  logout: {
+    border: "1px solid rgba(239,68,68,0.32)",
+    borderRadius: 999,
+    background: "rgba(239,68,68,0.10)",
+    color: "#FECACA",
+    padding: "11px 16px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  hero: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 34,
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.12))",
+    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+    padding: 22,
+    marginBottom: 16,
+  },
+  heroGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(280px, 0.45fr) minmax(0, 1fr)",
+    gap: 14,
+    alignItems: "stretch",
+  },
+  card: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 28,
+    background: "rgba(0,0,0,0.36)",
+    padding: 20,
+  },
+  eyebrow: {
+    margin: 0,
+    color: "#FF7A00",
+    fontSize: 13,
+    fontWeight: 950,
+  },
+  title: {
+    margin: "8px 0 0",
+    fontSize: "clamp(38px, 6vw, 70px)",
+    lineHeight: 1.06,
+    fontWeight: 950,
+  },
+  orange: {
+    color: "#FF7A00",
+  },
+  muted: {
+    color: "rgba(255,255,255,0.60)",
+    lineHeight: 1.85,
+    fontSize: 14,
+  },
+  heroStats: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 10,
+    marginTop: 18,
+  },
+  stat: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 22,
+    background: "rgba(0,0,0,0.28)",
+    padding: 14,
+  },
+  statLabel: {
+    margin: 0,
+    color: "rgba(255,255,255,0.54)",
+    fontSize: 13,
+    fontWeight: 850,
+  },
+  statValue: {
+    margin: "9px 0 0",
+    fontSize: 28,
+    fontWeight: 950,
+  },
+  roleTag: {
+    display: "inline-flex",
+    border: "1px solid rgba(255,122,0,0.30)",
+    borderRadius: 999,
+    background: "rgba(255,122,0,0.10)",
+    color: "#FFB56B",
+    padding: "7px 11px",
+    fontSize: 12,
+    fontWeight: 950,
+    marginTop: 12,
+  },
+  mainButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: 18,
+    background: "#FF7A00",
+    color: "#000",
+    padding: "15px 16px",
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 950,
+    marginTop: 14,
+    textDecoration: "none",
+    display: "block",
+    textAlign: "center",
+  },
+  infoBox: {
+    border: "1px solid rgba(255,122,0,0.22)",
+    borderRadius: 22,
+    background: "rgba(255,122,0,0.08)",
+    padding: 14,
+    marginTop: 14,
+  },
+  section: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 30,
+    background: "rgba(255,255,255,0.045)",
+    padding: 18,
+    marginBottom: 16,
+  },
+  sectionHead: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    marginBottom: 14,
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: 28,
+    fontWeight: 950,
+  },
+  quickGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 12,
+  },
+  quickCard: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 24,
+    background: "rgba(0,0,0,0.28)",
+    color: "white",
+    textDecoration: "none",
+    padding: 16,
+  },
+  filterGrid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(260px, 1fr) minmax(180px, 0.36fr) minmax(180px, 0.36fr)",
+    gap: 12,
+    marginBottom: 14,
+  },
+  input: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    background: "#070707",
+    color: "white",
+    padding: "14px 15px",
+    outline: "none",
+    fontSize: 14,
+  },
+  select: {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    background: "#070707",
+    color: "white",
+    padding: "14px 15px",
+    outline: "none",
+    fontSize: 14,
+  },
+  secondaryButton: {
+    border: "1px solid rgba(255,255,255,0.14)",
+    borderRadius: 18,
+    background: "rgba(255,255,255,0.06)",
+    color: "white",
+    padding: "13px 15px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 900,
+  },
+  restaurantsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: 12,
+  },
+  restaurantCard: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 28,
+    background:
+      "linear-gradient(135deg, rgba(0,0,0,0.35), rgba(255,122,0,0.06))",
+    padding: 16,
+  },
+  restaurantTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  badge: {
+    display: "inline-flex",
+    alignItems: "center",
+    border: "1px solid",
+    borderRadius: 999,
+    padding: "7px 11px",
+    fontSize: 12,
+    fontWeight: 950,
+  },
+  badgeGreen: {
+    borderColor: "rgba(34,197,94,0.42)",
+    background: "rgba(34,197,94,0.12)",
+    color: "#86EFAC",
+  },
+  badgeRed: {
+    borderColor: "rgba(239,68,68,0.42)",
+    background: "rgba(239,68,68,0.12)",
+    color: "#FCA5A5",
+  },
+  badgeOrange: {
+    borderColor: "rgba(255,122,0,0.42)",
+    background: "rgba(255,122,0,0.12)",
+    color: "#FFB56B",
+  },
+  miniGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 8,
+    marginTop: 14,
+  },
+  miniBox: {
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    background: "rgba(255,255,255,0.04)",
+    padding: 10,
+  },
+  menuPreview: {
+    borderTop: "1px solid rgba(255,255,255,0.08)",
+    marginTop: 14,
+    paddingTop: 12,
+    display: "grid",
+    gap: 8,
+  },
+  menuRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 8,
+    alignItems: "center",
+    color: "rgba(255,255,255,0.76)",
+    fontSize: 13,
+  },
+  empty: {
+    border: "1px dashed rgba(255,255,255,0.16)",
+    borderRadius: 24,
+    background: "rgba(255,255,255,0.035)",
+    padding: 24,
+    textAlign: "center",
+  },
+};
+
+export default function HomePage() {
+  const [session, setSession] = useState<FuseSession | null>(null);
+  const [restaurants, setRestaurants] = useState<RestaurantDoc[]>([]);
+  const [menu, setMenu] = useState<MenuDoc[]>([]);
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("الكل");
+  const [distanceFilter, setDistanceFilter] = useState("7");
+  const [locationText, setLocationText] = useState("لم يتم تحديد موقعك");
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    setSession(readSession());
+
+    const unsubscribeRestaurants = onSnapshot(
+      query(collection(db, "restaurants")),
+      (snapshot) => {
+        const data = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<RestaurantDoc, "documentId">),
+          documentId: item.id,
+        }));
+
+        setRestaurants(data);
+      },
+      () => setRestaurants([])
+    );
+
+    const unsubscribeMenu = onSnapshot(
+      query(collection(db, "menu")),
+      (snapshot) => {
+        const data = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<MenuDoc, "documentId">),
+          documentId: item.id,
+        }));
+
+        setMenu(data);
+      },
+      () => setMenu([])
+    );
+
+    return () => {
+      unsubscribeRestaurants();
+      unsubscribeMenu();
+    };
+  }, []);
+
+  const sourceRestaurants = restaurants.length ? restaurants : fallbackRestaurants;
+  const role = session?.role || null;
+  const links = roleLinks(role);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+
+    sourceRestaurants.forEach((item) => {
+      if (item.cuisine) set.add(item.cuisine);
+    });
+
+    return ["الكل", ...Array.from(set).slice(0, 8)];
+  }, [sourceRestaurants]);
+
+  const visibleRestaurants = useMemo(() => {
+    const cleanSearch = search.trim().toLowerCase();
+    const maxDistance = Number(distanceFilter);
+
+    return sourceRestaurants
+      .map((restaurant) => ({
+        ...restaurant,
+        computedDistance: restaurantDistance(restaurant, userLocation),
+      }))
+      .filter((restaurant) => {
+        const name = getRestaurantName(restaurant);
+        const haystack = [
+          name,
+          restaurant.description || "",
+          restaurant.cuisine || "",
+          restaurant.area || "",
+          restaurant.address || "",
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        const matchesSearch = !cleanSearch || haystack.includes(cleanSearch);
+        const matchesCategory = category === "الكل" || restaurant.cuisine === category;
+        const matchesDistance = restaurant.computedDistance <= maxDistance;
+
+        return matchesSearch && matchesCategory && matchesDistance;
+      })
+      .sort((a, b) => a.computedDistance - b.computedDistance);
+  }, [category, distanceFilter, search, sourceRestaurants, userLocation]);
+
+  const openCount = visibleRestaurants.filter(isOpen).length;
+  const menuCount = menu.filter(menuAvailable).length;
+
+  function logout() {
+    localStorage.removeItem(FUSE_LOCAL_SESSION);
+
+    clearCookie(FUSE_COOKIE_ROLE);
+    clearCookie(FUSE_COOKIE_EMAIL);
+    clearCookie(FUSE_COOKIE_NAME);
+    clearCookie(FUSE_COOKIE_PHONE);
+    clearCookie(FUSE_COOKIE_RESTAURANT);
+
+    window.location.href = "/login";
+  }
+
+  function detectLocation() {
+    if (!navigator.geolocation) {
+      setLocationText("المتصفح لا يدعم تحديد الموقع");
+      return;
+    }
+
+    setLocationText("جاري تحديد موقعك...");
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+
+        setLocationText("تم تحديد موقعك");
+      },
+      () => {
+        setLocationText("تعذر تحديد الموقع، نستخدم المسافة التقريبية");
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
+    <main dir="rtl" style={styles.page}>
+      <section style={styles.shell}>
+        <header style={styles.topBar}>
+          <div style={styles.brand}>
+            <div style={styles.logo}>F</div>
 
-        * { box-sizing: border-box; }
-
-        body {
-          margin: 0;
-          font-family: "Cairo", sans-serif;
-          background: #efe8df;
-        }
-
-        .app {
-          width: 100%;
-          max-width: 430px;
-          min-height: 100vh;
-          margin: 0 auto;
-          padding: 18px 18px 96px;
-          direction: rtl;
-          color: #151515;
-          background:
-            radial-gradient(circle at 15% -4%, rgba(255, 91, 18, 0.12), transparent 35%),
-            linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
-        }
-
-        .header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .profile {
-          width: 44px;
-          height: 44px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #ff4d00, #ff8a00);
-          display: grid;
-          place-items: center;
-          color: white;
-          font-size: 20px;
-          font-weight: 900;
-          box-shadow: 0 12px 28px rgba(255, 77, 0, .22);
-          text-decoration: none;
-        }
-
-        .location {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 15px;
-          font-weight: 900;
-          color: #181818;
-        }
-
-        .pin {
-          width: 11px;
-          height: 11px;
-          border-radius: 50%;
-          background: #ff4d00;
-          box-shadow: 0 0 0 5px rgba(255,77,0,.10);
-        }
-
-        .bell {
-          width: 44px;
-          height: 44px;
-          border-radius: 16px;
-          background: #ffffff;
-          color: #151515;
-          box-shadow: 0 12px 28px rgba(0,0,0,.07);
-          font-size: 19px;
-          font-weight: 900;
-          position: relative;
-          text-decoration: none;
-          display: grid;
-          place-items: center;
-        }
-
-        .bell::after {
-          content: "2";
-          position: absolute;
-          top: -4px;
-          right: -4px;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: #ff4d00;
-          color: #fff;
-          display: grid;
-          place-items: center;
-          font-size: 10px;
-          font-weight: 900;
-        }
-
-        .search-row {
-          margin-top: 22px;
-          display: grid;
-          grid-template-columns: 1fr 54px;
-          gap: 12px;
-        }
-
-        .search {
-          height: 56px;
-          border-radius: 22px;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          padding: 0 17px;
-          color: #969696;
-          font-size: 14px;
-          font-weight: 700;
-          box-shadow: 0 14px 32px rgba(0,0,0,.06);
-          border: 1px solid rgba(0,0,0,.04);
-        }
-
-        .filter {
-          height: 56px;
-          border: 0;
-          border-radius: 22px;
-          background: linear-gradient(135deg, #ff4d00, #ff7a00);
-          color: white;
-          font-size: 22px;
-          font-weight: 900;
-          box-shadow: 0 15px 30px rgba(255,77,0,.25);
-        }
-
-        .cats {
-          margin-top: 22px;
-          display: flex;
-          gap: 16px;
-          overflow-x: auto;
-          padding-bottom: 8px;
-          scrollbar-width: none;
-        }
-
-        .cats::-webkit-scrollbar,
-        .rest-row::-webkit-scrollbar,
-        .popular-row::-webkit-scrollbar {
-          display: none;
-        }
-
-        .cat {
-          min-width: 66px;
-          text-align: center;
-          color: #171717;
-          font-size: 12px;
-          font-weight: 900;
-        }
-
-        .cat-img {
-          width: 62px;
-          height: 62px;
-          border-radius: 50%;
-          background: #ffffff;
-          padding: 8px;
-          margin: 0 auto 8px;
-          box-shadow: 0 12px 28px rgba(0,0,0,.07);
-        }
-
-        .cat-img img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          border-radius: 50%;
-        }
-
-        .hero {
-          margin-top: 20px;
-          height: 214px;
-          border-radius: 28px;
-          background:
-            radial-gradient(circle at 78% 40%, rgba(255,255,255,.18), transparent 32%),
-            linear-gradient(135deg, #ff3f00 0%, #ff6b00 52%, #ff8a00 100%);
-          position: relative;
-          overflow: hidden;
-          padding: 24px;
-          box-shadow: 0 20px 45px rgba(255,77,0,.25);
-        }
-
-        .hero-content {
-          position: relative;
-          z-index: 2;
-          width: 50%;
-        }
-
-        .hero h1 {
-          margin: 0;
-          color: white;
-          font-size: 38px;
-          line-height: 1.05;
-          font-weight: 900;
-          letter-spacing: -1px;
-        }
-
-        .hero p {
-          margin: 9px 0 18px;
-          color: white;
-          font-size: 13px;
-          font-weight: 800;
-          line-height: 1.7;
-        }
-
-        .hero a {
-          display: inline-block;
-          text-decoration: none;
-          color: white;
-          background: #111111;
-          border-radius: 999px;
-          padding: 12px 23px;
-          font-size: 13px;
-          font-weight: 900;
-          box-shadow: 0 12px 28px rgba(0,0,0,.25);
-        }
-
-        .hero img {
-          position: absolute;
-          left: -18px;
-          bottom: -3px;
-          width: 245px;
-          height: 168px;
-          object-fit: cover;
-          border-radius: 30px;
-          filter: drop-shadow(0 18px 25px rgba(0,0,0,.20));
-        }
-
-        .dots {
-          margin: 13px auto 0;
-          display: flex;
-          width: fit-content;
-          gap: 6px;
-        }
-
-        .dot {
-          width: 7px;
-          height: 7px;
-          border-radius: 20px;
-          background: #dedede;
-        }
-
-        .dot.active {
-          width: 22px;
-          background: #ff4d00;
-        }
-
-        .section {
-          margin-top: 25px;
-          margin-bottom: 13px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .section h2 {
-          margin: 0;
-          color: #151515;
-          font-size: 20px;
-          font-weight: 900;
-        }
-
-        .section span {
-          color: #ff4d00;
-          font-size: 12px;
-          font-weight: 900;
-        }
-
-        .rest-row {
-          display: flex;
-          gap: 14px;
-          overflow-x: auto;
-          padding-bottom: 10px;
-        }
-
-        .rest-card {
-          flex: 0 0 164px;
-          background: #ffffff;
-          border-radius: 26px;
-          overflow: hidden;
-          text-decoration: none;
-          color: #151515;
-          box-shadow: 0 14px 34px rgba(0,0,0,.08);
-          border: 1px solid rgba(0,0,0,.04);
-          position: relative;
-        }
-
-        .rest-img {
-          height: 126px;
-          position: relative;
-          background: #f4f4f4;
-        }
-
-        .rest-img img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .heart {
-          position: absolute;
-          top: 9px;
-          left: 9px;
-          width: 33px;
-          height: 33px;
-          border-radius: 50%;
-          background: rgba(255,255,255,.92);
-          display: grid;
-          place-items: center;
-          color: #151515;
-          font-size: 17px;
-          font-weight: 900;
-          box-shadow: 0 8px 18px rgba(0,0,0,.10);
-        }
-
-        .rest-info {
-          padding: 12px;
-        }
-
-        .rest-info h3 {
-          margin: 0;
-          font-size: 15px;
-          font-weight: 900;
-          color: #111;
-        }
-
-        .rating-line {
-          margin-top: 7px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 11px;
-          font-weight: 900;
-          color: #555;
-        }
-
-        .star {
-          color: #ff8a00;
-        }
-
-        .rest-info p {
-          margin: 7px 0 0;
-          color: #8a8a8a;
-          font-size: 11px;
-          font-weight: 700;
-          line-height: 1.5;
-        }
-
-        .popular-row {
-          display: flex;
-          gap: 14px;
-          overflow-x: auto;
-          padding-bottom: 12px;
-        }
-
-        .food-card {
-          flex: 0 0 120px;
-          background: #ffffff;
-          border-radius: 22px;
-          padding: 10px;
-          box-shadow: 0 13px 30px rgba(0,0,0,.07);
-          border: 1px solid rgba(0,0,0,.04);
-        }
-
-        .food-card img {
-          width: 100%;
-          height: 84px;
-          object-fit: cover;
-          border-radius: 17px;
-          background: #f4f4f4;
-        }
-
-        .food-card h3 {
-          margin: 10px 0 4px;
-          color: #111;
-          font-size: 12px;
-          font-weight: 900;
-          line-height: 1.35;
-        }
-
-        .food-card p {
-          margin: 0;
-          color: #ff4d00;
-          font-size: 12px;
-          font-weight: 900;
-        }
-
-        .food-bottom {
-          margin-top: 8px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .plus {
-          width: 29px;
-          height: 29px;
-          border: 0;
-          border-radius: 50%;
-          background: #ff4d00;
-          color: #ffffff;
-          font-size: 18px;
-          font-weight: 900;
-          line-height: 1;
-        }
-
-        .nav {
-          position: fixed;
-          left: 50%;
-          bottom: 0;
-          transform: translateX(-50%);
-          width: 100%;
-          max-width: 430px;
-          height: 76px;
-          background: #ffffff;
-          box-shadow: 0 -12px 32px rgba(0,0,0,.08);
-          display: grid;
-          grid-template-columns: repeat(5,1fr);
-          align-items: center;
-          text-align: center;
-          color: #777;
-          font-size: 11px;
-          font-weight: 800;
-          z-index: 50;
-          border-top: 1px solid rgba(0,0,0,.04);
-        }
-
-        .nav a {
-          text-decoration: none;
-          color: inherit;
-          line-height: 1.6;
-        }
-
-        .nav .active {
-          color: #ff4d00;
-          font-weight: 900;
-        }
-
-        @media (min-width: 700px) {
-          .app {
-            border-left: 1px solid rgba(0,0,0,.05);
-            border-right: 1px solid rgba(0,0,0,.05);
-          }
-        }
-      `}</style>
-
-      <main className="app">
-        <header className="header">
-          <Link href="/profile" className="profile">F</Link>
-
-          <div className="location">
-            <span className="pin" />
-            بغداد - المنصور
+            <div>
+              <h1 style={{ margin: 0, fontSize: 28, fontWeight: 950 }}>FUSE Iraq</h1>
+              <p style={{ ...styles.muted, margin: "4px 0 0" }}>
+                نظام توصيل وتشغيل المطاعم
+              </p>
+            </div>
           </div>
 
-          <Link href="/notifications" className="bell">⌁</Link>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {session ? (
+              <>
+                <button onClick={logout} style={styles.logout}>
+                  خروج
+                </button>
+
+                <Link href={role ? roleHome[role] : "/login"} style={styles.activePill}>
+                  لوحتي
+                </Link>
+              </>
+            ) : (
+              <Link href="/login" style={styles.activePill}>
+                دخول
+              </Link>
+            )}
+          </div>
         </header>
 
-        <div className="search-row">
-          <div className="search">ابحث عن مطعم أو وجبة...</div>
-          <button className="filter">≡</button>
-        </div>
+        <section style={styles.hero}>
+          <div style={styles.heroGrid}>
+            <aside style={styles.card}>
+              <p style={styles.eyebrow}>حسابك</p>
 
-        <section className="cats">
-          {categories.map((cat) => (
-            <div className="cat" key={cat.name}>
-              <div className="cat-img">
-                <img src={cat.image} alt={cat.name} />
+              <h2 style={{ margin: "8px 0 0", fontSize: 32, fontWeight: 950 }}>
+                {session ? `FUSE ${role ? roleTitle[role] : ""}` : "زائر FUSE"}
+              </h2>
+
+              <p style={styles.muted}>
+                {session?.email || "سجل دخولك حتى تشوف قائمتك وتتابع طلباتك بسهولة."}
+              </p>
+
+              {role ? <span style={styles.roleTag}>{roleTitle[role]}</span> : null}
+
+              <Link href={session && role ? roleHome[role] : "/login"} style={styles.mainButton}>
+                {session ? "دخول لوحتي" : "تسجيل الدخول"}
+              </Link>
+
+              <div style={styles.infoBox}>
+                <p style={{ margin: 0, color: "#FFB56B", fontWeight: 950 }}>
+                  تتبع طلبك بسهولة
+                </p>
+                <p style={{ ...styles.muted, margin: "8px 0 0" }}>
+                  تابع حالة طلبك مباشرة من لحظة الاستلام إلى التوصيل.
+                </p>
               </div>
-              {cat.name}
-            </div>
-          ))}
-        </section>
+            </aside>
 
-        <section className="hero">
-          <div className="hero-content">
-            <h1>
-              خصم حتى
-              <br />
-              50%
-            </h1>
-            <p>على أول طلب داخل FUSE</p>
-            <Link href="/fayrouz">اطلب الآن</Link>
-          </div>
+            <section style={styles.card}>
+              <p style={styles.eyebrow}>فيوز مباشر</p>
 
-          <img src="/images/1.jpg" alt="عرض فيوز" />
-        </section>
+              <h1 style={styles.title}>
+                اطلب أسرع
+                <br />
+                <span style={styles.orange}>من مطاعم قريبة</span>
+              </h1>
 
-        <div className="dots">
-          <span className="dot active" />
-          <span className="dot" />
-          <span className="dot" />
-          <span className="dot" />
-        </div>
+              <p style={styles.muted}>
+                اختر مطعمك، شوف المنيو، اطلب، وتابع التحديثات مباشرة. المطاعم تظهر ضمن نطاق 7 كم.
+              </p>
 
-        <div className="section">
-          <span>عرض الكل</span>
-          <h2>المطاعم المميزة</h2>
-        </div>
-
-        <section className="rest-row">
-          {restaurants.map((r) => (
-            <Link href={r.href} className="rest-card" key={r.name}>
-              <div className="rest-img">
-                <img src={r.image} alt={r.name} />
-                <div className="heart">♡</div>
-              </div>
-
-              <div className="rest-info">
-                <h3>{r.name}</h3>
-
-                <div className="rating-line">
-                  <span>
-                    {r.rating} <span className="star">★</span>
-                  </span>
-                  <span>{r.time}</span>
+              <div style={styles.heroStats}>
+                <div style={styles.stat}>
+                  <p style={styles.statLabel}>نطاق التوصيل</p>
+                  <p style={styles.statValue}>7 كم</p>
                 </div>
 
-                <p>{r.desc}</p>
+                <div style={styles.stat}>
+                  <p style={styles.statLabel}>مطاعم ظاهرة</p>
+                  <p style={{ ...styles.statValue, color: "#86EFAC" }}>{visibleRestaurants.length}</p>
+                </div>
+
+                <div style={styles.stat}>
+                  <p style={styles.statLabel}>القائمة</p>
+                  <p style={{ ...styles.statValue, color: "#FFB56B" }}>حسب دورك</p>
+                </div>
               </div>
-            </Link>
-          ))}
+            </section>
+          </div>
         </section>
 
-        <div className="section">
-          <span>عرض الكل</span>
-          <h2>الأكثر طلباً</h2>
-        </div>
-
-        <section className="popular-row">
-          {popular.map((item) => (
-            <div className="food-card" key={item.name}>
-              <img src={item.image} alt={item.name} />
-              <h3>{item.name}</h3>
-
-              <div className="food-bottom">
-                <p>{item.price} د.ع</p>
-                <button className="plus">+</button>
-              </div>
+        <section style={styles.section}>
+          <div style={styles.sectionHead}>
+            <div>
+              <p style={styles.eyebrow}>القائمة</p>
+              <h2 style={styles.sectionTitle}>قائمتي</h2>
             </div>
-          ))}
+          </div>
+
+          <div style={styles.quickGrid}>
+            {links.map((item) => (
+              <Link key={item.href} href={item.href} style={styles.quickCard}>
+                <p style={styles.eyebrow}>{item.icon}</p>
+                <h3 style={{ margin: "8px 0 0", fontSize: 19, fontWeight: 950 }}>
+                  {item.title}
+                </h3>
+                <p style={{ ...styles.muted, margin: "6px 0 0" }}>{item.desc}</p>
+              </Link>
+            ))}
+          </div>
         </section>
 
-        <nav className="nav">
-          <Link href="/" className="active">
-            ⌂
-            <br />
-            الرئيسية
-          </Link>
+        <section style={styles.section}>
+          <div style={styles.sectionHead}>
+            <div>
+              <p style={styles.eyebrow}>Restaurants</p>
+              <h2 style={styles.sectionTitle}>المطاعم القريبة</h2>
+              <p style={{ ...styles.muted, margin: "6px 0 0" }}>
+                المفتوحة: {openCount} — أصناف المنيو: {menuCount || "تظهر بعد تحميل البيانات"}
+              </p>
+            </div>
 
-          <Link href="/explore">
-            ⌕
-            <br />
-            استكشف
-          </Link>
+            <button onClick={detectLocation} style={styles.secondaryButton}>
+              تحديد موقعي
+            </button>
+          </div>
 
-          <Link href="/cart">
-            ▱
-            <br />
-            السلة
-          </Link>
+          <div style={styles.filterGrid}>
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={styles.statLabel}>بحث سريع</span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                style={styles.input}
+                placeholder="اسم مطعم، فطور، معجنات، منطقة..."
+              />
+            </label>
 
-          <Link href="/order-status">
-            ▣
-            <br />
-            طلباتي
-          </Link>
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={styles.statLabel}>القسم</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                style={styles.select}
+              >
+                {categories.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <Link href="/profile">
-            ○
-            <br />
-            حسابي
-          </Link>
-        </nav>
-      </main>
-    </>
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={styles.statLabel}>المسافة</span>
+              <select
+                value={distanceFilter}
+                onChange={(event) => setDistanceFilter(event.target.value)}
+                style={styles.select}
+              >
+                <option value="7">ضمن 7 كم</option>
+                <option value="5">ضمن 5 كم</option>
+                <option value="3">ضمن 3 كم</option>
+              </select>
+            </label>
+          </div>
+
+          <p style={{ ...styles.muted, marginTop: 0 }}>{locationText}</p>
+
+          {visibleRestaurants.length === 0 ? (
+            <div style={styles.empty}>
+              <h3 style={{ margin: 0 }}>ماكو مطاعم ضمن الفلتر الحالي</h3>
+              <p style={styles.muted}>وسع المسافة أو امسح البحث حتى تظهر المطاعم.</p>
+            </div>
+          ) : (
+            <div style={styles.restaurantsGrid}>
+              {visibleRestaurants.map((restaurant) => {
+                const restaurantName = getRestaurantName(restaurant);
+                const previewMenu = menu
+                  .filter((item) => getRestaurantName(item) === restaurantName)
+                  .filter(menuAvailable)
+                  .slice(0, 3);
+
+                return (
+                  <article key={restaurant.documentId} style={styles.restaurantCard}>
+                    <div style={styles.restaurantTop}>
+                      <div>
+                        <h3 style={{ margin: 0, fontSize: 24, fontWeight: 950 }}>
+                          {restaurantName}
+                        </h3>
+
+                        <p style={{ ...styles.muted, margin: "8px 0 0" }}>
+                          {getDescription(restaurant)}
+                        </p>
+                      </div>
+
+                      <span
+                        style={{
+                          ...styles.badge,
+                          ...(isOpen(restaurant) ? styles.badgeGreen : styles.badgeRed),
+                        }}
+                      >
+                        {isOpen(restaurant) ? "مفتوح" : "مغلق"}
+                      </span>
+                    </div>
+
+                    <div style={styles.miniGrid}>
+                      <div style={styles.miniBox}>
+                        <p style={styles.statLabel}>المسافة</p>
+                        <p style={{ margin: "8px 0 0", fontWeight: 950 }}>
+                          {restaurantDistance(restaurant, userLocation).toFixed(1)} كم
+                        </p>
+                      </div>
+
+                      <div style={styles.miniBox}>
+                        <p style={styles.statLabel}>المنطقة</p>
+                        <p style={{ margin: "8px 0 0", fontWeight: 950 }}>
+                          {restaurant.area || "قريب"}
+                        </p>
+                      </div>
+
+                      <div style={styles.miniBox}>
+                        <p style={styles.statLabel}>النوع</p>
+                        <p style={{ margin: "8px 0 0", fontWeight: 950 }}>
+                          {restaurant.cuisine || "مطعم"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={styles.menuPreview}>
+                      {previewMenu.length === 0 ? (
+                        <p style={{ ...styles.muted, margin: 0 }}>
+                          المنيو يظهر بالخطوة الجاية داخل صفحة المطعم.
+                        </p>
+                      ) : (
+                        previewMenu.map((item) => (
+                          <div key={item.documentId} style={styles.menuRow}>
+                            <span>{item.name || item.title || "صنف"}</span>
+                            <strong>{Number(item.price || 0).toLocaleString()} د.ع</strong>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <Link
+                      href={`/restaurants/${restaurantSlug(restaurantName)}`}
+                      style={styles.mainButton}
+                    >
+                      افتح المنيو واطلب من {restaurantName}
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
   );
 }
