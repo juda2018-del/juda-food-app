@@ -1,6 +1,6 @@
 ﻿import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import RouteGuard from "../components/RouteGuard";
+import ClientRouteGuard from "../components/ClientRouteGuard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body>
-        <RouteGuard />
+        <ClientRouteGuard />
         {children}
       </body>
     </html>

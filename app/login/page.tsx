@@ -3,42 +3,49 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User,
+} from "firebase/auth";
+import { fuseAuth } from "../../lib/fuseAuthClient";
 
-type FuseRole = "admin" | "restaurant" | "driver" | "customer";
+type FuseRole = "admin" | "restaurant" | "driver" | "customer" | "guest";
 
-type FuseUser = {
-  email: string;
-  role: FuseRole;
-  name: string;
-  label: string;
-};
+const ACCOUNTS = [
+  { email: "admin@fuse.iq", role: "admin", name: "FUSE إدارة", label: "إدارة" },
+  { email: "restaurant@fuse.iq", role: "restaurant", name: "مطعم فيروز", label: "مطعم" },
+  { email: "driver@fuse.iq", role: "driver", name: "kkkkkk", label: "سائق" },
+  { email: "customer@fuse.iq", role: "customer", name: "FUSE زبون", label: "زبون" },
+] as const;
 
-const ACCOUNTS: FuseUser[] = [
-  {
-    email: "admin@fuse.iq",
-    role: "admin",
-    name: "FUSE إدارة",
-    label: "إدارة",
-  },
-  {
-    email: "restaurant@fuse.iq",
-    role: "restaurant",
-    name: "مطعم فيروز",
-    label: "مطعم",
-  },
-  {
-    email: "driver@fuse.iq",
-    role: "driver",
-    name: "kkkkkk",
-    label: "سائق",
-  },
-  {
-    email: "customer@fuse.iq",
-    role: "customer",
-    name: "FUSE زبون",
-    label: "زبون",
-  },
-];
+function roleFromEmail(email?: string | null): FuseRole {
+  const clean = (email || "").toLowerCase().trim();
+
+  if (clean === "admin@fuse.iq") return "admin";
+  if (clean === "restaurant@fuse.iq") return "restaurant";
+  if (clean === "driver@fuse.iq") return "driver";
+  if (clean === "customer@fuse.iq") return "customer";
+
+  return "guest";
+}
+
+function roleLabel(role: FuseRole) {
+  if (role === "admin") return "إدارة";
+  if (role === "restaurant") return "مطعم";
+  if (role === "driver") return "سائق";
+  if (role === "customer") return "زبون";
+  return "زائر";
+}
+
+function nameFromRole(role: FuseRole) {
+  if (role === "admin") return "FUSE إدارة";
+  if (role === "restaurant") return "مطعم فيروز";
+  if (role === "driver") return "kkkkkk";
+  if (role === "customer") return "FUSE زبون";
+  return "زائر";
+}
 
 function dashboardFor(role: FuseRole) {
   if (role === "admin") return "/fuse-admin";
@@ -47,62 +54,30 @@ function dashboardFor(role: FuseRole) {
   return "/";
 }
 
-function roleFromEmail(email?: string): FuseRole {
-  const clean = (email || "").toLowerCase().trim();
-
-  if (clean === "admin@fuse.iq") return "admin";
-  if (clean === "restaurant@fuse.iq") return "restaurant";
-  if (clean === "driver@fuse.iq") return "driver";
-
-  return "customer";
-}
-
-function roleLabel(role: FuseRole) {
-  if (role === "admin") return "إدارة";
-  if (role === "restaurant") return "مطعم";
-  if (role === "driver") return "سائق";
-  return "زبون";
-}
-
-function readCurrentUser(): FuseUser {
-  if (typeof window === "undefined") return ACCOUNTS[0];
-
-  const raw = window.localStorage.getItem("fuseUser");
-
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as Partial<FuseUser>;
-      const email = parsed.email || "admin@fuse.iq";
-      const role = (parsed.role as FuseRole) || roleFromEmail(email);
-
-      return {
-        email,
-        role,
-        name: parsed.name || (role === "admin" ? "FUSE إدارة" : roleLabel(role)),
-        label: parsed.label || roleLabel(role),
-      };
-    } catch {
-      // ignore bad old storage
-    }
-  }
-
-  const email = window.localStorage.getItem("fuseEmail") || "admin@fuse.iq";
-  const role = (window.localStorage.getItem("fuseRole") as FuseRole) || roleFromEmail(email);
-
-  return {
-    email,
+function saveSession(user: User, role: FuseRole) {
+  const payload = {
+    uid: user.uid,
+    email: user.email || "",
     role,
-    name: role === "admin" ? "FUSE إدارة" : roleLabel(role),
+    name: nameFromRole(role),
     label: roleLabel(role),
   };
+
+  window.localStorage.setItem("fuseUser", JSON.stringify(payload));
+  window.localStorage.setItem("fuseUid", user.uid);
+  window.localStorage.setItem("fuseEmail", user.email || "");
+  window.localStorage.setItem("fuseRole", role);
+  window.localStorage.setItem("email", user.email || "");
+  window.localStorage.setItem("role", role);
 }
 
-function saveUser(user: FuseUser) {
-  window.localStorage.setItem("fuseUser", JSON.stringify(user));
-  window.localStorage.setItem("fuseEmail", user.email);
-  window.localStorage.setItem("fuseRole", user.role);
-  window.localStorage.setItem("email", user.email);
-  window.localStorage.setItem("role", user.role);
+function clearSession() {
+  window.localStorage.removeItem("fuseUser");
+  window.localStorage.removeItem("fuseUid");
+  window.localStorage.removeItem("fuseEmail");
+  window.localStorage.removeItem("fuseRole");
+  window.localStorage.removeItem("email");
+  window.localStorage.removeItem("role");
 }
 
 function getNextTarget(role: FuseRole) {
@@ -111,7 +86,6 @@ function getNextTarget(role: FuseRole) {
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("next");
   const fromStorage = window.localStorage.getItem("fuseRedirectAfterLogin");
-
   const target = fromQuery || fromStorage || dashboardFor(role);
 
   window.localStorage.removeItem("fuseRedirectAfterLogin");
@@ -132,11 +106,7 @@ const styles: Record<string, CSSProperties> = {
     padding: "28px 16px",
     fontFamily: "Arial, sans-serif",
   },
-  shell: {
-    width: "100%",
-    maxWidth: 1180,
-    margin: "0 auto",
-  },
+  shell: { width: "100%", maxWidth: 1180, margin: "0 auto" },
   top: {
     display: "flex",
     justifyContent: "space-between",
@@ -169,32 +139,58 @@ const styles: Record<string, CSSProperties> = {
     padding: 26,
     textAlign: "right",
   },
-  eyebrow: {
-    margin: 0,
-    color: "#FF7A00",
-    fontSize: 13,
-    fontWeight: 950,
-  },
+  eyebrow: { margin: 0, color: "#FF7A00", fontSize: 13, fontWeight: 950 },
   title: {
     margin: "10px 0 0",
     fontSize: "clamp(44px, 7vw, 76px)",
     lineHeight: 1.06,
     fontWeight: 950,
   },
-  orange: {
-    color: "#FF7A00",
-  },
-  muted: {
-    color: "rgba(255,255,255,0.64)",
-    lineHeight: 1.9,
-    fontSize: 14,
-  },
-  currentCard: {
+  orange: { color: "#FF7A00" },
+  muted: { color: "rgba(255,255,255,0.64)", lineHeight: 1.9, fontSize: 14 },
+  form: {
     marginTop: 22,
-    border: "1px solid rgba(34,197,94,0.28)",
+    border: "1px solid rgba(255,122,0,0.18)",
     borderRadius: 28,
-    background: "rgba(34,197,94,0.10)",
+    background: "rgba(0,0,0,0.26)",
     padding: 20,
+  },
+  input: {
+    width: "100%",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 18,
+    background: "#050505",
+    color: "white",
+    padding: "16px 18px",
+    outline: "none",
+    fontSize: 15,
+    boxSizing: "border-box",
+    marginTop: 10,
+    direction: "ltr",
+  },
+  mainButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: 18,
+    background: "#FF7A00",
+    color: "#000",
+    padding: "16px 18px",
+    cursor: "pointer",
+    fontWeight: 950,
+    fontSize: 15,
+    marginTop: 14,
+  },
+  logoutButton: {
+    width: "100%",
+    border: "1px solid rgba(239,68,68,0.38)",
+    borderRadius: 18,
+    background: "rgba(239,68,68,0.08)",
+    color: "#FCA5A5",
+    padding: "16px 18px",
+    cursor: "pointer",
+    fontWeight: 950,
+    fontSize: 15,
+    marginTop: 10,
   },
   accountGrid: {
     display: "grid",
@@ -211,34 +207,6 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     textAlign: "right",
   },
-  mainButton: {
-    width: "100%",
-    border: 0,
-    borderRadius: 18,
-    background: "#FF7A00",
-    color: "#000",
-    padding: "16px 18px",
-    cursor: "pointer",
-    fontWeight: 950,
-    fontSize: 15,
-  },
-  logoutButton: {
-    width: "100%",
-    border: "1px solid rgba(239,68,68,0.38)",
-    borderRadius: 18,
-    background: "rgba(239,68,68,0.08)",
-    color: "#FCA5A5",
-    padding: "16px 18px",
-    cursor: "pointer",
-    fontWeight: 950,
-    fontSize: 15,
-  },
-  actions: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: 10,
-    marginTop: 18,
-  },
   badge: {
     display: "inline-flex",
     border: "1px solid rgba(255,122,0,0.35)",
@@ -248,52 +216,92 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 950,
     fontSize: 12,
   },
+  error: {
+    marginTop: 12,
+    border: "1px solid rgba(239,68,68,0.35)",
+    borderRadius: 16,
+    background: "rgba(239,68,68,0.10)",
+    color: "#FCA5A5",
+    padding: 12,
+  },
+  success: {
+    marginTop: 12,
+    border: "1px solid rgba(34,197,94,0.35)",
+    borderRadius: 16,
+    background: "rgba(34,197,94,0.10)",
+    color: "#86EFAC",
+    padding: 12,
+  },
 };
 
 export default function LoginPage() {
   const router = useRouter();
-  const [current, setCurrent] = useState<FuseUser>(ACCOUNTS[0]);
+  const [email, setEmail] = useState("admin@fuse.iq");
+  const [password, setPassword] = useState("");
+  const [currentEmail, setCurrentEmail] = useState("");
+  const [currentRole, setCurrentRole] = useState<FuseRole>("guest");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const [nextTarget, setNextTarget] = useState("/");
 
   useEffect(() => {
-    const user = readCurrentUser();
-    setCurrent(user);
-    setNextTarget(getNextTarget(user.role));
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") || window.localStorage.getItem("fuseRedirectAfterLogin") || "/";
+    setNextTarget(next);
+
+    const unsubscribe = onAuthStateChanged(fuseAuth, (user) => {
+      if (!user) {
+        clearSession();
+        setCurrentEmail("");
+        setCurrentRole("guest");
+        return;
+      }
+
+      const role = roleFromEmail(user.email);
+      saveSession(user, role);
+      setCurrentEmail(user.email || "");
+      setCurrentRole(role);
+      setEmail(user.email || "admin@fuse.iq");
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const nextLabel = useMemo(() => {
+    if (nextTarget.includes("system-tools")) return "أدوات النظام";
     if (nextTarget.includes("restaurant-admin")) return "لوحة المطعم";
     if (nextTarget.includes("auto-dispatch")) return "التوزيع التلقائي";
     if (nextTarget.includes("driver-app")) return "تطبيق السائق";
     if (nextTarget.includes("fuse-admin")) return "لوحة الإدارة";
-    if (nextTarget.includes("system-tools")) return "أدوات النظام";
     return "لوحتي";
   }, [nextTarget]);
 
-  function loginAs(user: FuseUser) {
-    saveUser(user);
-    setCurrent(user);
+  async function handleLogin() {
+    setLoading(true);
+    setMessage("");
 
-    const target = getNextTarget(user.role);
-    router.push(target);
+    try {
+      const result = await signInWithEmailAndPassword(fuseAuth, email.trim(), password);
+      const role = roleFromEmail(result.user.email);
+
+      saveSession(result.user, role);
+
+      const target = getNextTarget(role);
+      router.push(target);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "تعذر تسجيل الدخول";
+      setMessage(`خطأ بتسجيل الدخول: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function enterDashboard() {
-    saveUser(current);
-    const target = getNextTarget(current.role);
-    router.push(target);
-  }
-
-  function logout() {
-    window.localStorage.removeItem("fuseUser");
-    window.localStorage.removeItem("fuseEmail");
-    window.localStorage.removeItem("fuseRole");
-    window.localStorage.removeItem("email");
-    window.localStorage.removeItem("role");
-
-    const guest = ACCOUNTS[3];
-    setCurrent(guest);
-    saveUser(guest);
+  async function handleLogout() {
+    await signOut(fuseAuth);
+    clearSession();
+    setCurrentEmail("");
+    setCurrentRole("guest");
+    setPassword("");
     router.push("/");
   }
 
@@ -305,51 +313,83 @@ export default function LoginPage() {
             الرئيسية
           </Link>
 
-          <span style={styles.pill}>FUSE Access</span>
+          <span style={styles.pill}>FUSE Firebase Auth</span>
         </header>
 
         <section style={styles.panel}>
           <div style={styles.hero}>
-            <p style={styles.eyebrow}>Login / Logout + Roles</p>
+            <p style={styles.eyebrow}>Real Firebase Login</p>
             <h1 style={styles.title}>
               دخول فيوز
               <br />
-              <span style={styles.orange}>حسب الصلاحية</span>
+              <span style={styles.orange}>بحساب حقيقي</span>
             </h1>
+
             <p style={styles.muted}>
-              الإدارة تدخل كل النظام، المطعم يدخل لوحة المطعم، السائق يدخل تطبيق السائق،
-              والزبون يدخل الطلبات المباشرة والتتبع والتقييم.
+              استخدم الحسابات اللي أضفتها داخل Firebase Authentication. بعد الدخول راح يرجعك
+              مباشرة إلى الصفحة المطلوبة: {nextLabel}.
             </p>
 
-            <div style={styles.currentCard}>
-              <p style={{ ...styles.muted, margin: 0 }}>مسجل دخول حالياً</p>
-
-              <h2 style={{ margin: "10px 0 0", fontSize: 34, fontWeight: 950 }}>
-                {current.name}
+            <div style={styles.form}>
+              <p style={{ ...styles.muted, margin: 0 }}>الحساب الحالي</p>
+              <h2 style={{ margin: "8px 0 0", fontSize: 28, fontWeight: 950 }}>
+                {currentEmail || "غير مسجل"}
               </h2>
+              <span style={styles.badge}>{roleLabel(currentRole)}</span>
 
-              <p style={{ ...styles.muted, direction: "ltr" }}>{current.email}</p>
-
-              <span style={styles.badge}>{current.label}</span>
-
-              <div style={styles.actions}>
-                <button onClick={enterDashboard} style={styles.mainButton}>
+              {currentEmail ? (
+                <button onClick={() => router.push(getNextTarget(currentRole))} style={styles.mainButton}>
                   دخول {nextLabel}
                 </button>
+              ) : null}
 
-                <button onClick={logout} style={styles.logoutButton}>
+              {currentEmail ? (
+                <button onClick={handleLogout} style={styles.logoutButton}>
                   تسجيل خروج
                 </button>
-              </div>
+              ) : null}
             </div>
 
-            <h3 style={{ margin: "24px 0 0", fontSize: 22 }}>حسابات التجربة</h3>
+            <div style={styles.form}>
+              <label style={{ fontWeight: 900 }}>Email</label>
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                style={styles.input}
+                placeholder="admin@fuse.iq"
+              />
+
+              <label style={{ display: "block", marginTop: 14, fontWeight: 900 }}>Password</label>
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                style={styles.input}
+                placeholder="اكتب الباسورد اللي سويته في Firebase"
+                type="password"
+              />
+
+              <button disabled={loading} onClick={handleLogin} style={styles.mainButton}>
+                {loading ? "جاري الدخول..." : `دخول ${nextLabel}`}
+              </button>
+
+              {message ? <div style={styles.error}>{message}</div> : null}
+
+              {currentEmail ? (
+                <div style={styles.success}>مسجل دخول حقيقي عبر Firebase: {currentEmail}</div>
+              ) : null}
+            </div>
+
+            <h3 style={{ margin: "24px 0 0", fontSize: 22 }}>الحسابات</h3>
 
             <div style={styles.accountGrid}>
               {ACCOUNTS.map((account) => (
                 <button
                   key={account.email}
-                  onClick={() => loginAs(account)}
+                  onClick={() => {
+                    setEmail(account.email);
+                    setPassword("");
+                    setMessage("اكتب باسورد هذا الحساب ثم اضغط دخول.");
+                  }}
                   style={styles.accountButton}
                 >
                   <strong style={{ fontSize: 18 }}>{account.name}</strong>
