@@ -1,4 +1,4 @@
-export type FuseRole = "admin" | "restaurant" | "driver" | "customer";
+﻿export type FuseRole = "admin" | "restaurant" | "driver" | "customer";
 
 export type FuseAccount = {
   email: string;

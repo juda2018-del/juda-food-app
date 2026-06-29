@@ -528,7 +528,7 @@ export default function RestaurantAdminPage() {
     const saved = readSession();
 
     if (!saved) {
-      window.location.href = "/login?next=/restaurant-admin";
+console.log('FUSE disabled old restaurant login redirect');
       return;
     }
 

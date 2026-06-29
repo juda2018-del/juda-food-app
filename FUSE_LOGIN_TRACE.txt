@@ -1,0 +1,70 @@
+﻿===== FUSE LOGIN REDIRECT TRACE =====
+
+===== أي ملف يذكر /login =====
+C:\Users\RQ\Desktop\2026\juda-food-app\app\app\FuseAuthGuard.tsx:17  const publicRoutes = ["/", "/login", "/logout"];
+C:\Users\RQ\Desktop\2026\juda-food-app\app\app\FuseAuthGuard.tsx:61  return "/login";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\app\FuseAuthGuard.tsx:148  window.location.replace(`/login?next=${encodeURIComponent(path)}`);
+C:\Users\RQ\Desktop\2026\juda-food-app\app\components\FuseAuthGuard.tsx:17  const publicRoutes = ["/", "/login", "/logout"];
+C:\Users\RQ\Desktop\2026\juda-food-app\app\components\FuseAuthGuard.tsx:61  return "/login";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\components\FuseAuthGuard.tsx:148  window.location.replace(`/login?next=${encodeURIComponent(path)}`);
+C:\Users\RQ\Desktop\2026\juda-food-app\app\driver-app\page.tsx:414  <Link href="/login" style={styles.logout}>خروج</Link>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\drivers-admin\page.tsx:412  window.location.href = "/login?next=/drivers-admin";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\fuse-admin\page.tsx:426  window.location.href = "/login?next=/fuse-admin";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\live-orders\page.tsx:503  window.location.href = "/login?next=/live-orders";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\live-orders\page.tsx:578  router.replace("/login");
+C:\Users\RQ\Desktop\2026\juda-food-app\app\live-orders\page.tsx:591  <button onClick={() => router.push(role ? roleHome[role] : "/login")} style={styles.button}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\login\page.tsx:53  const next = params.get("next") || window.localStorage.getItem("fuseRedirectAfterLogin");
+C:\Users\RQ\Desktop\2026\juda-food-app\app\login\page.tsx:55  if (next && !next.startsWith("/login")) return next;
+C:\Users\RQ\Desktop\2026\juda-food-app\app\login\page.tsx:67  window.localStorage.removeItem("fuseRedirectAfterLogin");
+C:\Users\RQ\Desktop\2026\juda-food-app\app\login\page.tsx:247  const next = params.get("next") || window.localStorage.getItem("fuseRedirectAfterLogin") || "/restaurant-admin";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\login\page.tsx:314  window.location.assign("/login?next=/restaurant-admin");
+C:\Users\RQ\Desktop\2026\juda-food-app\app\logout\page.tsx:14  window.location.href = "/login";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\logout\page.tsx:31  <a href="/login" style={styles.link}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\notification-center\page.tsx:315  window.location.href = "/login?next=/notification-center";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\notification-center\page.tsx:390  <Link href={role ? roleHome[role] : "/login"} style={styles.pill}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\reports\page.tsx:361  window.location.href = "/login?next=/reports";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\reports\page.tsx:469  <Link href={role ? roleHome[role] : "/login"} style={styles.pill}>لوحتي</Link>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:531  window.location.href = "/login?next=/restaurant-admin";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:749  <Link href={role ? roleHome[role] : "/login"} style={styles.pill}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\page.tsx:631  window.location.href = "/login";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\page.tsx:680  <Link href={role ? roleHome[role] : "/login"} style={styles.activePill}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\page.tsx:685  <Link href="/login" style={styles.activePill}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\page.tsx:707  <Link href={session && role ? roleHome[role] : "/login"} style={styles.mainButton}>
+C:\Users\RQ\Desktop\2026\juda-food-app\components\RouteGuard.tsx:149  window.localStorage.setItem("fuseRedirectAfterLogin", pathname);
+C:\Users\RQ\Desktop\2026\juda-food-app\components\RouteGuard.tsx:156  window.location.replace(`${base}/login?next=${encodeURIComponent(pathname)}`);
+C:\Users\RQ\Desktop\2026\juda-food-app\lib\fuse-auth.ts:203  "/login",
+C:\Users\RQ\Desktop\2026\juda-food-app\lib\fuse-auth.ts:237  if (!role) return "/login";
+C:\Users\RQ\Desktop\2026\juda-food-app\lib\fuse-auth.ts:238  return roleHome[role] || "/login";
+
+===== داخل app/restaurant-admin: auth / redirect / localStorage =====
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\components\EmployeesCenter.tsx:3  { name: "أحمد", role: "كاشير", status: "متصل", shift: "صباحي" },
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\components\EmployeesCenter.tsx:4  { name: "علي", role: "مشرف طلبات", status: "متصل", shift: "مسائي" },
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\components\EmployeesCenter.tsx:5  { name: "حسين", role: "مطبخ", status: "غير متصل", shift: "صباحي" },
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\components\EmployeesCenter.tsx:51  {emp.role}
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:17  parseFuseRole,
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:18  roleHome,
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:19  roleTitle,
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:20  type FuseRole,
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:22  } from "@/lib/fuse-auth";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:76  const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:80  const role = parseFuseRole(parsed.role);
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:82  if (!parsed.email || !role) return null;
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:84  return { ...parsed, role };
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:158  role: FuseRole | null,
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:162  if (!role || !session) return false;
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:164  if (role === "admin") {
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:168  if (role === "restaurant") {
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:531  window.location.href = "/login?next=/restaurant-admin";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:535  if (saved.role !== "admin" && saved.role !== "restaurant") {
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:536  window.location.href = roleHome[saved.role] || "/live-orders";
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:542  if (saved.role === "restaurant" && saved.restaurant) {
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:591  const role = session?.role || null;
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:607  canSeeRestaurantData(getRestaurant(order), role, session, selectedRestaurant)
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:627  }, [orders, role, search, selectedRestaurant, session, statusFilter]);
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:631  canSeeRestaurantData(getRestaurant(item), role, session, selectedRestaurant)
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:633  }, [menu, role, selectedRestaurant, session]);
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:672  role === "restaurant" && session?.restaurant
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:749  <Link href={role ? roleHome[role] : "/login"} style={styles.pill}>
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:771  {role ? roleTitle[role] : "—"}
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:816  disabled={role === "restaurant"}
+C:\Users\RQ\Desktop\2026\juda-food-app\app\restaurant-admin\page.tsx:818  {role === "admin" ? <option value="الكل">الكل</option> : null}

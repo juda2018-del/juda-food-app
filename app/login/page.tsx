@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useRouter } from "next/navigation";
 import {
   browserLocalPersistence,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
-  type User,
 } from "firebase/auth";
 import { fuseAuth } from "../../lib/fuseAuthClient";
 
@@ -23,7 +21,7 @@ const ACCOUNTS = [
 ] as const;
 
 function roleFromEmail(email?: string | null): FuseRole {
-  const clean = (email || "").toLowerCase().trim();
+  const clean = String(email || "").toLowerCase().trim();
 
   if (clean === "admin@fuse.iq") return "admin";
   if (clean === "restaurant@fuse.iq") return "restaurant";
@@ -41,14 +39,6 @@ function roleLabel(role: FuseRole) {
   return "زائر";
 }
 
-function nameFromRole(role: FuseRole) {
-  if (role === "admin") return "FUSE إدارة";
-  if (role === "restaurant") return "مطعم فيروز";
-  if (role === "driver") return "kkkkkk";
-  if (role === "customer") return "FUSE زبون";
-  return "زائر";
-}
-
 function dashboardFor(role: FuseRole) {
   if (role === "admin") return "/fuse-admin";
   if (role === "restaurant") return "/restaurant-admin";
@@ -56,21 +46,15 @@ function dashboardFor(role: FuseRole) {
   return "/";
 }
 
-function saveSession(user: User, role: FuseRole) {
-  const payload = {
-    uid: user.uid,
-    email: user.email || "",
-    role,
-    name: nameFromRole(role),
-    label: roleLabel(role),
-  };
+function getNextTarget(role: FuseRole) {
+  if (typeof window === "undefined") return dashboardFor(role);
 
-  window.localStorage.setItem("fuseUser", JSON.stringify(payload));
-  window.localStorage.setItem("fuseUid", user.uid);
-  window.localStorage.setItem("fuseEmail", user.email || "");
-  window.localStorage.setItem("fuseRole", role);
-  window.localStorage.setItem("email", user.email || "");
-  window.localStorage.setItem("role", role);
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get("next") || window.localStorage.getItem("fuseRedirectAfterLogin");
+
+  if (next && !next.startsWith("/login")) return next;
+
+  return dashboardFor(role);
 }
 
 function clearSession() {
@@ -83,21 +67,42 @@ function clearSession() {
   window.localStorage.removeItem("fuseRedirectAfterLogin");
 }
 
-function getNextTarget(role: FuseRole) {
-  if (typeof window === "undefined") return dashboardFor(role);
+function saveSession(email: string, role: FuseRole, uid = "") {
+  const payload = {
+    uid,
+    email,
+    role,
+    name:
+      role === "admin"
+        ? "FUSE إدارة"
+        : role === "restaurant"
+        ? "مطعم فيروز"
+        : role === "driver"
+        ? "kkkkkk"
+        : "FUSE زبون",
+    label: roleLabel(role),
+  };
 
-  const params = new URLSearchParams(window.location.search);
-  const fromQuery = params.get("next");
-  const fromStorage = window.localStorage.getItem("fuseRedirectAfterLogin");
-  const target = fromQuery || fromStorage || dashboardFor(role);
+  window.localStorage.setItem("fuseUser", JSON.stringify(payload));
+  window.localStorage.setItem("fuseUid", uid);
+  window.localStorage.setItem("fuseEmail", email);
+  window.localStorage.setItem("fuseRole", role);
+  window.localStorage.setItem("email", email);
+  window.localStorage.setItem("role", role);
+}
 
-  window.localStorage.removeItem("fuseRedirectAfterLogin");
+function addRoleAccess(target: string, role: FuseRole, email: string) {
+  const origin =
+    window.location.hostname === "fuseiraq.com"
+      ? "https://www.fuseiraq.com"
+      : window.location.origin;
 
-  if (!target || target === "/login" || target.startsWith("/login?")) {
-    return dashboardFor(role);
-  }
+  const url = new URL(target, origin);
 
-  return target;
+  url.searchParams.set("fuseRole", role);
+  url.searchParams.set("fuseEmail", email);
+
+  return url.toString();
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -133,7 +138,6 @@ const styles: Record<string, CSSProperties> = {
     background:
       "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.12))",
     padding: 24,
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
   },
   hero: {
     border: "1px solid rgba(255,255,255,0.10)",
@@ -151,7 +155,7 @@ const styles: Record<string, CSSProperties> = {
   },
   orange: { color: "#FF7A00" },
   muted: { color: "rgba(255,255,255,0.64)", lineHeight: 1.9, fontSize: 14 },
-  form: {
+  box: {
     marginTop: 22,
     border: "1px solid rgba(255,122,0,0.18)",
     borderRadius: 28,
@@ -227,44 +231,37 @@ const styles: Record<string, CSSProperties> = {
     color: "#FCA5A5",
     padding: 12,
   },
-  success: {
-    marginTop: 12,
-    border: "1px solid rgba(34,197,94,0.35)",
-    borderRadius: 16,
-    background: "rgba(34,197,94,0.10)",
-    color: "#86EFAC",
-    padding: 12,
-  },
 };
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("admin@fuse.iq");
+  const [email, setEmail] = useState("restaurant@fuse.iq");
   const [password, setPassword] = useState("");
   const [currentEmail, setCurrentEmail] = useState("");
   const [currentRole, setCurrentRole] = useState<FuseRole>("guest");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [nextTarget, setNextTarget] = useState("/");
+  const [nextTarget, setNextTarget] = useState("/restaurant-admin");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const next = params.get("next") || window.localStorage.getItem("fuseRedirectAfterLogin") || "/";
+    const next = params.get("next") || window.localStorage.getItem("fuseRedirectAfterLogin") || "/restaurant-admin";
+
     setNextTarget(next);
 
     const unsubscribe = onAuthStateChanged(fuseAuth, (user) => {
       if (!user) {
-        clearSession();
         setCurrentEmail("");
         setCurrentRole("guest");
         return;
       }
 
       const role = roleFromEmail(user.email);
-      saveSession(user, role);
-      setCurrentEmail(user.email || "");
+      const userEmail = user.email || "";
+
+      saveSession(userEmail, role, user.uid);
+      setCurrentEmail(userEmail);
       setCurrentRole(role);
-      setEmail(user.email || "admin@fuse.iq");
+      setEmail(userEmail);
     });
 
     return () => unsubscribe();
@@ -292,11 +289,13 @@ export default function LoginPage() {
         password
       );
 
-      const role = roleFromEmail(result.user.email);
-      saveSession(result.user, role);
-
+      const userEmail = result.user.email || email.trim();
+      const role = roleFromEmail(userEmail);
       const target = getNextTarget(role);
-      window.location.assign(target);
+
+      saveSession(userEmail, role, result.user.uid);
+
+      window.location.assign(addRoleAccess(target, role, userEmail));
       return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : "تعذر تسجيل الدخول";
@@ -312,12 +311,16 @@ export default function LoginPage() {
     setCurrentEmail("");
     setCurrentRole("guest");
     setPassword("");
-    router.push("/");
+    window.location.assign("/login?next=/restaurant-admin");
   }
 
   function enterCurrentDashboard() {
-    const target = getNextTarget(currentRole);
-    window.location.assign(target);
+    const role = currentRole !== "guest" ? currentRole : roleFromEmail(currentEmail || email);
+    const userEmail = currentEmail || email;
+    const target = getNextTarget(role);
+
+    saveSession(userEmail, role, window.localStorage.getItem("fuseUid") || "");
+    window.location.assign(addRoleAccess(target, role, userEmail));
   }
 
   return (
@@ -334,6 +337,7 @@ export default function LoginPage() {
         <section style={styles.panel}>
           <div style={styles.hero}>
             <p style={styles.eyebrow}>Real Firebase Login</p>
+
             <h1 style={styles.title}>
               دخول فيوز
               <br />
@@ -341,15 +345,16 @@ export default function LoginPage() {
             </h1>
 
             <p style={styles.muted}>
-              استخدم الحسابات اللي أضفتها داخل Firebase Authentication. بعد الدخول راح يرجعك
-              مباشرة إلى الصفحة المطلوبة: {nextLabel}.
+              بعد الدخول راح يفتح مباشرة: {nextLabel}
             </p>
 
-            <div style={styles.form}>
+            <div style={styles.box}>
               <p style={{ ...styles.muted, margin: 0 }}>الحساب الحالي</p>
+
               <h2 style={{ margin: "8px 0 0", fontSize: 28, fontWeight: 950 }}>
                 {currentEmail || "غير مسجل"}
               </h2>
+
               <span style={styles.badge}>{roleLabel(currentRole)}</span>
 
               {currentEmail ? (
@@ -365,13 +370,13 @@ export default function LoginPage() {
               ) : null}
             </div>
 
-            <div style={styles.form}>
+            <div style={styles.box}>
               <label style={{ fontWeight: 900 }}>Email</label>
               <input
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 style={styles.input}
-                placeholder="admin@fuse.iq"
+                placeholder="restaurant@fuse.iq"
               />
 
               <label style={{ display: "block", marginTop: 14, fontWeight: 900 }}>
@@ -381,7 +386,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 style={styles.input}
-                placeholder="اكتب الباسورد اللي سويته في Firebase"
+                placeholder="اكتب باسورد Firebase"
                 type="password"
               />
 
@@ -390,12 +395,6 @@ export default function LoginPage() {
               </button>
 
               {message ? <div style={styles.error}>{message}</div> : null}
-
-              {currentEmail ? (
-                <div style={styles.success}>
-                  مسجل دخول حقيقي عبر Firebase: {currentEmail}
-                </div>
-              ) : null}
             </div>
 
             <h3 style={{ margin: "24px 0 0", fontSize: 22 }}>الحسابات</h3>
@@ -412,9 +411,11 @@ export default function LoginPage() {
                   style={styles.accountButton}
                 >
                   <strong style={{ fontSize: 18 }}>{account.name}</strong>
+
                   <p style={{ ...styles.muted, margin: "8px 0 0", direction: "ltr" }}>
                     {account.email}
                   </p>
+
                   <span style={styles.badge}>{account.label}</span>
                 </button>
               ))}
