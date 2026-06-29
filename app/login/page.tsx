@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import {
+  browserLocalPersistence,
   onAuthStateChanged,
+  setPersistence,
   signInWithEmailAndPassword,
   signOut,
   type User,
@@ -78,6 +80,7 @@ function clearSession() {
   window.localStorage.removeItem("fuseRole");
   window.localStorage.removeItem("email");
   window.localStorage.removeItem("role");
+  window.localStorage.removeItem("fuseRedirectAfterLogin");
 }
 
 function getNextTarget(role: FuseRole) {
@@ -281,13 +284,20 @@ export default function LoginPage() {
     setMessage("");
 
     try {
-      const result = await signInWithEmailAndPassword(fuseAuth, email.trim(), password);
-      const role = roleFromEmail(result.user.email);
+      await setPersistence(fuseAuth, browserLocalPersistence);
 
+      const result = await signInWithEmailAndPassword(
+        fuseAuth,
+        email.trim(),
+        password
+      );
+
+      const role = roleFromEmail(result.user.email);
       saveSession(result.user, role);
 
       const target = getNextTarget(role);
-      router.push(target);
+      window.location.assign(target);
+      return;
     } catch (error) {
       const msg = error instanceof Error ? error.message : "تعذر تسجيل الدخول";
       setMessage(`خطأ بتسجيل الدخول: ${msg}`);
@@ -303,6 +313,11 @@ export default function LoginPage() {
     setCurrentRole("guest");
     setPassword("");
     router.push("/");
+  }
+
+  function enterCurrentDashboard() {
+    const target = getNextTarget(currentRole);
+    window.location.assign(target);
   }
 
   return (
@@ -338,7 +353,7 @@ export default function LoginPage() {
               <span style={styles.badge}>{roleLabel(currentRole)}</span>
 
               {currentEmail ? (
-                <button onClick={() => router.push(getNextTarget(currentRole))} style={styles.mainButton}>
+                <button onClick={enterCurrentDashboard} style={styles.mainButton}>
                   دخول {nextLabel}
                 </button>
               ) : null}
@@ -359,7 +374,9 @@ export default function LoginPage() {
                 placeholder="admin@fuse.iq"
               />
 
-              <label style={{ display: "block", marginTop: 14, fontWeight: 900 }}>Password</label>
+              <label style={{ display: "block", marginTop: 14, fontWeight: 900 }}>
+                Password
+              </label>
               <input
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -375,7 +392,9 @@ export default function LoginPage() {
               {message ? <div style={styles.error}>{message}</div> : null}
 
               {currentEmail ? (
-                <div style={styles.success}>مسجل دخول حقيقي عبر Firebase: {currentEmail}</div>
+                <div style={styles.success}>
+                  مسجل دخول حقيقي عبر Firebase: {currentEmail}
+                </div>
               ) : null}
             </div>
 

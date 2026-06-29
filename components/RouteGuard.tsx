@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { fuseAuth } from "../lib/fuseAuthClient";
 
@@ -27,7 +27,7 @@ const ACCESS_RULES: AccessRule[] = [
     label: "الإدارة",
   },
   {
-    prefixes: ["/restaurant-admin", "/restaurant-live"],
+    prefixes: ["/restaurant-admin", "/restaurant-live", "/restaurants-admin"],
     roles: ["admin", "restaurant"],
     label: "لوحة المطعم",
   },
@@ -54,6 +54,14 @@ function roleFromEmail(email?: string | null): FuseRole {
   return "guest";
 }
 
+function labelFromRole(role: FuseRole) {
+  if (role === "admin") return "إدارة";
+  if (role === "restaurant") return "مطعم";
+  if (role === "driver") return "سائق";
+  if (role === "customer") return "زبون";
+  return "زائر";
+}
+
 function nameFromRole(role: FuseRole) {
   if (role === "admin") return "FUSE إدارة";
   if (role === "restaurant") return "مطعم فيروز";
@@ -68,16 +76,7 @@ function saveSession(user: User, role: FuseRole) {
     email: user.email || "",
     role,
     name: nameFromRole(role),
-    label:
-      role === "admin"
-        ? "إدارة"
-        : role === "restaurant"
-        ? "مطعم"
-        : role === "driver"
-        ? "سائق"
-        : role === "customer"
-        ? "زبون"
-        : "زائر",
+    label: labelFromRole(role),
   };
 
   window.localStorage.setItem("fuseUser", JSON.stringify(payload));
@@ -88,69 +87,126 @@ function saveSession(user: User, role: FuseRole) {
   window.localStorage.setItem("role", role);
 }
 
-function clearSession() {
-  window.localStorage.removeItem("fuseUser");
-  window.localStorage.removeItem("fuseUid");
-  window.localStorage.removeItem("fuseEmail");
-  window.localStorage.removeItem("fuseRole");
-  window.localStorage.removeItem("email");
-  window.localStorage.removeItem("role");
+function getLocalRole(): FuseRole {
+  if (typeof window === "undefined") return "guest";
+
+  const rawUser = window.localStorage.getItem("fuseUser");
+
+  if (rawUser) {
+    try {
+      const parsed = JSON.parse(rawUser) as { email?: string; role?: string };
+      const role = String(parsed.role || "").toLowerCase();
+
+      if (role === "admin") return "admin";
+      if (role === "restaurant") return "restaurant";
+      if (role === "driver") return "driver";
+      if (role === "customer") return "customer";
+
+      return roleFromEmail(parsed.email);
+    } catch {
+      // ignore
+    }
+  }
+
+  const role =
+    window.localStorage.getItem("fuseRole") ||
+    window.localStorage.getItem("role") ||
+    "";
+
+  if (role === "admin") return "admin";
+  if (role === "restaurant") return "restaurant";
+  if (role === "driver") return "driver";
+  if (role === "customer") return "customer";
+
+  return roleFromEmail(
+    window.localStorage.getItem("fuseEmail") ||
+      window.localStorage.getItem("email")
+  );
 }
 
 function getRule(pathname: string): AccessRule | null {
   return (
     ACCESS_RULES.find((rule) =>
-      rule.prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+      rule.prefixes.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+      )
     ) || null
   );
 }
 
+function goLogin(pathname: string) {
+  window.localStorage.setItem("fuseRedirectAfterLogin", pathname);
+  window.location.href = `/login?next=${encodeURIComponent(pathname)}`;
+}
+
 export default function RouteGuard() {
   const pathname = usePathname() || "/";
-  const router = useRouter();
   const rule = useMemo(() => getRule(pathname), [pathname]);
   const [checking, setChecking] = useState(Boolean(rule));
-  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     if (!rule) {
       setChecking(false);
-      setBlocked(false);
       return;
     }
 
-    setChecking(true);
-    setBlocked(false);
+    let finished = false;
+
+    const localRole = getLocalRole();
+
+    if (rule.roles.includes(localRole)) {
+      setChecking(false);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      if (finished) return;
+
+      const roleAfterWait = getLocalRole();
+
+      if (rule.roles.includes(roleAfterWait)) {
+        setChecking(false);
+        return;
+      }
+
+      goLogin(pathname);
+    }, 1800);
 
     const unsubscribe = onAuthStateChanged(fuseAuth, (user) => {
+      finished = true;
+      window.clearTimeout(timeout);
+
       if (!user) {
-        clearSession();
-        window.localStorage.setItem("fuseRedirectAfterLogin", pathname);
-        setBlocked(true);
-        setChecking(false);
-        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        const fallbackRole = getLocalRole();
+
+        if (rule.roles.includes(fallbackRole)) {
+          setChecking(false);
+          return;
+        }
+
+        goLogin(pathname);
         return;
       }
 
-      const role = roleFromEmail(user.email);
-      saveSession(user, role);
+      const firebaseRole = roleFromEmail(user.email);
+      saveSession(user, firebaseRole);
 
-      if (!rule.roles.includes(role)) {
-        window.localStorage.setItem("fuseRedirectAfterLogin", pathname);
-        setBlocked(true);
-        setChecking(false);
-        router.replace(`/login?next=${encodeURIComponent(pathname)}&blocked=1`);
+      if (!rule.roles.includes(firebaseRole)) {
+        goLogin(pathname);
         return;
       }
 
-      setBlocked(false);
       setChecking(false);
     });
 
-    return () => unsubscribe();
-  }, [pathname, router, rule]);
+    return () => {
+      finished = true;
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
+  }, [pathname, rule]);
 
-  if (!rule || (!checking && !blocked)) return null;
+  if (!rule || !checking) return null;
 
   return (
     <div
@@ -178,10 +234,12 @@ export default function RouteGuard() {
           textAlign: "center",
         }}
       >
-        <p style={{ margin: 0, color: "#FF7A00", fontWeight: 900 }}>FUSE Security</p>
+        <p style={{ margin: 0, color: "#FF7A00", fontWeight: 900 }}>
+          FUSE Security
+        </p>
         <h1 style={{ margin: "12px 0", fontSize: 34 }}>فحص الصلاحيات</h1>
         <p style={{ margin: 0, color: "rgba(255,255,255,0.65)", lineHeight: 1.8 }}>
-          هاي الصفحة تحتاج تسجيل دخول Firebase حقيقي. راح نحولك لصفحة الدخول.
+          جاري التأكد من تسجيل الدخول والصلاحية...
         </p>
       </div>
     </div>
