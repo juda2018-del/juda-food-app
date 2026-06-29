@@ -1,7 +1,6 @@
 ﻿import type { ReactNode } from "react";
 import { Suspense } from "react";
-import FirebaseRouteGuard from "@/components/auth/FirebaseRouteGuard";
-import RestaurantWrongRoleRedirect from "./RestaurantWrongRoleRedirect";
+import RestaurantAdminGate from "./RestaurantAdminGate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -12,11 +11,8 @@ export default function RestaurantAdminLayout({
   children: ReactNode;
 }) {
   return (
-    <FirebaseRouteGuard>
-      <Suspense fallback={null}>
-        <RestaurantWrongRoleRedirect />
-      </Suspense>
-      {children}
-    </FirebaseRouteGuard>
+    <Suspense fallback={null}>
+      <RestaurantAdminGate>{children}</RestaurantAdminGate>
+    </Suspense>
   );
 }
