@@ -1,180 +1,217 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FUSE_COOKIE_EMAIL,
-  FUSE_COOKIE_NAME,
-  FUSE_COOKIE_PHONE,
-  FUSE_COOKIE_RESTAURANT,
-  FUSE_COOKIE_ROLE,
-  FUSE_LOCAL_SESSION,
-  buildSession,
-  findFuseAccount,
-  fuseAccounts,
-  roleHome,
-  roleTitle,
-  type FuseRole,
-  type FuseSession,
-} from "@/lib/fuse-auth";
 
-function setCookie(name: string, value: string, maxAge = 60 * 60 * 24 * 7) {
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-}
+type FuseRole = "admin" | "restaurant" | "driver" | "customer";
 
-function clearCookie(name: string) {
-  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
-}
-
-function readSession(): FuseSession | null {
-  try {
-    const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as FuseSession;
-    if (!parsed?.email || !parsed?.role) return null;
-
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function getNextPath() {
-  if (typeof window === "undefined") return "";
-  const params = new URLSearchParams(window.location.search);
-  const next = params.get("next");
-  return next && next.startsWith("/") ? next : "";
-}
-
-const roleBadge: Record<FuseRole, CSSProperties> = {
-  admin: {
-    borderColor: "rgba(255,122,0,0.45)",
-    background: "rgba(255,122,0,0.12)",
-    color: "#FFB56B",
-  },
-  restaurant: {
-    borderColor: "rgba(34,197,94,0.45)",
-    background: "rgba(34,197,94,0.12)",
-    color: "#86EFAC",
-  },
-  driver: {
-    borderColor: "rgba(14,165,233,0.45)",
-    background: "rgba(14,165,233,0.12)",
-    color: "#7DD3FC",
-  },
-  customer: {
-    borderColor: "rgba(168,85,247,0.45)",
-    background: "rgba(168,85,247,0.12)",
-    color: "#D8B4FE",
-  },
+type FuseUser = {
+  email: string;
+  role: FuseRole;
+  name: string;
+  label: string;
 };
+
+const ACCOUNTS: FuseUser[] = [
+  {
+    email: "admin@fuse.iq",
+    role: "admin",
+    name: "FUSE إدارة",
+    label: "إدارة",
+  },
+  {
+    email: "restaurant@fuse.iq",
+    role: "restaurant",
+    name: "مطعم فيروز",
+    label: "مطعم",
+  },
+  {
+    email: "driver@fuse.iq",
+    role: "driver",
+    name: "kkkkkk",
+    label: "سائق",
+  },
+  {
+    email: "customer@fuse.iq",
+    role: "customer",
+    name: "FUSE زبون",
+    label: "زبون",
+  },
+];
+
+function dashboardFor(role: FuseRole) {
+  if (role === "admin") return "/fuse-admin";
+  if (role === "restaurant") return "/restaurant-admin";
+  if (role === "driver") return "/driver-app";
+  return "/";
+}
+
+function roleFromEmail(email?: string): FuseRole {
+  const clean = (email || "").toLowerCase().trim();
+
+  if (clean === "admin@fuse.iq") return "admin";
+  if (clean === "restaurant@fuse.iq") return "restaurant";
+  if (clean === "driver@fuse.iq") return "driver";
+
+  return "customer";
+}
+
+function roleLabel(role: FuseRole) {
+  if (role === "admin") return "إدارة";
+  if (role === "restaurant") return "مطعم";
+  if (role === "driver") return "سائق";
+  return "زبون";
+}
+
+function readCurrentUser(): FuseUser {
+  if (typeof window === "undefined") return ACCOUNTS[0];
+
+  const raw = window.localStorage.getItem("fuseUser");
+
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as Partial<FuseUser>;
+      const email = parsed.email || "admin@fuse.iq";
+      const role = (parsed.role as FuseRole) || roleFromEmail(email);
+
+      return {
+        email,
+        role,
+        name: parsed.name || (role === "admin" ? "FUSE إدارة" : roleLabel(role)),
+        label: parsed.label || roleLabel(role),
+      };
+    } catch {
+      // ignore bad old storage
+    }
+  }
+
+  const email = window.localStorage.getItem("fuseEmail") || "admin@fuse.iq";
+  const role = (window.localStorage.getItem("fuseRole") as FuseRole) || roleFromEmail(email);
+
+  return {
+    email,
+    role,
+    name: role === "admin" ? "FUSE إدارة" : roleLabel(role),
+    label: roleLabel(role),
+  };
+}
+
+function saveUser(user: FuseUser) {
+  window.localStorage.setItem("fuseUser", JSON.stringify(user));
+  window.localStorage.setItem("fuseEmail", user.email);
+  window.localStorage.setItem("fuseRole", user.role);
+  window.localStorage.setItem("email", user.email);
+  window.localStorage.setItem("role", user.role);
+}
+
+function getNextTarget(role: FuseRole) {
+  if (typeof window === "undefined") return dashboardFor(role);
+
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("next");
+  const fromStorage = window.localStorage.getItem("fuseRedirectAfterLogin");
+
+  const target = fromQuery || fromStorage || dashboardFor(role);
+
+  window.localStorage.removeItem("fuseRedirectAfterLogin");
+
+  if (!target || target === "/login" || target.startsWith("/login?")) {
+    return dashboardFor(role);
+  }
+
+  return target;
+}
 
 const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top right, rgba(255,122,0,0.18), transparent 32%), #050505",
+      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
     color: "white",
-    padding: "28px 18px",
+    padding: "28px 16px",
     fontFamily: "Arial, sans-serif",
   },
   shell: {
     width: "100%",
-    maxWidth: 1120,
+    maxWidth: 1180,
     margin: "0 auto",
   },
   top: {
     display: "flex",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: 12,
+    flexWrap: "wrap",
     marginBottom: 18,
   },
-  logoPill: {
-    border: "1px solid rgba(255,255,255,0.14)",
+  pill: {
+    border: "1px solid rgba(255,255,255,0.13)",
     borderRadius: 999,
-    padding: "12px 18px",
     background: "rgba(255,255,255,0.05)",
-    fontWeight: 900,
-    letterSpacing: 0.4,
-  },
-  homeLink: {
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 999,
-    padding: "11px 16px",
-    background: "rgba(255,255,255,0.04)",
-    color: "rgba(255,255,255,0.8)",
+    padding: "12px 18px",
+    color: "white",
     textDecoration: "none",
-    fontSize: 14,
-    fontWeight: 800,
+    fontWeight: 900,
+  },
+  panel: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 34,
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.12))",
+    padding: 24,
+    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
   },
   hero: {
     border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 34,
-    background: "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,122,0,0.10))",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-    overflow: "hidden",
-  },
-  heroInner: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr)",
-    gap: 18,
-    padding: 22,
-  },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.42)",
-    padding: 22,
+    borderRadius: 30,
+    background: "rgba(0,0,0,0.36)",
+    padding: 26,
+    textAlign: "right",
   },
   eyebrow: {
     margin: 0,
     color: "#FF7A00",
     fontSize: 13,
-    fontWeight: 900,
+    fontWeight: 950,
   },
   title: {
     margin: "10px 0 0",
-    fontSize: "clamp(34px, 5vw, 58px)",
-    lineHeight: 1.12,
+    fontSize: "clamp(44px, 7vw, 76px)",
+    lineHeight: 1.06,
     fontWeight: 950,
   },
   orange: {
     color: "#FF7A00",
   },
-  text: {
-    margin: "16px 0 0",
-    color: "rgba(255,255,255,0.62)",
-    fontSize: 15,
+  muted: {
+    color: "rgba(255,255,255,0.64)",
     lineHeight: 1.9,
-    maxWidth: 720,
-  },
-  form: {
-    display: "grid",
-    gap: 13,
-    marginTop: 20,
-  },
-  label: {
-    display: "grid",
-    gap: 8,
-    color: "rgba(255,255,255,0.72)",
     fontSize: 14,
-    fontWeight: 900,
   },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
+  currentCard: {
+    marginTop: 22,
+    border: "1px solid rgba(34,197,94,0.28)",
+    borderRadius: 28,
+    background: "rgba(34,197,94,0.10)",
+    padding: 20,
+  },
+  accountGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+    gap: 12,
+    marginTop: 18,
+  },
+  accountButton: {
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 22,
+    background: "rgba(0,0,0,0.28)",
     color: "white",
-    padding: "15px 16px",
-    outline: "none",
-    fontSize: 15,
+    padding: 16,
+    cursor: "pointer",
+    textAlign: "right",
   },
-  primaryButton: {
+  mainButton: {
     width: "100%",
     border: 0,
     borderRadius: 18,
@@ -185,269 +222,146 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 950,
     fontSize: 15,
   },
-  ghostButton: {
+  logoutButton: {
     width: "100%",
-    border: "1px solid rgba(239,68,68,0.35)",
+    border: "1px solid rgba(239,68,68,0.38)",
     borderRadius: 18,
-    background: "rgba(239,68,68,0.10)",
-    color: "#FECACA",
-    padding: "15px 18px",
+    background: "rgba(239,68,68,0.08)",
+    color: "#FCA5A5",
+    padding: "16px 18px",
     cursor: "pointer",
     fontWeight: 950,
     fontSize: 15,
   },
-  demoGrid: {
+  actions: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-    gap: 12,
-    marginTop: 16,
-  },
-  demoCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 22,
-    background: "rgba(255,255,255,0.04)",
-    padding: 16,
-    textAlign: "right",
-    color: "white",
-    cursor: "pointer",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+    marginTop: 18,
   },
   badge: {
     display: "inline-flex",
-    border: "1px solid",
+    border: "1px solid rgba(255,122,0,0.35)",
     borderRadius: 999,
-    padding: "7px 11px",
+    color: "#FFB56B",
+    padding: "7px 10px",
+    fontWeight: 950,
     fontSize: 12,
-    fontWeight: 900,
-  },
-  error: {
-    border: "1px solid rgba(239,68,68,0.28)",
-    borderRadius: 18,
-    background: "rgba(239,68,68,0.10)",
-    color: "#FECACA",
-    padding: 14,
-    fontSize: 14,
-    fontWeight: 800,
   },
 };
 
 export default function LoginPage() {
   const router = useRouter();
-
-  const [email, setEmail] = useState("admin@fuse.iq");
-  const [password, setPassword] = useState("123456");
-  const [session, setSession] = useState<FuseSession | null>(null);
-  const [error, setError] = useState("");
+  const [current, setCurrent] = useState<FuseUser>(ACCOUNTS[0]);
+  const [nextTarget, setNextTarget] = useState("/");
 
   useEffect(() => {
-    setSession(readSession());
+    const user = readCurrentUser();
+    setCurrent(user);
+    setNextTarget(getNextTarget(user.role));
   }, []);
 
-  function saveSession(nextSession: FuseSession) {
-    localStorage.setItem(FUSE_LOCAL_SESSION, JSON.stringify(nextSession));
+  const nextLabel = useMemo(() => {
+    if (nextTarget.includes("restaurant-admin")) return "لوحة المطعم";
+    if (nextTarget.includes("auto-dispatch")) return "التوزيع التلقائي";
+    if (nextTarget.includes("driver-app")) return "تطبيق السائق";
+    if (nextTarget.includes("fuse-admin")) return "لوحة الإدارة";
+    if (nextTarget.includes("system-tools")) return "أدوات النظام";
+    return "لوحتي";
+  }, [nextTarget]);
 
-    setCookie(FUSE_COOKIE_ROLE, nextSession.role);
-    setCookie(FUSE_COOKIE_EMAIL, nextSession.email);
-    setCookie(FUSE_COOKIE_NAME, nextSession.name);
-    setCookie(FUSE_COOKIE_PHONE, nextSession.phone || "");
-    setCookie(FUSE_COOKIE_RESTAURANT, nextSession.restaurant || "");
+  function loginAs(user: FuseUser) {
+    saveUser(user);
+    setCurrent(user);
 
-    setSession(nextSession);
+    const target = getNextTarget(user.role);
+    router.push(target);
+  }
+
+  function enterDashboard() {
+    saveUser(current);
+    const target = getNextTarget(current.role);
+    router.push(target);
   }
 
   function logout() {
-    localStorage.removeItem(FUSE_LOCAL_SESSION);
+    window.localStorage.removeItem("fuseUser");
+    window.localStorage.removeItem("fuseEmail");
+    window.localStorage.removeItem("fuseRole");
+    window.localStorage.removeItem("email");
+    window.localStorage.removeItem("role");
 
-    clearCookie(FUSE_COOKIE_ROLE);
-    clearCookie(FUSE_COOKIE_EMAIL);
-    clearCookie(FUSE_COOKIE_NAME);
-    clearCookie(FUSE_COOKIE_PHONE);
-    clearCookie(FUSE_COOKIE_RESTAURANT);
-
-    setSession(null);
-    router.replace("/login");
-    router.refresh();
-  }
-
-  function login() {
-    setError("");
-
-    const account = findFuseAccount(email, password);
-
-    if (!account) {
-      setError("الإيميل أو كلمة المرور غير صحيحة. اختار حساب ديمو من الأسفل.");
-      return;
-    }
-
-    const nextSession = buildSession(account);
-    saveSession(nextSession);
-
-    const next = getNextPath();
-    router.replace(next || roleHome[nextSession.role] || "/live-orders");
-    router.refresh();
+    const guest = ACCOUNTS[3];
+    setCurrent(guest);
+    saveUser(guest);
+    router.push("/");
   }
 
   return (
     <main dir="rtl" style={styles.page}>
       <section style={styles.shell}>
-        <div style={styles.top}>
-          <div style={styles.logoPill}>FUSE Access</div>
-          <Link href="/" style={styles.homeLink}>
+        <header style={styles.top}>
+          <Link href="/" style={styles.pill}>
             الرئيسية
           </Link>
-        </div>
 
-        <div style={styles.hero}>
-          <div style={styles.heroInner}>
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>Login / Logout + Roles</p>
+          <span style={styles.pill}>FUSE Access</span>
+        </header>
 
-              <h1 style={styles.title}>
-                دخول فيوز
-                <br />
-                <span style={styles.orange}>حسب الصلاحية</span>
-              </h1>
+        <section style={styles.panel}>
+          <div style={styles.hero}>
+            <p style={styles.eyebrow}>Login / Logout + Roles</p>
+            <h1 style={styles.title}>
+              دخول فيوز
+              <br />
+              <span style={styles.orange}>حسب الصلاحية</span>
+            </h1>
+            <p style={styles.muted}>
+              الإدارة تدخل كل النظام، المطعم يدخل لوحة المطعم، السائق يدخل تطبيق السائق،
+              والزبون يدخل الطلبات المباشرة والتتبع والتقييم.
+            </p>
 
-              <p style={styles.text}>
-                الإدارة تدخل كل النظام. المطعم يدخل لوحة المطعم والطلبات.
-                السائق يدخل تطبيق السائق. الزبون يدخل الطلبات المباشرة والتتبع والتقييم،
-                وما يگدر يفتح System Tools.
-              </p>
+            <div style={styles.currentCard}>
+              <p style={{ ...styles.muted, margin: 0 }}>مسجل دخول حالياً</p>
 
-              {session ? (
-                <div style={{ ...styles.card, marginTop: 20, background: "rgba(34,197,94,0.08)" }}>
-                  <p style={{ margin: 0, color: "rgba(255,255,255,0.55)", fontSize: 13 }}>
-                    مسجل دخول حالياً
-                  </p>
+              <h2 style={{ margin: "10px 0 0", fontSize: 34, fontWeight: 950 }}>
+                {current.name}
+              </h2>
 
-                  <h2 style={{ margin: "8px 0 0", fontSize: 28, fontWeight: 950 }}>
-                    {session.name}
-                  </h2>
+              <p style={{ ...styles.muted, direction: "ltr" }}>{current.email}</p>
 
-                  <p style={{ margin: "7px 0 0", color: "rgba(255,255,255,0.55)", direction: "ltr" }}>
-                    {session.email}
-                  </p>
+              <span style={styles.badge}>{current.label}</span>
 
-                  <div style={{ marginTop: 14 }}>
-                    <span style={{ ...styles.badge, ...roleBadge[session.role] }}>
-                      {roleTitle[session.role]}
-                    </span>
-                  </div>
+              <div style={styles.actions}>
+                <button onClick={enterDashboard} style={styles.mainButton}>
+                  دخول {nextLabel}
+                </button>
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                      gap: 10,
-                      marginTop: 18,
-                    }}
-                  >
-                    <button
-                      onClick={() => router.push(roleHome[session.role])}
-                      style={styles.primaryButton}
-                    >
-                      دخول لوحتي
-                    </button>
-
-                    <button onClick={logout} style={styles.ghostButton}>
-                      تسجيل خروج
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={styles.form}>
-                  <label style={styles.label}>
-                    الإيميل
-                    <input
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      style={styles.input}
-                      dir="ltr"
-                      placeholder="admin@fuse.iq"
-                    />
-                  </label>
-
-                  <label style={styles.label}>
-                    كلمة المرور
-                    <input
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") login();
-                      }}
-                      style={styles.input}
-                      dir="ltr"
-                      type="password"
-                      placeholder="123456"
-                    />
-                  </label>
-
-                  {error ? <div style={styles.error}>{error}</div> : null}
-
-                  <button onClick={login} style={styles.primaryButton}>
-                    دخول
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={styles.card}>
-              <h2 style={{ margin: 0, fontSize: 24, fontWeight: 950 }}>حسابات الديمو</h2>
-              <p style={{ margin: "8px 0 0", color: "rgba(255,255,255,0.50)", lineHeight: 1.8 }}>
-                اضغط على أي حساب حتى يتعبّى تلقائياً.
-              </p>
-
-              <div style={styles.demoGrid}>
-                {fuseAccounts.map((account) => (
-                  <button
-                    key={account.email}
-                    onClick={() => {
-                      setEmail(account.email);
-                      setPassword(account.password);
-                      setError("");
-                    }}
-                    style={styles.demoCard}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 950 }}>
-                          {account.name}
-                        </h3>
-                        <p
-                          style={{
-                            margin: "8px 0 0",
-                            color: "rgba(255,255,255,0.48)",
-                            direction: "ltr",
-                            fontSize: 13,
-                          }}
-                        >
-                          {account.email}
-                        </p>
-                      </div>
-
-                      <span style={{ ...styles.badge, ...roleBadge[account.role] }}>
-                        {roleTitle[account.role]}
-                      </span>
-                    </div>
-
-                    <p
-                      style={{
-                        margin: "12px 0 0",
-                        borderRadius: 14,
-                        background: "rgba(255,255,255,0.06)",
-                        padding: "9px 10px",
-                        color: "rgba(255,255,255,0.46)",
-                        direction: "ltr",
-                        fontSize: 12,
-                      }}
-                    >
-                      password: {account.password} / also accepts 1234
-                    </p>
-                  </button>
-                ))}
+                <button onClick={logout} style={styles.logoutButton}>
+                  تسجيل خروج
+                </button>
               </div>
             </div>
+
+            <h3 style={{ margin: "24px 0 0", fontSize: 22 }}>حسابات التجربة</h3>
+
+            <div style={styles.accountGrid}>
+              {ACCOUNTS.map((account) => (
+                <button
+                  key={account.email}
+                  onClick={() => loginAs(account)}
+                  style={styles.accountButton}
+                >
+                  <strong style={{ fontSize: 18 }}>{account.name}</strong>
+                  <p style={{ ...styles.muted, margin: "8px 0 0", direction: "ltr" }}>
+                    {account.email}
+                  </p>
+                  <span style={styles.badge}>{account.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
       </section>
     </main>
   );
