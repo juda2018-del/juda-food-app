@@ -1,4 +1,4 @@
- import { initializeApp } from "firebase/app";
+ import { getApp, getApps, initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
 import { getAuth } from "firebase/auth";
@@ -13,7 +13,7 @@ const firebaseConfig = {
   measurementId: "G-H27FJ7XVJS",
 };
 
-export const app = initializeApp(firebaseConfig);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 
