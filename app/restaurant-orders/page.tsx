@@ -7,27 +7,62 @@ type LiveOrder = {
   [key: string]: any;
 };
 
-const PAGE_VERSION = "FUSE_RESTAURANT_ORDERS_V11_SAFE_RUNTIME";
+const PAGE_VERSION = "FUSE_RESTAURANT_ORDERS_V12_REST_NO_FIREBASE_SDK";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "",
-};
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+
+function decodeFirestoreValue(value: any): any {
+  if (!value || typeof value !== "object") return value;
+
+  if ("stringValue" in value) return value.stringValue;
+  if ("integerValue" in value) return Number(value.integerValue);
+  if ("doubleValue" in value) return Number(value.doubleValue);
+  if ("booleanValue" in value) return Boolean(value.booleanValue);
+  if ("timestampValue" in value) return value.timestampValue;
+  if ("nullValue" in value) return null;
+
+  if ("arrayValue" in value) {
+    const values = value.arrayValue?.values || [];
+    return values.map(decodeFirestoreValue);
+  }
+
+  if ("mapValue" in value) {
+    const fields = value.mapValue?.fields || {};
+    const obj: Record<string, any> = {};
+
+    for (const key of Object.keys(fields)) {
+      obj[key] = decodeFirestoreValue(fields[key]);
+    }
+
+    return obj;
+  }
+
+  return value;
+}
+
+function decodeDocument(doc: any): LiveOrder {
+  const fields = doc.fields || {};
+  const id = String(doc.name || "").split("/").pop() || "unknown";
+  const obj: LiveOrder = { id };
+
+  for (const key of Object.keys(fields)) {
+    obj[key] = decodeFirestoreValue(fields[key]);
+  }
+
+  return obj;
+}
 
 function toMillis(value: any): number {
   if (!value) return 0;
-  if (typeof value?.toDate === "function") return value.toDate().getTime();
-  if (typeof value?.seconds === "number") return value.seconds * 1000;
   if (typeof value === "number") return value;
 
   if (typeof value === "string") {
     const parsed = Date.parse(value);
     return Number.isNaN(parsed) ? 0 : parsed;
   }
+
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
 
   return 0;
 }
@@ -42,18 +77,31 @@ function orderTime(order: LiveOrder): number {
   );
 }
 
+function formatDate(value: any): string {
+  const millis = toMillis(value);
+  if (!millis) return "بدون وقت";
+
+  return new Intl.DateTimeFormat("ar-IQ", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(millis));
+}
+
 function getText(order: LiveOrder, keys: string[], fallback: string): string {
   for (const key of keys) {
     const value = order[key];
+
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number") return String(value);
   }
+
   return fallback;
 }
 
 function getNumber(order: LiveOrder, keys: string[]): number | null {
   for (const key of keys) {
     const value = order[key];
+
     if (typeof value === "number" && Number.isFinite(value)) return value;
 
     if (typeof value === "string") {
@@ -72,14 +120,24 @@ function money(value: number | null): string {
 
 function getItems(order: LiveOrder): any[] {
   const raw = order.items || order.cart || order.orderItems || order.products || order.meals || [];
+
   if (Array.isArray(raw)) return raw;
   if (raw && typeof raw === "object") return Object.values(raw);
+
   return [];
 }
 
 function itemName(item: any): string {
   if (typeof item === "string") return item;
-  return item?.name || item?.title || item?.itemName || item?.mealName || item?.productName || "مادة بدون اسم";
+
+  return (
+    item?.name ||
+    item?.title ||
+    item?.itemName ||
+    item?.mealName ||
+    item?.productName ||
+    "مادة بدون اسم"
+  );
 }
 
 function itemQty(item: any): number {
@@ -88,96 +146,74 @@ function itemQty(item: any): number {
 }
 
 function itemPrice(item: any): number | null {
-  const price = Number(item?.price ?? item?.unitPrice ?? item?.itemPrice ?? item?.totalPrice ?? item?.total ?? 0);
+  const price = Number(
+    item?.price ??
+      item?.unitPrice ??
+      item?.itemPrice ??
+      item?.totalPrice ??
+      item?.total ??
+      0
+  );
+
   return Number.isFinite(price) && price > 0 ? price : null;
-}
-
-function formatDate(value: any): string {
-  const millis = toMillis(value);
-  if (!millis) return "بدون وقت";
-
-  return new Intl.DateTimeFormat("ar-IQ", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(millis));
 }
 
 export default function RestaurantOrdersPage() {
   const [orders, setOrders] = useState<LiveOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [email, setEmail] = useState("جاري الفحص...");
+
+  async function loadOrders() {
+    try {
+      setLoading(true);
+      setError("");
+
+      if (!projectId || !apiKey) {
+        throw new Error("Firebase ENV ناقصة: projectId/apiKey");
+      }
+
+      const url =
+        "https://firestore.googleapis.com/v1/projects/" +
+        encodeURIComponent(projectId) +
+        "/databases/(default)/documents/orders?key=" +
+        encodeURIComponent(apiKey);
+
+      const res = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const message =
+          data?.error?.message ||
+          data?.error?.status ||
+          "Firestore REST read failed";
+        throw new Error(message);
+      }
+
+      const docs = Array.isArray(data.documents) ? data.documents : [];
+
+      const list = docs
+        .map(decodeDocument)
+        .sort((a: LiveOrder, b: LiveOrder) => orderTime(b) - orderTime(a));
+
+      setOrders(list);
+    } catch (err: any) {
+      setError(err?.message || String(err));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let alive = true;
-    let unsubscribeAuth: undefined | (() => void);
-    let unsubscribeOrders: undefined | (() => void);
+    loadOrders();
 
-    async function start() {
-      try {
-        const missing = Object.entries(firebaseConfig)
-          .filter(([, value]) => !value)
-          .map(([key]) => key);
-
-        if (missing.length > 0) {
-          throw new Error("Firebase ENV ناقصة: " + missing.join(", "));
-        }
-
-        const firebaseApp = await import("firebase/app");
-        const firebaseAuth = await import("firebase/auth");
-        const firebaseFirestore = await import("firebase/firestore");
-
-        const app =
-          firebaseApp.getApps().length > 0
-            ? firebaseApp.getApps()[0]
-            : firebaseApp.initializeApp(firebaseConfig);
-
-        const auth = firebaseAuth.getAuth(app);
-        const db = firebaseFirestore.getFirestore(app);
-
-        unsubscribeAuth = firebaseAuth.onAuthStateChanged(auth, (user) => {
-          if (!alive) return;
-
-          setEmail(user?.email || "غير مسجل دخول");
-
-          if (unsubscribeOrders) {
-            unsubscribeOrders();
-            unsubscribeOrders = undefined;
-          }
-
-          unsubscribeOrders = firebaseFirestore.onSnapshot(
-            firebaseFirestore.collection(db, "orders"),
-            (snapshot) => {
-              if (!alive) return;
-
-              const list = snapshot.docs
-                .map((doc) => ({ id: doc.id, ...doc.data() }))
-                .sort((a, b) => orderTime(b) - orderTime(a));
-
-              setOrders(list);
-              setLoading(false);
-              setError("");
-            },
-            (err) => {
-              if (!alive) return;
-              setError(err?.message || String(err));
-              setLoading(false);
-            }
-          );
-        });
-      } catch (err: any) {
-        if (!alive) return;
-        setError(err?.message || String(err));
-        setLoading(false);
-      }
-    }
-
-    start();
+    const timer = window.setInterval(loadOrders, 8000);
 
     return () => {
-      alive = false;
-      if (unsubscribeOrders) unsubscribeOrders();
-      if (unsubscribeAuth) unsubscribeAuth();
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -210,7 +246,7 @@ export default function RestaurantOrdersPage() {
                 الطلبات الحقيقية من Firestore
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-400">
-                صفحة مستقلة وآمنة تقرأ collection اسمها orders بدون لمس restaurant-admin.
+                نسخة آمنة بدون Firebase SDK. تقرأ orders عن طريق REST API.
               </p>
             </div>
 
@@ -221,33 +257,40 @@ export default function RestaurantOrdersPage() {
               <a href="/restaurant-admin" className="rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-bold text-white">
                 رجوع للوحة المطعم
               </a>
+              <button
+                onClick={loadOrders}
+                className="rounded-2xl border border-green-500/40 bg-green-500/10 px-5 py-3 text-sm font-bold text-green-200"
+              >
+                تحديث الطلبات
+              </button>
             </div>
           </div>
         </header>
 
-        <section className="mb-6 grid gap-4 md:grid-cols-4">
+        <section className="mb-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-[24px] border border-white/10 bg-[#111116] p-5">
             <p className="text-xs text-zinc-500">كل الطلبات</p>
             <p className="mt-2 text-4xl font-black">{stats.total}</p>
           </div>
+
           <div className="rounded-[24px] border border-white/10 bg-[#111116] p-5">
             <p className="text-xs text-zinc-500">طلبات اليوم</p>
             <p className="mt-2 text-4xl font-black text-orange-400">{stats.today}</p>
           </div>
+
           <div className="rounded-[24px] border border-white/10 bg-[#111116] p-5">
             <p className="text-xs text-zinc-500">طلبات جديدة</p>
             <p className="mt-2 text-4xl font-black">{stats.newOrders}</p>
-          </div>
-          <div className="rounded-[24px] border border-white/10 bg-[#111116] p-5">
-            <p className="text-xs text-zinc-500">الحساب الحالي</p>
-            <p className="mt-2 truncate text-sm font-bold">{email}</p>
           </div>
         </section>
 
         {error ? (
           <div className="mb-6 rounded-[24px] border border-red-500/30 bg-red-500/10 p-5 text-red-100">
             <p className="font-black">خطأ بقراءة Firestore</p>
-            <p className="mt-2 text-sm leading-7">{error}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-7">{error}</p>
+            <p className="mt-3 text-sm text-red-200/80">
+              إذا مكتوب PERMISSION_DENIED، نحتاج نعدل Firestore Rules أو نقرأ بحساب مسجل.
+            </p>
           </div>
         ) : null}
 
@@ -255,7 +298,7 @@ export default function RestaurantOrdersPage() {
           <div className="rounded-[28px] border border-white/10 bg-[#111116] p-10 text-center text-zinc-400">
             جاري تحميل orders...
           </div>
-        ) : orders.length === 0 ? (
+        ) : orders.length === 0 && !error ? (
           <div className="rounded-[28px] border border-dashed border-orange-500/30 bg-[#111116] p-10 text-center">
             <p className="text-2xl font-black">ماكو طلبات بعد</p>
             <p className="mt-3 text-sm text-zinc-400">
