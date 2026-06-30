@@ -358,6 +358,8 @@ export default function RestaurantOrdersV5StaticPage() {
   }
 
   window.fuseRefreshOrders = loadOrders;
+  var refreshButton = byId("refresh-orders-button");
+  if (refreshButton) refreshButton.addEventListener("click", loadOrders);
 
   setText("page-version", VERSION);
   loadOrders();
@@ -697,7 +699,7 @@ export default function RestaurantOrdersV5StaticPage() {
             <a className="btn-dark" href="/restaurant-admin">
               رجوع للوحة المطعم
             </a>
-            <button className="btn-green" type="button" onClick="window.fuseRefreshOrders && window.fuseRefreshOrders()">
+            <button id="refresh-orders-button" className="btn-green" type="button">
               تحديث الطلبات
             </button>
           </div>
@@ -744,3 +746,4 @@ export default function RestaurantOrdersV5StaticPage() {
     </main>
   );
 }
+
