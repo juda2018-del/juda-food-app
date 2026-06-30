@@ -3,7 +3,7 @@
   [key: string]: any;
 };
 
-const VERSION = "FUSE_RESTAURANT_ORDERS_V18_SERVER_SAFE_FIXED";
+const VERSION = "FUSE_RESTAURANT_ORDERS_V19_STATIC_FETCH_FIXED";
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
@@ -195,9 +195,7 @@ async function loadOrders(): Promise<{ orders: OrderDoc[]; error: string }> {
       "/databases/(default)/documents/orders?pageSize=50&key=" +
       encodeURIComponent(apiKey);
 
-    const response = await fetch(url, {
-      cache: "no-store",
-    });
+    const response = await fetch(url, { next: { revalidate: 20 } });
 
     const data = await response.json().catch(() => null);
 
@@ -685,3 +683,4 @@ export default async function RestaurantOrdersV5Page() {
     </main>
   );
 }
+
