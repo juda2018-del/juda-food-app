@@ -1,13 +1,13 @@
-﻿"use client";
+﻿ "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 
 type LiveOrder = {
   id: string;
   [key: string]: any;
 };
 
-const PAGE_VERSION = "FUSE_RESTAURANT_ORDERS_V15_LIVE_ON_V5";
+const PAGE_VERSION = "FUSE_RESTAURANT_ORDERS_V17_REAL_FIRESTORE_ON_V5_FIXED";
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
@@ -169,7 +169,7 @@ function itemPrice(item: any): number | null {
   return Number.isFinite(price) && price > 0 ? price : null;
 }
 
-const pageStyle: React.CSSProperties = {
+const pageStyle: CSSProperties = {
   minHeight: "100vh",
   background: "#050505",
   color: "white",
@@ -177,14 +177,14 @@ const pageStyle: React.CSSProperties = {
   fontFamily: "Arial, sans-serif",
 };
 
-const cardStyle: React.CSSProperties = {
+const cardStyle: CSSProperties = {
   background: "#111116",
   border: "1px solid rgba(255,255,255,0.10)",
   borderRadius: 28,
   padding: 22,
 };
 
-const orangeButtonStyle: React.CSSProperties = {
+const orangeButtonStyle: CSSProperties = {
   background: "#ff7a00",
   color: "#000",
   border: 0,
@@ -195,7 +195,7 @@ const orangeButtonStyle: React.CSSProperties = {
   textDecoration: "none",
 };
 
-const darkButtonStyle: React.CSSProperties = {
+const darkButtonStyle: CSSProperties = {
   background: "rgba(255,255,255,0.05)",
   color: "#fff",
   border: "1px solid rgba(255,255,255,0.14)",
