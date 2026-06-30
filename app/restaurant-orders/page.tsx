@@ -1,4 +1,4 @@
-﻿export default function RestaurantOrdersStaticProof() {
+﻿export default function RestaurantOrdersCleanRoute() {
   return (
     <main
       dir="rtl"
@@ -24,30 +24,16 @@
           textAlign: "center",
         }}
       >
-        <h1
-          style={{
-            fontSize: "42px",
-            lineHeight: 1.25,
-            marginBottom: "20px",
-            color: "#ffffff",
-          }}
-        >
-          FUSE_RESTAURANT_ORDERS_V13_STATIC_ROUTE_OK
+        <h1 style={{ fontSize: "42px", lineHeight: 1.25, marginBottom: "20px" }}>
+          FUSE_RESTAURANT_ORDERS_V14_CLEAN_ROUTE_OK
         </h1>
 
-        <p
-          style={{
-            fontSize: "22px",
-            fontWeight: 900,
-            color: "#ff7a00",
-            marginBottom: "16px",
-          }}
-        >
-          /restaurant-orders route is clean and loading.
+        <p style={{ fontSize: "22px", fontWeight: 900, color: "#ff7a00" }}>
+          /restaurant-orders is now cleaned and loading.
         </p>
 
-        <p style={{ fontSize: "18px", color: "#bbbbbb" }}>
-          الخطوة الجاية نركب قراءة الطلبات بطريقة آمنة بعد ما نتأكد أن المسار ما عاد ينكسر.
+        <p style={{ fontSize: "18px", color: "#bbbbbb", marginTop: "18px" }}>
+          إذا تشوف هاي الصفحة، نقدر نركب قراءة orders بعدها بدون ما تنكسر.
         </p>
       </div>
     </main>
