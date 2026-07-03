@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -119,9 +119,18 @@ function groupBy<T>(items: T[], key: (item: T) => string) {
 }
 
 function restaurantName(item: Restaurant | MenuItem | LiveOrder) {
-  return clean(
-    "restaurantName" in item ? item.restaurantName || item.restaurant : item.restaurant
-  );
+  if ("restaurantName" in item || "restaurant" in item) {
+    return clean(
+      ("restaurantName" in item ? item.restaurantName : "") ||
+        ("restaurant" in item ? item.restaurant : "")
+    );
+  }
+
+  if ("name" in item) {
+    return clean(item.name);
+  }
+
+  return "";
 }
 
 function orderStatus(order: LiveOrder) {
@@ -314,10 +323,10 @@ export default function SystemToolsPage() {
 
   const brokenMenu = useMemo(() => {
     return menu.filter((item) => {
-      const name = norm(item.restaurant || item.restaurantName);
+      const name = norm(restaurantName(item));
       if (!name) return true;
 
-      return !restaurants.some((restaurant) => norm(restaurant.name) === name);
+      return !restaurants.some((restaurant) => norm(restaurantName(restaurant)) === name);
     });
   }, [menu, restaurants]);
 
@@ -659,7 +668,7 @@ export default function SystemToolsPage() {
                   brokenMenu.length > 0
                     ? brokenMenu
                         .slice(0, 6)
-                        .map((item) => `${item.name || "صنف"} / ${item.restaurant || item.restaurantName || "بدون مطعم"}`)
+                        .map((item) => `${item.name || "صنف"} / ${restaurantName(item) || "بدون مطعم"}`)
                         .join(" · ")
                     : "كل الأصناف مربوطة بمطاعم"
                 }
