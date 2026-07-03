@@ -1,4 +1,4 @@
-﻿ "use client";
+ "use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -202,6 +202,19 @@ function Icon({ name }: { name: string }) {
       <svg {...common}>
         <path d="M4 11.5L12 5l8 6.5" />
         <path d="M6.5 10.5V19h11v-8.5" />
+      </svg>
+    );
+  }
+
+
+  if (name === "reels") {
+    return (
+      <svg {...common}>
+        <rect x="5" y="4" width="14" height="16" rx="3" />
+        <path d="M9 4l2 5" />
+        <path d="M14 4l2 5" />
+        <path d="M5 9h14" />
+        <path d="M10 13l5 3-5 3v-6z" fill="currentColor" stroke="none" />
       </svg>
     );
   }
@@ -758,6 +771,11 @@ export default function CustomerClient() {
           <Link href="/">
             <Icon name="search" />
             <b>استكشف</b>
+          </Link>
+
+          <Link href="/reels">
+            <Icon name="reels" />
+            <b>ريلز</b>
           </Link>
 
           <Link href="/cart">
@@ -1471,7 +1489,7 @@ export default function CustomerClient() {
           width: min(680px, calc(100% - 28px));
           transform: translateX(-50%);
           display: grid;
-          grid-template-columns: repeat(5, 1fr);
+          grid-template-columns: repeat(6, 1fr);
           gap: 6px;
           border-radius: 28px;
           padding: 9px;

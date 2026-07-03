@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/",
   "/login",
   "/logout",
+  "/reels",
   "/favicon.ico",
   "/manifest.json",
   "/robots.txt",

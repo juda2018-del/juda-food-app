@@ -1,4 +1,4 @@
-﻿export type FuseRole = "admin" | "restaurant" | "driver" | "customer";
+export type FuseRole = "admin" | "restaurant" | "driver" | "customer";
 
 export type FuseAccount = {
   email: string;
@@ -116,6 +116,15 @@ export const fuseNavigation: FuseNavItem[] = [
     desc: "طلبات السائق والحالة والموقع",
     icon: "driver",
     roles: ["admin", "driver"],
+  },
+
+  {
+    title: "🎬 ريلز المطاعم",
+    label: "الريلز",
+    href: "/reels",
+    desc: "فيديوهات قصيرة للأصناف والعروض داخل FUSE",
+    icon: "reels",
+    roles: ["admin", "restaurant", "customer"],
   },
   {
     title: "⭐ تقييم الطلب",
@@ -255,6 +264,7 @@ const publicPrefixes = [
   "/ahram",
   "/khan",
   "/restaurants",
+  "/reels",
   "/order-status",
   "/ratings",
 ];
@@ -269,7 +279,7 @@ const protectedPrefixesByRole: Record<FuseRole, string[]> = {
     "/notification-center",
   ],
   driver: ["/driver", "/driver-app", "/live-orders", "/order-status", "/live-tracking"],
-  customer: ["/", "/customer", "/live-orders", "/order-status", "/ratings", "/fayrouz", "/ahram", "/khan", "/restaurants", "/cart", "/profile"],
+  customer: ["/", "/customer", "/reels", "/live-orders", "/order-status", "/ratings", "/fayrouz", "/ahram", "/khan", "/restaurants", "/cart", "/profile"],
 };
 
 export function isPublicPath(pathname: string) {

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -257,6 +257,7 @@ function Icon({ name }: { name: string }) {
   if (name === "clock") return <svg {...p}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>;
   if (name === "home") return <svg {...p}><path d="M4 11.5L12 5l8 6.5" /><path d="M6.5 10.5V19h11v-8.5" /></svg>;
   if (name === "explore") return <svg {...p}><circle cx="12" cy="12" r="8" /><path d="M9 15l2-6 4-2-2 4-6 2z" /></svg>;
+  if (name === "reels") return <svg {...p}><rect x="5" y="4" width="14" height="16" rx="3" /><path d="M9 4l2 5" /><path d="M14 4l2 5" /><path d="M5 9h14" /><path d="M10 13l5 3-5 3v-6z" fill="currentColor" stroke="none" /></svg>;
   if (name === "cart") return <svg {...p}><path d="M4 6h2l1.5 8h8l2-6H8" /><circle cx="10" cy="18" r="1.4" /><circle cx="16" cy="18" r="1.4" /></svg>;
   if (name === "orders") return <svg {...p}><rect x="6" y="4" width="12" height="16" rx="2" /><path d="M9 9h6" /><path d="M9 13h6" /></svg>;
   if (name === "user") return <svg {...p}><circle cx="12" cy="8" r="3" /><path d="M5 19c2-3 4-4.5 7-4.5s5 1.5 7 4.5" /></svg>;
@@ -559,6 +560,11 @@ export default function HomePage() {
           <Link href="/restaurants">
             <Icon name="explore" />
             <b>استكشف</b>
+          </Link>
+
+          <Link href="/reels">
+            <Icon name="reels" />
+            <b>ريلز</b>
           </Link>
 
           <Link href="/cart">
@@ -1211,7 +1217,7 @@ export default function HomePage() {
           border-radius: 26px;
           background: #0b1220;
           display: grid;
-          grid-template-columns: repeat(5, 1fr);
+          grid-template-columns: repeat(6, 1fr);
           padding: 8px;
           box-shadow: 0 22px 52px rgba(11, 18, 32, 0.3);
         }

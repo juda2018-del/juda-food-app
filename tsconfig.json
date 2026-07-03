@@ -42,6 +42,20 @@
     "dist",
     "build",
     "backups",
-    "backups/**"
+    "backups/**",
+    ".fuse-backups/**",
+    "android/app/src/main/assets/public/**",
+    ".fuse-tools",
+    "android/.gradle",
+    "ios/App/App/public",
+    "ios/App/App/public/**",
+    "android/.gradle/**",
+    ".fuse-tools/**",
+    "android/app/build",
+    "android/app/build/**",
+    "android/app/src/main/assets/public",
+    "ios/App/Pods",
+    "ios/App/Pods/**",
+    ".fuse-backups"
   ]
 }
