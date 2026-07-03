@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   collection,
@@ -71,13 +71,19 @@ const statuses = [
   "مرفوض",
 ];
 
+const statusFlow = ["قيد التحضير", "جاهز للتوصيل", "تم التسليم", "مرفوض"];
+
 function readSession(): FuseSession | null {
   try {
-    const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
+    const raw =
+      localStorage.getItem(FUSE_LOCAL_SESSION) ||
+      localStorage.getItem("FUSE_LOCAL_SESSION") ||
+      localStorage.getItem("fuseUser");
+
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as FuseSession;
-    const role = parseFuseRole(parsed.role);
+    const role = parseFuseRole(parsed.role || parsed.fuseRole);
 
     if (!parsed.email || !role) return null;
 
@@ -129,8 +135,12 @@ function formatDate(value: unknown) {
   });
 }
 
-function getRestaurant(order: OrderDoc | MenuDoc) {
-  return order.restaurant || order.restaurantName || "مطعم";
+function formatIQD(value: number) {
+  return `${Number(value || 0).toLocaleString()} د.ع`;
+}
+
+function getRestaurant(item: OrderDoc | MenuDoc) {
+  return item.restaurant || item.restaurantName || "مطعم";
 }
 
 function getCustomer(order: OrderDoc) {
@@ -153,6 +163,10 @@ function menuAvailable(item: MenuDoc) {
   return item.available !== false && item.isAvailable !== false;
 }
 
+function sessionRestaurant(session: FuseSession | null) {
+  return session?.restaurant || session?.restaurantName || session?.restaurantId || "";
+}
+
 function canSeeRestaurantData(
   restaurant: string,
   role: FuseRole | null,
@@ -166,348 +180,101 @@ function canSeeRestaurantData(
   }
 
   if (role === "restaurant") {
-    if (!session.restaurant) return true;
-    return restaurant === session.restaurant;
+    const ownRestaurant = sessionRestaurant(session);
+    if (!ownRestaurant) return true;
+    return restaurant === ownRestaurant;
   }
 
   return false;
 }
 
-function statusStyle(status?: string): CSSProperties {
+function statusClass(status?: string) {
   const clean = normalizeStatus(status);
 
-  if (clean === "جديد") return styles.badgeOrange;
-  if (clean === "قيد التحضير") return styles.badgeYellow;
-  if (clean === "جاهز للتوصيل") return styles.badgeSky;
-  if (clean === "قيد التوصيل") return styles.badgePurple;
-  if (clean === "تم التسليم") return styles.badgeGreen;
-  if (clean === "مرفوض") return styles.badgeRed;
+  if (clean === "جديد") return "orange";
+  if (clean === "قيد التحضير") return "yellow";
+  if (clean === "جاهز للتوصيل") return "sky";
+  if (clean === "قيد التوصيل") return "purple";
+  if (clean === "تم التسليم") return "green";
+  if (clean === "مرفوض") return "red";
 
-  return styles.badgeMuted;
+  return "muted";
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
-    color: "white",
-    padding: "26px 16px",
-    fontFamily: "Arial, sans-serif",
-  },
-  shell: {
-    width: "100%",
-    maxWidth: 1220,
-    margin: "0 auto",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 16,
-  },
-  nav: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  pill: {
-    border: "1px solid rgba(255,255,255,0.13)",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.05)",
-    padding: "11px 16px",
-    color: "rgba(255,255,255,0.82)",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  activePill: {
-    border: "1px solid rgba(255,122,0,0.35)",
-    borderRadius: 999,
-    background: "#FF7A00",
-    padding: "11px 16px",
-    color: "#000",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  hero: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 34,
-    background:
-      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.10))",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-    padding: 22,
-    marginBottom: 16,
-  },
-  heroGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) repeat(4, minmax(150px, 0.32fr))",
-    gap: 12,
-    alignItems: "stretch",
-  },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.36)",
-    padding: 20,
-  },
-  compactCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 24,
-    background: "rgba(0,0,0,0.34)",
-    padding: 16,
-    minHeight: 118,
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#FF7A00",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  title: {
-    margin: "8px 0 0",
-    fontSize: "clamp(36px, 5vw, 60px)",
-    lineHeight: 1.08,
-    fontWeight: 950,
-  },
-  orange: {
-    color: "#FF7A00",
-  },
-  muted: {
-    color: "rgba(255,255,255,0.58)",
-    lineHeight: 1.85,
-    fontSize: 14,
-  },
-  statLabel: {
-    margin: 0,
-    color: "rgba(255,255,255,0.52)",
-    fontSize: 13,
-    fontWeight: 850,
-  },
-  statValue: {
-    margin: "10px 0 0",
-    fontSize: 30,
-    fontWeight: 950,
-  },
-  controls: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-    marginBottom: 16,
-  },
-  controlGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(220px, 1fr) minmax(170px, 0.4fr) minmax(170px, 0.4fr)",
-    gap: 12,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "14px 15px",
-    outline: "none",
-    fontSize: 14,
-  },
-  select: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "14px 15px",
-    outline: "none",
-    fontSize: 14,
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 0.42fr)",
-    gap: 14,
-    marginBottom: 16,
-  },
-  panel: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 30,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-  },
-  sectionTitle: {
-    margin: 0,
-    fontSize: 25,
-    fontWeight: 950,
-  },
-  ordersGrid: {
-    display: "grid",
-    gap: 12,
-    marginTop: 14,
-  },
-  orderCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.30)",
-    padding: 16,
-  },
-  orderTop: {
-    display: "grid",
-    gridTemplateColumns: "minmax(220px, 1fr) minmax(170px, 0.35fr)",
-    gap: 12,
-    alignItems: "start",
-  },
-  totalBox: {
-    border: "1px solid rgba(255,122,0,0.22)",
-    borderRadius: 22,
-    background: "rgba(255,122,0,0.08)",
-    padding: 14,
-  },
-  infoGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-    gap: 10,
-    marginTop: 14,
-  },
-  infoBox: {
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 16,
-    background: "rgba(255,255,255,0.04)",
-    padding: 10,
-  },
-  actionGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-    gap: 10,
-    marginTop: 14,
-  },
-  actionButton: {
-    border: 0,
-    borderRadius: 16,
-    background: "#FF7A00",
-    color: "#000",
-    padding: "12px 13px",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  secondaryButton: {
-    border: "1px solid rgba(255,255,255,0.14)",
-    borderRadius: 16,
-    background: "rgba(255,255,255,0.06)",
-    color: "white",
-    padding: "12px 13px",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  dangerButton: {
-    border: "1px solid rgba(239,68,68,0.32)",
-    borderRadius: 16,
-    background: "rgba(239,68,68,0.10)",
-    color: "#FECACA",
-    padding: "12px 13px",
-    cursor: "pointer",
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  formGrid: {
-    display: "grid",
-    gap: 10,
-    marginTop: 14,
-  },
-  menuGrid: {
-    display: "grid",
-    gap: 10,
-    marginTop: 14,
-  },
-  menuCard: {
-    border: "1px solid rgba(255,255,255,0.09)",
-    borderRadius: 20,
-    background: "rgba(0,0,0,0.26)",
-    padding: 13,
-  },
-  menuTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid",
-    borderRadius: 999,
-    padding: "7px 11px",
-    fontSize: 12,
-    fontWeight: 950,
-  },
-  badgeOrange: {
-    borderColor: "rgba(255,122,0,0.42)",
-    background: "rgba(255,122,0,0.12)",
-    color: "#FFB56B",
-  },
-  badgeYellow: {
-    borderColor: "rgba(234,179,8,0.42)",
-    background: "rgba(234,179,8,0.12)",
-    color: "#FDE68A",
-  },
-  badgeSky: {
-    borderColor: "rgba(14,165,233,0.42)",
-    background: "rgba(14,165,233,0.12)",
-    color: "#7DD3FC",
-  },
-  badgePurple: {
-    borderColor: "rgba(168,85,247,0.42)",
-    background: "rgba(168,85,247,0.12)",
-    color: "#D8B4FE",
-  },
-  badgeGreen: {
-    borderColor: "rgba(34,197,94,0.42)",
-    background: "rgba(34,197,94,0.12)",
-    color: "#86EFAC",
-  },
-  badgeRed: {
-    borderColor: "rgba(239,68,68,0.42)",
-    background: "rgba(239,68,68,0.12)",
-    color: "#FCA5A5",
-  },
-  badgeMuted: {
-    borderColor: "rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.06)",
-    color: "rgba(255,255,255,0.65)",
-  },
-  messageOk: {
-    border: "1px solid rgba(34,197,94,0.30)",
-    borderRadius: 18,
-    background: "rgba(34,197,94,0.10)",
-    color: "#86EFAC",
-    padding: 14,
-    marginTop: 14,
-    fontSize: 14,
-    fontWeight: 900,
-  },
-  messageBad: {
-    border: "1px solid rgba(239,68,68,0.30)",
-    borderRadius: 18,
-    background: "rgba(239,68,68,0.10)",
-    color: "#FCA5A5",
-    padding: 14,
-    marginTop: 14,
-    fontSize: 14,
-    fontWeight: 900,
-  },
-  empty: {
-    border: "1px dashed rgba(255,255,255,0.16)",
-    borderRadius: 24,
-    background: "rgba(255,255,255,0.035)",
-    padding: 24,
-    textAlign: "center",
-  },
-};
+function Icon({ name }: { name: string }) {
+  const p = {
+    width: 20,
+    height: 20,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  if (name === "orders") {
+    return (
+      <svg {...p}>
+        <rect x="5" y="4" width="14" height="16" rx="2" />
+        <path d="M9 9h6" />
+        <path d="M9 13h6" />
+      </svg>
+    );
+  }
+
+  if (name === "menu") {
+    return (
+      <svg {...p}>
+        <path d="M4 7h16" />
+        <path d="M4 12h16" />
+        <path d="M4 17h16" />
+      </svg>
+    );
+  }
+
+  if (name === "search") {
+    return (
+      <svg {...p}>
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-4-4" />
+      </svg>
+    );
+  }
+
+  if (name === "money") {
+    return (
+      <svg {...p}>
+        <rect x="4" y="6" width="16" height="12" rx="2" />
+        <circle cx="12" cy="12" r="2" />
+      </svg>
+    );
+  }
+
+  if (name === "bell") {
+    return (
+      <svg {...p}>
+        <path d="M18 9a6 6 0 10-12 0c0 7-2 7-2 9h16c0-2-2-2-2-9z" />
+        <path d="M10 21h4" />
+      </svg>
+    );
+  }
+
+  if (name === "clock") {
+    return (
+      <svg {...p}>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v4l3 2" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...p}>
+      <circle cx="12" cy="12" r="8" />
+    </svg>
+  );
+}
 
 export default function RestaurantAdminPage() {
   const [session, setSession] = useState<FuseSession | null>(null);
@@ -528,19 +295,19 @@ export default function RestaurantAdminPage() {
     const saved = readSession();
 
     if (!saved) {
-console.log('FUSE disabled old restaurant login redirect');
+      setError("ماكو جلسة دخول. ارجع لصفحة تسجيل الدخول.");
       return;
     }
 
     if (saved.role !== "admin" && saved.role !== "restaurant") {
-      window.location.href = roleHome[saved.role] || "/live-orders";
+      window.location.href = roleHome[saved.role] || "/login";
       return;
     }
 
     setSession(saved);
 
-    if (saved.role === "restaurant" && saved.restaurant) {
-      setSelectedRestaurant(saved.restaurant);
+    if (saved.role === "restaurant" && sessionRestaurant(saved)) {
+      setSelectedRestaurant(sessionRestaurant(saved));
     }
   }, []);
 
@@ -596,8 +363,14 @@ console.log('FUSE disabled old restaurant login redirect');
     orders.forEach((order) => list.add(getRestaurant(order)));
     menu.forEach((item) => list.add(getRestaurant(item)));
 
-    return Array.from(list).filter(Boolean).sort();
-  }, [menu, orders]);
+    const result = Array.from(list).filter(Boolean).sort();
+
+    if (result.length === 0 && sessionRestaurant(session)) {
+      return [sessionRestaurant(session)];
+    }
+
+    return result;
+  }, [menu, orders, session]);
 
   const visibleOrders = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
@@ -632,18 +405,24 @@ console.log('FUSE disabled old restaurant login redirect');
     );
   }, [menu, role, selectedRestaurant, session]);
 
-  const newOrders = visibleOrders.filter((order) => normalizeStatus(order.status) === "جديد");
-  const preparingOrders = visibleOrders.filter((order) => normalizeStatus(order.status) === "قيد التحضير");
-  const readyOrders = visibleOrders.filter((order) => normalizeStatus(order.status) === "جاهز للتوصيل");
-  const deliveredOrders = visibleOrders.filter((order) => normalizeStatus(order.status) === "تم التسليم");
+  const counts = useMemo(() => {
+    const delivered = visibleOrders.filter((order) => normalizeStatus(order.status) === "تم التسليم");
+    const active = visibleOrders.filter((order) => {
+      const status = normalizeStatus(order.status);
+      return status !== "تم التسليم" && status !== "مرفوض";
+    });
 
-  const activeOrders = visibleOrders.filter((order) => {
-    const status = normalizeStatus(order.status);
-    return status !== "تم التسليم" && status !== "مرفوض";
-  });
-
-  const revenue = deliveredOrders.reduce((sum, order) => sum + getTotal(order), 0);
-  const availableMenuCount = visibleMenu.filter(menuAvailable).length;
+    return {
+      all: visibleOrders.length,
+      newOrders: visibleOrders.filter((order) => normalizeStatus(order.status) === "جديد").length,
+      preparing: visibleOrders.filter((order) => normalizeStatus(order.status) === "قيد التحضير").length,
+      ready: visibleOrders.filter((order) => normalizeStatus(order.status) === "جاهز للتوصيل").length,
+      active: active.length,
+      delivered: delivered.length,
+      revenue: delivered.reduce((sum, order) => sum + getTotal(order), 0),
+      availableMenu: visibleMenu.filter(menuAvailable).length,
+    };
+  }, [visibleMenu, visibleOrders]);
 
   async function updateOrderStatus(order: OrderDoc, status: string) {
     setSavingOrderId(order.documentId);
@@ -669,8 +448,8 @@ console.log('FUSE disabled old restaurant login redirect');
     setError("");
 
     const restaurant =
-      role === "restaurant" && session?.restaurant
-        ? session.restaurant
+      role === "restaurant" && sessionRestaurant(session)
+        ? sessionRestaurant(session)
         : selectedRestaurant !== "الكل"
           ? selectedRestaurant
           : restaurants[0] || "فيروز";
@@ -725,193 +504,176 @@ console.log('FUSE disabled old restaurant login redirect');
   }
 
   return (
-    <main dir="rtl" style={styles.page}>
-      <section style={styles.shell}>
-        <header style={styles.topBar}>
-          <nav style={styles.nav}>
-            <Link href="/" style={styles.pill}>
-              الرئيسية
-            </Link>
-            <Link href="/restaurant-admin" style={styles.activePill}>
-              لوحة المطعم
-            </Link>
-            <Link href="/live-orders" style={styles.pill}>
-              الطلبات المباشرة
-            </Link>
-            <Link href="/notification-center" style={styles.pill}>
-              الإشعارات
-            </Link>
-            <Link href="/reports" style={styles.pill}>
-              التقارير
-            </Link>
-          </nav>
+    <main dir="rtl" className="page">
+      <section className="shell">
+        <header className="topbar">
+          <div className="brand">
+            <div className="brand-icon">F</div>
+            <div>
+              <b>FUSE Restaurant</b>
+              <span>{session?.name || "لوحة تشغيل المطعم"}</span>
+            </div>
+          </div>
 
-          <Link href={role ? roleHome[role] : "/login"} style={styles.pill}>
-            لوحتي
-          </Link>
+          <nav className="nav">
+            <Link href="/" className="pill">الرئيسية</Link>
+            <Link href="/restaurant-admin" className="pill active">لوحة المطعم</Link>
+            <Link href="/live-orders" className="pill">الطلبات المباشرة</Link>
+            <Link href="/notification-center" className="pill">الإشعارات</Link>
+            <Link href="/reports" className="pill">التقارير</Link>
+          </nav>
         </header>
 
-        <section style={styles.hero}>
-          <div style={styles.heroGrid}>
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>لوحة المطعم</p>
-              <h1 style={styles.title}>
-                الطلبات
-                <br />
-                <span style={styles.orange}>والمنيو مباشر</span>
-              </h1>
-              <p style={styles.muted}>
-                لوحة تشغيل نظيفة لإدارة الطلبات، تحديث الحالات، متابعة الإيراد، وإدارة الأصناف.
-              </p>
-            </div>
+        <section className="hero">
+          <div className="hero-copy">
+            <span>لوحة المطعم الاحترافية</span>
+            <h1>
+              إدارة الطلبات
+              <br />
+              <em>والمنيو مباشر</em>
+            </h1>
+            <p>
+              تحكم سريع بحالات الطلب، متابعة الإيراد، إدارة الأصناف، وفلاتر تشغيلية
+              مناسبة للمطعم والإدارة.
+            </p>
+          </div>
 
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>الدور</p>
-              <p style={{ ...styles.statValue, ...styles.orange }}>
-                {role ? roleTitle[role] : "—"}
-              </p>
-              <p style={styles.muted}>{session?.name || "غير مسجل"}</p>
-            </div>
+          <div className="hero-stats">
+            <article>
+              <Icon name="orders" />
+              <span>طلبات نشطة</span>
+              <b>{counts.active}</b>
+              <small>جديدة: {counts.newOrders}</small>
+            </article>
 
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>طلبات نشطة</p>
-              <p style={{ ...styles.statValue, color: "#86EFAC" }}>{activeOrders.length}</p>
-              <p style={styles.muted}>جديدة: {newOrders.length}</p>
-            </div>
+            <article>
+              <Icon name="clock" />
+              <span>قيد التحضير</span>
+              <b>{counts.preparing}</b>
+              <small>جاهزة: {counts.ready}</small>
+            </article>
 
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>جاهزة للتوصيل</p>
-              <p style={{ ...styles.statValue, color: "#7DD3FC" }}>{readyOrders.length}</p>
-              <p style={styles.muted}>قيد التحضير: {preparingOrders.length}</p>
-            </div>
+            <article>
+              <Icon name="money" />
+              <span>مبيعات مكتملة</span>
+              <b>{formatIQD(counts.revenue)}</b>
+              <small>{counts.delivered} طلب مكتمل</small>
+            </article>
 
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>مبيعات مكتملة</p>
-              <p style={{ ...styles.statValue, color: "#FFB56B" }}>
-                {revenue.toLocaleString()}
-              </p>
-              <p style={styles.muted}>دينار عراقي</p>
-            </div>
+            <article>
+              <Icon name="menu" />
+              <span>أصناف متاحة</span>
+              <b>{counts.availableMenu}</b>
+              <small>من أصل {visibleMenu.length}</small>
+            </article>
           </div>
         </section>
 
-        <section style={styles.controls}>
-          <div style={styles.controlGrid}>
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={styles.statLabel}>بحث سريع</span>
+        <section className="controls">
+          <label>
+            <span>بحث سريع</span>
+            <div className="input-wrap">
+              <Icon name="search" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                style={styles.input}
                 placeholder="زبون، هاتف، عنوان، سائق..."
               />
-            </label>
+            </div>
+          </label>
 
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={styles.statLabel}>المطعم</span>
-              <select
-                value={selectedRestaurant}
-                onChange={(event) => setSelectedRestaurant(event.target.value)}
-                style={styles.select}
-                disabled={role === "restaurant"}
-              >
-                {role === "admin" ? <option value="الكل">الكل</option> : null}
-                {restaurants.map((restaurant) => (
-                  <option key={restaurant} value={restaurant}>
-                    {restaurant}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <label>
+            <span>المطعم</span>
+            <select
+              value={selectedRestaurant}
+              onChange={(event) => setSelectedRestaurant(event.target.value)}
+              disabled={role === "restaurant"}
+            >
+              {role === "admin" ? <option value="الكل">الكل</option> : null}
+              {restaurants.map((restaurant) => (
+                <option key={restaurant} value={restaurant}>
+                  {restaurant}
+                </option>
+              ))}
+            </select>
+          </label>
 
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={styles.statLabel}>الحالة</span>
-              <select
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value)}
-                style={styles.select}
-              >
-                {["الكل", ...statuses].map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {message ? <div style={styles.messageOk}>{message}</div> : null}
-          {error ? <div style={styles.messageBad}>{error}</div> : null}
+          <label>
+            <span>الحالة</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              {["الكل", ...statuses].map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
         </section>
 
-        <section style={styles.layout}>
-          <section style={styles.panel}>
-            <h2 style={styles.sectionTitle}>طلبات المطعم</h2>
+        {message ? <div className="alert ok">{message}</div> : null}
+        {error ? <div className="alert bad">{error}</div> : null}
+
+        <section className="layout">
+          <section className="panel orders-panel">
+            <div className="panel-head">
+              <div>
+                <span>Live Orders</span>
+                <h2>طلبات المطعم</h2>
+              </div>
+              <b>{counts.all}</b>
+            </div>
 
             {visibleOrders.length === 0 ? (
-              <div style={{ ...styles.empty, marginTop: 14 }}>
-                <h3 style={{ margin: 0 }}>ماكو طلبات مطابقة</h3>
-                <p style={styles.muted}>إذا وصل طلب جديد راح يظهر هنا مباشرة.</p>
+              <div className="empty">
+                <h3>ماكو طلبات مطابقة</h3>
+                <p>إذا وصل طلب جديد راح يظهر هنا مباشرة.</p>
               </div>
             ) : (
-              <div style={styles.ordersGrid}>
+              <div className="orders-list">
                 {visibleOrders.slice(0, 60).map((order) => {
                   const status = normalizeStatus(order.status);
 
                   return (
-                    <article key={order.documentId} style={styles.orderCard}>
-                      <div style={styles.orderTop}>
+                    <article key={order.documentId} className="order-card">
+                      <div className="order-top">
                         <div>
-                          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                            <h3 style={{ margin: 0, fontSize: 23, fontWeight: 950 }}>
-                              {getCustomer(order)}
-                            </h3>
-
-                            <span style={{ ...styles.badge, ...statusStyle(status) }}>
-                              {status}
-                            </span>
+                          <div className="order-title">
+                            <h3>{getCustomer(order)}</h3>
+                            <span className={`badge ${statusClass(status)}`}>{status}</span>
                           </div>
-
-                          <p style={styles.muted}>
+                          <p>
                             {getRestaurant(order)} — {formatDate(order.createdAt)}
                           </p>
                         </div>
 
-                        <div style={styles.totalBox}>
-                          <p style={styles.statLabel}>المجموع</p>
-                          <p style={{ ...styles.statValue, ...styles.orange }}>
-                            {getTotal(order).toLocaleString()} د.ع
-                          </p>
+                        <div className="total-box">
+                          <span>المجموع</span>
+                          <b>{formatIQD(getTotal(order))}</b>
                         </div>
                       </div>
 
-                      <div style={styles.infoGrid}>
-                        <div style={styles.infoBox}>
-                          <p style={styles.statLabel}>الهاتف</p>
-                          <p style={{ margin: "7px 0 0", direction: "ltr" }}>
-                            {getPhone(order) || "—"}
-                          </p>
+                      <div className="info-grid">
+                        <div>
+                          <span>الهاتف</span>
+                          <b dir="ltr">{getPhone(order) || "—"}</b>
                         </div>
-
-                        <div style={styles.infoBox}>
-                          <p style={styles.statLabel}>العنوان</p>
-                          <p style={{ ...styles.muted, margin: "7px 0 0" }}>
-                            {order.address || "بدون عنوان"}
-                          </p>
+                        <div>
+                          <span>العنوان</span>
+                          <b>{order.address || "بدون عنوان"}</b>
                         </div>
-
-                        <div style={styles.infoBox}>
-                          <p style={styles.statLabel}>السائق</p>
-                          <p style={{ ...styles.muted, margin: "7px 0 0" }}>
-                            {order.driverName || "غير محدد"}
-                          </p>
+                        <div>
+                          <span>السائق</span>
+                          <b>{order.driverName || "غير محدد"}</b>
                         </div>
                       </div>
 
                       {order.items?.length ? (
-                        <div style={styles.infoBox}>
-                          <p style={styles.statLabel}>تفاصيل الطلب</p>
-                          <p style={{ ...styles.muted, margin: "7px 0 0" }}>
+                        <div className="items-box">
+                          <span>تفاصيل الطلب</span>
+                          <p>
                             {order.items
                               .map((item) => `${item.name || item.title || "صنف"} ×${item.qty || item.quantity || 1}`)
                               .join("، ")}
@@ -919,38 +681,18 @@ console.log('FUSE disabled old restaurant login redirect');
                         </div>
                       ) : null}
 
-                      <div style={styles.actionGrid}>
-                        <button
-                          onClick={() => updateOrderStatus(order, "قيد التحضير")}
-                          disabled={savingOrderId === order.documentId}
-                          style={styles.secondaryButton}
-                        >
-                          قيد التحضير
-                        </button>
-
-                        <button
-                          onClick={() => updateOrderStatus(order, "جاهز للتوصيل")}
-                          disabled={savingOrderId === order.documentId}
-                          style={styles.actionButton}
-                        >
-                          جاهز للتوصيل
-                        </button>
-
-                        <button
-                          onClick={() => updateOrderStatus(order, "تم التسليم")}
-                          disabled={savingOrderId === order.documentId}
-                          style={styles.secondaryButton}
-                        >
-                          تم التسليم
-                        </button>
-
-                        <button
-                          onClick={() => updateOrderStatus(order, "مرفوض")}
-                          disabled={savingOrderId === order.documentId}
-                          style={styles.dangerButton}
-                        >
-                          رفض
-                        </button>
+                      <div className="actions">
+                        {statusFlow.map((nextStatus) => (
+                          <button
+                            key={nextStatus}
+                            type="button"
+                            disabled={savingOrderId === order.documentId}
+                            onClick={() => updateOrderStatus(order, nextStatus)}
+                            className={nextStatus === "مرفوض" ? "danger" : nextStatus === "جاهز للتوصيل" ? "primary" : ""}
+                          >
+                            {savingOrderId === order.documentId ? "..." : nextStatus}
+                          </button>
+                        ))}
                       </div>
                     </article>
                   );
@@ -959,84 +701,69 @@ console.log('FUSE disabled old restaurant login redirect');
             )}
           </section>
 
-          <aside style={styles.panel}>
-            <h2 style={styles.sectionTitle}>المنيو</h2>
-            <p style={styles.muted}>
-              الأصناف الظاهرة: {visibleMenu.length} — المتاحة: {availableMenuCount}
-            </p>
+          <aside className="panel menu-panel">
+            <div className="panel-head">
+              <div>
+                <span>Menu Control</span>
+                <h2>المنيو</h2>
+              </div>
+              <b>{visibleMenu.length}</b>
+            </div>
 
-            <div style={styles.formGrid}>
+            <div className="menu-form">
               <input
                 value={menuName}
                 onChange={(event) => setMenuName(event.target.value)}
-                style={styles.input}
                 placeholder="اسم الصنف"
               />
-
               <input
                 value={menuPrice}
                 onChange={(event) => setMenuPrice(event.target.value)}
-                style={styles.input}
                 placeholder="السعر"
                 dir="ltr"
               />
-
               <input
                 value={menuCategory}
                 onChange={(event) => setMenuCategory(event.target.value)}
-                style={styles.input}
                 placeholder="القسم"
               />
-
-              <button onClick={addMenuItem} style={styles.actionButton}>
+              <button type="button" onClick={addMenuItem}>
                 إضافة صنف
               </button>
             </div>
 
-            <div style={styles.menuGrid}>
+            <div className="menu-list">
               {visibleMenu.length === 0 ? (
-                <div style={styles.empty}>
-                  <h3 style={{ margin: 0 }}>ماكو أصناف حالياً</h3>
-                  <p style={styles.muted}>أضف صنف جديد حتى يظهر هنا.</p>
+                <div className="empty small">
+                  <h3>ماكو أصناف حالياً</h3>
+                  <p>أضف صنف جديد حتى يظهر هنا.</p>
                 </div>
               ) : (
                 visibleMenu.slice(0, 30).map((item) => (
-                  <article key={item.documentId} style={styles.menuCard}>
-                    <div style={styles.menuTop}>
+                  <article key={item.documentId} className="menu-card">
+                    <div className="menu-top">
                       <div>
-                        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 950 }}>
-                          {getMenuName(item)}
-                        </h3>
-
-                        <p style={{ ...styles.muted, margin: "7px 0 0" }}>
-                          {item.category || "عام"} — {getRestaurant(item)}
-                        </p>
+                        <h3>{getMenuName(item)}</h3>
+                        <p>{item.category || "عام"} — {getRestaurant(item)}</p>
                       </div>
-
-                      <span
-                        style={{
-                          ...styles.badge,
-                          ...(menuAvailable(item) ? styles.badgeGreen : styles.badgeRed),
-                        }}
-                      >
+                      <span className={`badge ${menuAvailable(item) ? "green" : "red"}`}>
                         {menuAvailable(item) ? "متاح" : "متوقف"}
                       </span>
                     </div>
 
-                    <p style={{ margin: "12px 0 0", color: "#FFB56B", fontWeight: 950 }}>
-                      {Number(item.price || 0).toLocaleString()} د.ع
-                    </p>
+                    <b className="price">{formatIQD(Number(item.price || 0))}</b>
 
                     <button
-                      onClick={() => toggleMenu(item)}
+                      type="button"
                       disabled={savingMenuId === item.documentId}
-                      style={{
-                        ...(menuAvailable(item) ? styles.dangerButton : styles.actionButton),
-                        width: "100%",
-                        marginTop: 12,
-                      }}
+                      onClick={() => toggleMenu(item)}
+                      className={menuAvailable(item) ? "danger" : "primary"}
                     >
-                      {menuAvailable(item) ? "إيقاف الصنف" : "تفعيل الصنف"}
+                      {savingMenuId === item.documentId
+                        ? "جاري..."
+                        : menuAvailable(item)
+                          ? "إيقاف الصنف"
+                          : "تفعيل الصنف"}
                     </button>
                   </article>
                 ))
@@ -1045,6 +772,570 @@ console.log('FUSE disabled old restaurant login redirect');
           </aside>
         </section>
       </section>
+
+      <style jsx>{`
+        :global(*) {
+          box-sizing: border-box;
+        }
+
+        :global(html),
+        :global(body) {
+          margin: 0;
+          padding: 0;
+          background: #050505;
+        }
+
+        .page {
+          min-height: 100vh;
+          padding: 26px 16px;
+          color: #fff;
+          font-family: Cairo, system-ui, sans-serif;
+          background:
+            radial-gradient(circle at top right, rgba(255,122,0,0.18), transparent 34%),
+            radial-gradient(circle at bottom left, rgba(255,61,0,0.11), transparent 34%),
+            #050505;
+        }
+
+        .shell {
+          width: min(1240px, 100%);
+          margin: 0 auto;
+        }
+
+        .topbar,
+        .hero,
+        .controls,
+        .panel,
+        .alert {
+          border: 1px solid rgba(255,255,255,0.11);
+          background: rgba(255,255,255,0.055);
+          box-shadow: 0 24px 70px rgba(0,0,0,0.28);
+          backdrop-filter: blur(18px);
+        }
+
+        .topbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+          border-radius: 28px;
+          padding: 14px;
+          margin-bottom: 16px;
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .brand-icon {
+          width: 52px;
+          height: 52px;
+          border-radius: 18px;
+          display: grid;
+          place-items: center;
+          background: linear-gradient(135deg, #ff8a00, #ff3d00);
+          color: #101010;
+          font-size: 24px;
+          font-weight: 950;
+        }
+
+        .brand b {
+          display: block;
+          font-size: 20px;
+          font-weight: 950;
+        }
+
+        .brand span {
+          display: block;
+          margin-top: 4px;
+          color: rgba(255,255,255,0.55);
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .nav {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 9px;
+        }
+
+        .pill {
+          border-radius: 999px;
+          padding: 11px 15px;
+          color: rgba(255,255,255,0.74);
+          text-decoration: none;
+          background: rgba(255,255,255,0.065);
+          font-size: 13px;
+          font-weight: 950;
+        }
+
+        .pill.active {
+          background: #ff7a00;
+          color: #101010;
+        }
+
+        .hero {
+          display: grid;
+          grid-template-columns: minmax(0, 0.85fr) minmax(520px, 1.15fr);
+          gap: 16px;
+          border-radius: 34px;
+          padding: 22px;
+          margin-bottom: 16px;
+          background:
+            radial-gradient(circle at 85% 20%, rgba(255,255,255,0.13), transparent 24%),
+            linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.11));
+        }
+
+        .hero-copy {
+          border-radius: 28px;
+          padding: 24px;
+          background: rgba(0,0,0,0.28);
+        }
+
+        .hero-copy > span,
+        .panel-head span,
+        .controls label span {
+          color: #ff7a00;
+          font-size: 12px;
+          font-weight: 950;
+        }
+
+        .hero-copy h1 {
+          margin: 12px 0 12px;
+          font-size: clamp(42px, 5vw, 70px);
+          line-height: 0.98;
+          font-weight: 950;
+          letter-spacing: -1px;
+        }
+
+        .hero-copy em {
+          color: #ff7a00;
+          font-style: normal;
+        }
+
+        .hero-copy p {
+          margin: 0;
+          color: rgba(255,255,255,0.68);
+          line-height: 1.9;
+          font-weight: 700;
+        }
+
+        .hero-stats {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 12px;
+        }
+
+        .hero-stats article {
+          min-height: 165px;
+          border-radius: 26px;
+          padding: 18px;
+          background: rgba(0,0,0,0.32);
+          border: 1px solid rgba(255,255,255,0.09);
+        }
+
+        .hero-stats svg {
+          color: #ff7a00;
+          margin-bottom: 14px;
+        }
+
+        .hero-stats span {
+          display: block;
+          color: rgba(255,255,255,0.55);
+          font-size: 12px;
+          font-weight: 950;
+        }
+
+        .hero-stats b {
+          display: block;
+          margin: 10px 0 7px;
+          color: #fff;
+          font-size: 30px;
+          line-height: 1.05;
+          font-weight: 950;
+        }
+
+        .hero-stats small {
+          color: rgba(255,255,255,0.46);
+          font-weight: 700;
+        }
+
+        .controls {
+          display: grid;
+          grid-template-columns: minmax(260px, 1fr) minmax(170px, 0.36fr) minmax(170px, 0.36fr);
+          gap: 12px;
+          border-radius: 28px;
+          padding: 18px;
+          margin-bottom: 14px;
+        }
+
+        .controls label {
+          display: grid;
+          gap: 8px;
+        }
+
+        .input-wrap {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .input-wrap svg {
+          color: #ff7a00;
+          flex: 0 0 auto;
+        }
+
+        input,
+        select {
+          width: 100%;
+          min-height: 50px;
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 18px;
+          outline: 0;
+          background: #070707;
+          color: #fff;
+          padding: 0 14px;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 800;
+        }
+
+        .input-wrap input {
+          border: 0;
+          background: transparent;
+          min-height: 48px;
+          padding: 0;
+        }
+
+        .input-wrap {
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 18px;
+          background: #070707;
+          padding: 0 14px;
+        }
+
+        .alert {
+          border-radius: 18px;
+          padding: 14px 16px;
+          margin-bottom: 14px;
+          font-weight: 950;
+        }
+
+        .alert.ok {
+          color: #86efac;
+          border-color: rgba(34,197,94,0.28);
+          background: rgba(34,197,94,0.10);
+        }
+
+        .alert.bad {
+          color: #fca5a5;
+          border-color: rgba(239,68,68,0.28);
+          background: rgba(239,68,68,0.10);
+        }
+
+        .layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(330px, 0.42fr);
+          gap: 14px;
+        }
+
+        .panel {
+          border-radius: 30px;
+          padding: 18px;
+        }
+
+        .panel-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: end;
+          gap: 12px;
+          margin-bottom: 14px;
+        }
+
+        .panel-head h2 {
+          margin: 5px 0 0;
+          font-size: 30px;
+          line-height: 1.1;
+          font-weight: 950;
+        }
+
+        .panel-head > b {
+          min-width: 52px;
+          height: 52px;
+          border-radius: 18px;
+          display: grid;
+          place-items: center;
+          background: #ff7a00;
+          color: #101010;
+          font-size: 22px;
+          font-weight: 950;
+        }
+
+        .orders-list,
+        .menu-list {
+          display: grid;
+          gap: 12px;
+        }
+
+        .order-card,
+        .menu-card,
+        .empty {
+          border: 1px solid rgba(255,255,255,0.10);
+          background: rgba(0,0,0,0.28);
+          border-radius: 26px;
+          padding: 16px;
+        }
+
+        .order-top {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 210px;
+          gap: 12px;
+          align-items: start;
+        }
+
+        .order-title {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        .order-title h3,
+        .menu-card h3,
+        .empty h3 {
+          margin: 0;
+          font-size: 22px;
+          line-height: 1.1;
+          font-weight: 950;
+        }
+
+        .order-card p,
+        .menu-card p,
+        .empty p {
+          margin: 8px 0 0;
+          color: rgba(255,255,255,0.58);
+          line-height: 1.7;
+          font-weight: 700;
+        }
+
+        .total-box {
+          border-radius: 22px;
+          padding: 14px;
+          background: rgba(255,122,0,0.09);
+          border: 1px solid rgba(255,122,0,0.24);
+        }
+
+        .total-box span,
+        .info-grid span,
+        .items-box span {
+          color: rgba(255,255,255,0.52);
+          font-size: 12px;
+          font-weight: 950;
+        }
+
+        .total-box b {
+          display: block;
+          margin-top: 8px;
+          color: #ffb56b;
+          font-size: 24px;
+          font-weight: 950;
+        }
+
+        .info-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        .info-grid > div,
+        .items-box {
+          border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.035);
+          border-radius: 18px;
+          padding: 12px;
+        }
+
+        .info-grid b {
+          display: block;
+          margin-top: 7px;
+          color: rgba(255,255,255,0.78);
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .items-box {
+          margin-top: 12px;
+        }
+
+        .actions {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        button {
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 16px;
+          min-height: 46px;
+          padding: 0 12px;
+          background: rgba(255,255,255,0.065);
+          color: #fff;
+          font-family: inherit;
+          font-weight: 950;
+          cursor: pointer;
+        }
+
+        button.primary {
+          border: 0;
+          background: #ff7a00;
+          color: #101010;
+        }
+
+        button.danger {
+          border-color: rgba(239,68,68,0.34);
+          background: rgba(239,68,68,0.12);
+          color: #fca5a5;
+        }
+
+        button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .menu-form {
+          display: grid;
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+
+        .menu-form button {
+          border: 0;
+          background: #ff7a00;
+          color: #101010;
+        }
+
+        .menu-top {
+          display: flex;
+          justify-content: space-between;
+          gap: 10px;
+          align-items: flex-start;
+        }
+
+        .price {
+          display: block;
+          margin: 12px 0;
+          color: #ffb56b;
+          font-size: 18px;
+          font-weight: 950;
+        }
+
+        .menu-card button {
+          width: 100%;
+        }
+
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          border: 1px solid;
+          border-radius: 999px;
+          padding: 7px 11px;
+          font-size: 12px;
+          font-weight: 950;
+          white-space: nowrap;
+        }
+
+        .badge.orange {
+          border-color: rgba(255,122,0,0.42);
+          background: rgba(255,122,0,0.12);
+          color: #ffb56b;
+        }
+
+        .badge.yellow {
+          border-color: rgba(234,179,8,0.42);
+          background: rgba(234,179,8,0.12);
+          color: #fde68a;
+        }
+
+        .badge.sky {
+          border-color: rgba(14,165,233,0.42);
+          background: rgba(14,165,233,0.12);
+          color: #7dd3fc;
+        }
+
+        .badge.purple {
+          border-color: rgba(168,85,247,0.42);
+          background: rgba(168,85,247,0.12);
+          color: #d8b4fe;
+        }
+
+        .badge.green {
+          border-color: rgba(34,197,94,0.42);
+          background: rgba(34,197,94,0.12);
+          color: #86efac;
+        }
+
+        .badge.red {
+          border-color: rgba(239,68,68,0.42);
+          background: rgba(239,68,68,0.12);
+          color: #fca5a5;
+        }
+
+        .badge.muted {
+          border-color: rgba(255,255,255,0.14);
+          background: rgba(255,255,255,0.06);
+          color: rgba(255,255,255,0.65);
+        }
+
+        @media (max-width: 1060px) {
+          .hero,
+          .layout {
+            grid-template-columns: 1fr;
+          }
+
+          .hero-stats {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
+        @media (max-width: 720px) {
+          .page {
+            padding: 14px;
+          }
+
+          .topbar,
+          .hero,
+          .controls,
+          .panel {
+            border-radius: 24px;
+          }
+
+          .hero-stats,
+          .controls,
+          .info-grid,
+          .actions {
+            grid-template-columns: 1fr;
+          }
+
+          .order-top {
+            grid-template-columns: 1fr;
+          }
+
+          .nav {
+            width: 100%;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 2px;
+          }
+
+          .pill {
+            flex: 0 0 auto;
+          }
+        }
+      `}</style>
     </main>
   );
 }

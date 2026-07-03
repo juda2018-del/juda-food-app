@@ -59,10 +59,10 @@ const fallbackRestaurants: RestaurantDoc[] = [
     name: "فيروز",
     description: "فطور عراقي، كاهي، قيمر وبورك أصيل.",
     cuisine: "فطور",
-    area: "بغداد - المنصور",
+    area: "زيونة",
     open: true,
-    rating: 4.8,
-    deliveryTime: "25-35 د",
+    rating: 4.9,
+    deliveryTime: "20 - 30 دقيقة",
     priceRange: "25-35 د",
     image: "/images/m2.jpg",
   },
@@ -71,11 +71,11 @@ const fallbackRestaurants: RestaurantDoc[] = [
     name: "شلتتة",
     description: "مشلتت وفطائر حار وحلو.",
     cuisine: "فطور",
-    area: "بغداد",
+    area: "زيونة",
     open: true,
     rating: 4.7,
-    deliveryTime: "30-40 د",
-    priceRange: "30-40 د",
+    deliveryTime: "25 - 35 دقيقة",
+    priceRange: "25-35 د",
     image: "/images/m3.jpg",
   },
   {
@@ -86,7 +86,7 @@ const fallbackRestaurants: RestaurantDoc[] = [
     area: "بغداد",
     open: true,
     rating: 4.6,
-    deliveryTime: "35-45 د",
+    deliveryTime: "30 - 40 دقيقة",
     priceRange: "20-35 د",
     image: "/images/m4.jpg",
   },
@@ -98,7 +98,7 @@ const fallbackRestaurants: RestaurantDoc[] = [
     area: "بغداد",
     open: true,
     rating: 4.5,
-    deliveryTime: "30-40 د",
+    deliveryTime: "30 - 40 دقيقة",
     priceRange: "20-35 د",
     image: "/images/m5.jpg",
   },
@@ -150,10 +150,20 @@ const fallbackMenu: MenuDoc[] = [
     restaurantName: "الفرن",
     restaurantId: "alforn",
     category: "بيتزا",
-    name: "مناقيش جبن",
-    price: 6000,
+    name: "بيتزا لحم",
+    price: 8500,
     available: true,
     image: "/images/m10.jpg",
+  },
+  {
+    documentId: "m6",
+    restaurantName: "فيروز",
+    restaurantId: "fayrouz",
+    category: "مشروبات",
+    name: "شاي عراقي",
+    price: 1500,
+    available: true,
+    image: "/images/1.jpg",
   },
 ];
 
@@ -197,10 +207,12 @@ function menuAvailable(item: MenuDoc) {
 
 function restaurantSlug(name: string, documentId?: string) {
   const clean = `${name} ${documentId || ""}`.toLowerCase();
+
   if (clean.includes("fayrouz") || clean.includes("فيروز")) return "fayrouz";
   if (clean.includes("shalteta") || clean.includes("شلتتة")) return "shalteta";
   if (clean.includes("khan") || clean.includes("خان")) return "khan";
   if (clean.includes("alforn") || clean.includes("الفرن")) return "alforn";
+
   return documentId || "fayrouz";
 }
 
@@ -296,12 +308,12 @@ export default function HomePage() {
     const unsubscribeRestaurants = onSnapshot(
       query(collection(db, "restaurants")),
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          ...(doc.data() as Omit<RestaurantDoc, "documentId">),
-          documentId: doc.id,
-        }));
-
-        setRestaurants(data);
+        setRestaurants(
+          snapshot.docs.map((doc) => ({
+            ...(doc.data() as Omit<RestaurantDoc, "documentId">),
+            documentId: doc.id,
+          }))
+        );
       },
       () => setRestaurants([])
     );
@@ -309,12 +321,12 @@ export default function HomePage() {
     const unsubscribeMenu = onSnapshot(
       query(collection(db, "menu")),
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          ...(doc.data() as Omit<MenuDoc, "documentId">),
-          documentId: doc.id,
-        }));
-
-        setMenu(data);
+        setMenu(
+          snapshot.docs.map((doc) => ({
+            ...(doc.data() as Omit<MenuDoc, "documentId">),
+            documentId: doc.id,
+          }))
+        );
       },
       () => setMenu([])
     );
@@ -524,13 +536,15 @@ export default function HomePage() {
                   label={item.name || "FUSE"}
                 />
 
-                <div>
+                <div className="product-body">
                   <h3>{item.name || item.title || "صنف"}</h3>
                   <p>{restaurantName}</p>
-                  <strong>{formatIQD(item.price)}</strong>
-                </div>
 
-                <span>+</span>
+                  <div>
+                    <strong>{formatIQD(item.price)}</strong>
+                    <span>+</span>
+                  </div>
+                </div>
               </Link>
             );
           })}
@@ -986,16 +1000,9 @@ export default function HomePage() {
 
         .restaurants {
           display: grid;
-          grid-auto-flow: column;
-          grid-auto-columns: 185px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 14px;
-          overflow-x: auto;
-          padding: 2px 1px 22px;
-          scrollbar-width: none;
-        }
-
-        .restaurants::-webkit-scrollbar {
-          display: none;
+          padding-bottom: 22px;
         }
 
         .rest-card {
@@ -1004,50 +1011,59 @@ export default function HomePage() {
           background: #fffdf9;
           color: #0b1220;
           text-decoration: none;
-          box-shadow: 0 18px 40px rgba(11, 18, 32, 0.1);
+          box-shadow: 0 18px 40px rgba(11, 18, 32, 0.09);
         }
 
         .rest-img-wrap {
           position: relative;
-          height: 132px;
+          height: 126px;
           background: #0b1220;
+          overflow: hidden;
         }
 
         .rest-img {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          object-position: center;
           display: block;
         }
 
         .heart {
           position: absolute;
-          top: 10px;
-          right: 10px;
-          width: 36px;
-          height: 36px;
+          top: 9px;
+          right: 9px;
+          width: 34px;
+          height: 34px;
           border: 0;
           border-radius: 999px;
           display: grid;
           place-items: center;
           background: rgba(255, 253, 249, 0.94);
           color: #0b1220;
+          box-shadow: 0 10px 20px rgba(11, 18, 32, 0.12);
+        }
+
+        .heart svg {
+          width: 18px;
+          height: 18px;
         }
 
         .time {
           position: absolute;
-          top: 10px;
-          left: 10px;
+          top: 9px;
+          left: 9px;
           border-radius: 999px;
           background: rgba(11, 18, 32, 0.82);
           color: #fff7ee;
           padding: 6px 9px;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
+          white-space: nowrap;
         }
 
         .rest-body {
-          padding: 12px;
+          padding: 11px;
         }
 
         .rest-rating {
@@ -1055,14 +1071,14 @@ export default function HomePage() {
           align-items: center;
           gap: 4px;
           color: #ff5a00;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
 
         .rest-rating svg {
-          width: 15px;
-          height: 15px;
+          width: 14px;
+          height: 14px;
         }
 
         .rest-body h3 {
@@ -1075,93 +1091,115 @@ export default function HomePage() {
         }
 
         .rest-body p {
-          margin: 6px 0 12px;
+          margin: 6px 0 11px;
           color: #786f66;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 500;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .rest-footer {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 8px;
+          gap: 6px;
         }
 
         .rest-footer strong {
           color: #0b1220;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
+          white-space: nowrap;
         }
 
         .rest-footer span {
-          min-width: 82px;
-          height: 34px;
+          height: 32px;
+          min-width: 76px;
           border-radius: 999px;
           background: linear-gradient(135deg, #ff7a00, #ff3d00);
           color: #fff7ee;
           display: grid;
           place-items: center;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 700;
+          white-space: nowrap;
         }
 
         .products {
           display: grid;
-          gap: 11px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 13px;
           padding-bottom: 8px;
         }
 
         .product {
-          display: grid;
-          grid-template-columns: 72px 1fr 34px;
-          align-items: center;
-          gap: 11px;
-          border-radius: 22px;
-          padding: 9px;
+          overflow: hidden;
+          border-radius: 24px;
           background: #fffdf9;
           color: #0b1220;
           text-decoration: none;
-          box-shadow: 0 14px 30px rgba(11, 18, 32, 0.07);
+          box-shadow: 0 16px 34px rgba(11, 18, 32, 0.08);
         }
 
         .product-img {
-          width: 72px;
-          height: 72px;
-          border-radius: 18px;
+          width: 100%;
+          height: 112px;
           object-fit: cover;
+          object-position: center;
+          display: block;
           background: #0b1220;
+        }
+
+        .product-body {
+          padding: 11px;
         }
 
         .product h3 {
           margin: 0;
           font-family: var(--fuse-title-font);
-          font-size: 16px;
+          font-size: 15px;
+          line-height: 1.15;
           font-weight: 900;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .product p {
-          margin: 4px 0 6px;
+          margin: 5px 0 10px;
           color: #786f66;
-          font-size: 12px;
+          font-size: 11px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .product-body div {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
         }
 
         .product strong {
           color: #ff5a00;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 700;
         }
 
-        .product > span {
-          width: 34px;
-          height: 34px;
+        .product-body span {
+          width: 28px;
+          height: 28px;
           border-radius: 999px;
           display: grid;
           place-items: center;
           background: #ff5a00;
           color: #fff7ee;
-          font-size: 22px;
+          font-size: 19px;
           font-weight: 700;
+          line-height: 1;
         }
 
         .bottom-nav {
@@ -1259,7 +1297,6 @@ export default function HomePage() {
 
           .hero {
             min-height: 205px;
-            grid-template-columns: 1fr 42%;
           }
 
           .hero-copy h1 {
@@ -1271,7 +1308,19 @@ export default function HomePage() {
           }
 
           .restaurants {
-            grid-auto-columns: 174px;
+            gap: 12px;
+          }
+
+          .rest-img-wrap {
+            height: 118px;
+          }
+
+          .products {
+            gap: 12px;
+          }
+
+          .product-img {
+            height: 104px;
           }
         }
       `}</style>
