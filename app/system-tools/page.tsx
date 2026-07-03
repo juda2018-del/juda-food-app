@@ -1,5 +1,6 @@
  "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   collection,
@@ -17,7 +18,7 @@ type Restaurant = {
   name?: string;
   open?: boolean;
   active?: boolean;
-  createdAt?: any;
+  createdAt?: unknown;
 };
 
 type Driver = {
@@ -27,43 +28,55 @@ type Driver = {
   online?: boolean;
   active?: boolean;
   currentOrderId?: string;
-  createdAt?: any;
+  createdAt?: unknown;
 };
 
 type MenuItem = {
   docId: string;
   name?: string;
   restaurant?: string;
+  restaurantName?: string;
   category?: string;
   active?: boolean;
-  createdAt?: any;
+  available?: boolean;
+  isAvailable?: boolean;
+  createdAt?: unknown;
 };
 
 type LiveOrder = {
   docId: string;
   restaurant?: string;
+  restaurantName?: string;
   driverDocId?: string;
+  driverId?: string;
   driverName?: string;
+  assignedDriverName?: string;
   status?: string;
-  createdAt?: any;
+  total?: number;
+  amount?: number;
+  createdAt?: unknown;
 };
 
 function clean(value?: string) {
   return String(value || "").trim();
 }
 
-function formatDate(value: any) {
+function norm(value?: string) {
+  return clean(value).toLowerCase();
+}
+
+function formatDate(value: unknown) {
   if (!value) return "بدون وقت";
 
   try {
     const date =
-      typeof value?.toDate === "function"
-        ? value.toDate()
+      typeof (value as { toDate?: unknown })?.toDate === "function"
+        ? (value as { toDate: () => Date }).toDate()
         : value instanceof Date
-        ? value
-        : new Date(value);
+          ? value
+          : new Date(value as string | number);
 
-    if (isNaN(date.getTime())) return "بدون وقت";
+    if (Number.isNaN(date.getTime())) return "بدون وقت";
 
     return date.toLocaleString("ar-IQ", {
       month: "2-digit",
@@ -76,10 +89,13 @@ function formatDate(value: any) {
   }
 }
 
-function createdMs(value: any) {
+function createdMs(value: unknown) {
   try {
-    if (typeof value?.toDate === "function") return value.toDate().getTime();
-    return new Date(value || 0).getTime();
+    if (typeof (value as { toDate?: unknown })?.toDate === "function") {
+      return (value as { toDate: () => Date }).toDate().getTime();
+    }
+
+    return new Date((value as string | number) || 0).getTime();
   } catch {
     return 0;
   }
@@ -102,6 +118,96 @@ function groupBy<T>(items: T[], key: (item: T) => string) {
     .filter((group) => group.list.length > 1);
 }
 
+function restaurantName(item: Restaurant | MenuItem | LiveOrder) {
+  return clean(
+    "restaurantName" in item ? item.restaurantName || item.restaurant : item.restaurant
+  );
+}
+
+function orderStatus(order: LiveOrder) {
+  return clean(order.status || "جديد");
+}
+
+function orderTotal(order: LiveOrder) {
+  return Number(order.total || order.amount || 0);
+}
+
+function isMenuActive(item: MenuItem) {
+  return item.active !== false && item.available !== false && item.isAvailable !== false;
+}
+
+function isOrderActive(order: LiveOrder) {
+  return !["تم التسليم", "مرفوض", "ملغي", "Cancelled", "Delivered"].includes(
+    String(order.status || "")
+  );
+}
+
+function Icon({ name }: { name: string }) {
+  const p = {
+    width: 20,
+    height: 20,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  if (name === "tools") {
+    return (
+      <svg {...p}>
+        <path d="M14.7 6.3a4 4 0 105.6 5.6l-7.7 7.7a2 2 0 01-2.8 0l-1.4-1.4a2 2 0 010-2.8l7.7-7.7z" />
+        <path d="M6 14l-3 3 4 4 3-3" />
+      </svg>
+    );
+  }
+
+  if (name === "database") {
+    return (
+      <svg {...p}>
+        <ellipse cx="12" cy="5" rx="8" ry="3" />
+        <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+        <path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+      </svg>
+    );
+  }
+
+  if (name === "orders") {
+    return (
+      <svg {...p}>
+        <rect x="5" y="4" width="14" height="16" rx="2" />
+        <path d="M9 9h6" />
+        <path d="M9 13h6" />
+      </svg>
+    );
+  }
+
+  if (name === "alert") {
+    return (
+      <svg {...p}>
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+        <path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
+      </svg>
+    );
+  }
+
+  if (name === "check") {
+    return (
+      <svg {...p}>
+        <path d="M20 6L9 17l-5-5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...p}>
+      <circle cx="12" cy="12" r="8" />
+    </svg>
+  );
+}
+
 export default function SystemToolsPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -112,7 +218,7 @@ export default function SystemToolsPage() {
 
   function showToast(message: string) {
     setToast(message);
-    setTimeout(() => setToast(""), 3500);
+    window.setTimeout(() => setToast(""), 3600);
   }
 
   useEffect(() => {
@@ -128,9 +234,7 @@ export default function SystemToolsPage() {
           }))
         );
       },
-      () => {
-        showToast("صار خطأ بقراءة المطاعم");
-      }
+      () => showToast("صار خطأ بقراءة المطاعم")
     );
 
     return () => unsub();
@@ -149,9 +253,7 @@ export default function SystemToolsPage() {
           }))
         );
       },
-      () => {
-        showToast("صار خطأ بقراءة السائقين");
-      }
+      () => showToast("صار خطأ بقراءة السائقين")
     );
 
     return () => unsub();
@@ -170,9 +272,7 @@ export default function SystemToolsPage() {
           }))
         );
       },
-      () => {
-        showToast("صار خطأ بقراءة المنيو");
-      }
+      () => showToast("صار خطأ بقراءة المنيو")
     );
 
     return () => unsub();
@@ -191,53 +291,75 @@ export default function SystemToolsPage() {
           }))
         );
       },
-      () => {
-        showToast("صار خطأ بقراءة الطلبات");
-      }
+      () => showToast("صار خطأ بقراءة الطلبات")
     );
 
     return () => unsub();
   }, []);
 
   const restaurantDuplicates = useMemo(() => {
-    return groupBy(restaurants, (item) => clean(item.name));
+    return groupBy(restaurants, (item) => norm(item.name));
   }, [restaurants]);
 
   const driverDuplicates = useMemo(() => {
-    return groupBy(drivers, (item) => clean(item.phone) || clean(item.name));
+    return groupBy(drivers, (item) => norm(item.phone) || norm(item.name));
   }, [drivers]);
 
   const menuDuplicates = useMemo(() => {
     return groupBy(
       menu,
-      (item) =>
-        `${clean(item.restaurant)}__${clean(item.category)}__${clean(item.name)}`
+      (item) => `${norm(item.restaurant || item.restaurantName)}__${norm(item.category)}__${norm(item.name)}`
     );
   }, [menu]);
 
   const brokenMenu = useMemo(() => {
     return menu.filter((item) => {
-      const restaurantName = clean(item.restaurant);
-      if (!restaurantName) return true;
+      const name = norm(item.restaurant || item.restaurantName);
+      if (!name) return true;
 
-      return !restaurants.some(
-        (restaurant) => clean(restaurant.name) === restaurantName
-      );
+      return !restaurants.some((restaurant) => norm(restaurant.name) === name);
     });
   }, [menu, restaurants]);
 
   const ordersWithoutDriver = useMemo(() => {
-    return orders.filter(
-      (order) =>
-        order.status === "قيد التوصيل" && !order.driverDocId && !order.driverName
-    );
+    return orders.filter((order) => {
+      const status = orderStatus(order);
+
+      return (
+        status === "قيد التوصيل" &&
+        !order.driverDocId &&
+        !order.driverId &&
+        !order.driverName &&
+        !order.assignedDriverName
+      );
+    });
   }, [orders]);
 
-  const activeOrders = useMemo(() => {
-    return orders.filter(
-      (order) => !["تم التسليم", "مرفوض"].includes(String(order.status || ""))
-    );
+  const activeOrders = useMemo(() => orders.filter(isOrderActive), [orders]);
+
+  const revenue = useMemo(() => {
+    return orders
+      .filter((order) => ["تم التسليم", "Delivered"].includes(String(order.status || "")))
+      .reduce((sum, order) => sum + orderTotal(order), 0);
   }, [orders]);
+
+  const healthScore = useMemo(() => {
+    const issues =
+      restaurantDuplicates.length +
+      driverDuplicates.length +
+      menuDuplicates.length +
+      brokenMenu.length +
+      ordersWithoutDriver.length;
+
+    if (issues === 0) return 100;
+    return Math.max(20, 100 - issues * 12);
+  }, [
+    brokenMenu.length,
+    driverDuplicates.length,
+    menuDuplicates.length,
+    ordersWithoutDriver.length,
+    restaurantDuplicates.length,
+  ]);
 
   function pickKeepRestaurant(list: Restaurant[]) {
     return [...list].sort((a, b) => {
@@ -263,8 +385,8 @@ export default function SystemToolsPage() {
 
   function pickKeepMenu(list: MenuItem[]) {
     return [...list].sort((a, b) => {
-      const aActive = a.active !== false ? 1 : 0;
-      const bActive = b.active !== false ? 1 : 0;
+      const aActive = isMenuActive(a) ? 1 : 0;
+      const bActive = isMenuActive(b) ? 1 : 0;
 
       if (aActive !== bActive) return bActive - aActive;
 
@@ -311,9 +433,7 @@ export default function SystemToolsPage() {
         const keep = pickKeepDriver(group.list);
         const remove = group.list.filter((item) => item.docId !== keep.docId);
 
-        await Promise.all(
-          remove.map((item) => deleteDoc(doc(db, "drivers", item.docId)))
-        );
+        await Promise.all(remove.map((item) => deleteDoc(doc(db, "drivers", item.docId))));
       }
 
       showToast("تم تنظيف السائقين المكررين");
@@ -337,9 +457,7 @@ export default function SystemToolsPage() {
         const keep = pickKeepMenu(group.list);
         const remove = group.list.filter((item) => item.docId !== keep.docId);
 
-        await Promise.all(
-          remove.map((item) => deleteDoc(doc(db, "menu", item.docId)))
-        );
+        await Promise.all(remove.map((item) => deleteDoc(doc(db, "menu", item.docId))));
       }
 
       showToast("تم تنظيف المنيو المكرر");
@@ -363,6 +481,8 @@ export default function SystemToolsPage() {
         brokenMenu.map((item) =>
           updateDoc(doc(db, "menu", item.docId), {
             active: false,
+            available: false,
+            isAvailable: false,
             updatedAt: Date.now(),
           })
         )
@@ -378,14 +498,187 @@ export default function SystemToolsPage() {
 
   return (
     <main dir="rtl" className="tools-page">
-      <style jsx global>{`
-        body {
-          margin: 0;
-          background: #050505;
+      {toast ? <div className="toast">{toast}</div> : null}
+
+      <section className="shell">
+        <header className="topbar">
+          <div className="brand">
+            <div className="logo">
+              <Icon name="tools" />
+            </div>
+            <div>
+              <h1>FUSE Command Tools</h1>
+              <p>تنظيف Firestore وفحص سلامة التشغيل</p>
+            </div>
+          </div>
+
+          <nav className="nav">
+            <Link href="/" className="nav-link">الرئيسية</Link>
+            <Link href="/restaurant-admin" className="nav-link">المطعم</Link>
+            <Link href="/driver-app" className="nav-link">السائق</Link>
+            <Link href="/live-orders" className="nav-link">الطلبات</Link>
+            <Link href="/system-tools" className="nav-link main">أدوات النظام</Link>
+          </nav>
+        </header>
+
+        <section className="hero">
+          <div className="hero-card">
+            <span className="kicker">🧹 مركز تنظيف الداتا</span>
+            <h2>
+              إدارة صحة <span>نظام FUSE</span>
+            </h2>
+            <p>
+              فحص التكرارات، تعطيل الأصناف المكسورة، متابعة الطلبات النشطة، وتنظيف
+              البيانات التجريبية بدون أي حذف تلقائي.
+            </p>
+
+            <div className="stats">
+              <Stat title="مطاعم" value={restaurants.length} />
+              <Stat title="أصناف منيو" value={menu.length} />
+              <Stat title="سائقين" value={drivers.length} />
+              <Stat title="طلبات" value={orders.length} />
+            </div>
+          </div>
+
+          <aside className="side-card">
+            <div className="score-ring">
+              <strong>{healthScore}%</strong>
+              <span>System Health</span>
+            </div>
+
+            <div className="health">
+              <Health title="مطاعم مكررة" value={restaurantDuplicates.length} danger={restaurantDuplicates.length > 0} />
+              <Health title="سائقين مكررين" value={driverDuplicates.length} danger={driverDuplicates.length > 0} />
+              <Health title="أصناف مكررة" value={menuDuplicates.length} danger={menuDuplicates.length > 0} />
+              <Health title="منيو بدون مطعم" value={brokenMenu.length} danger={brokenMenu.length > 0} />
+              <Health title="طلبات بالطريق بدون سائق" value={ordersWithoutDriver.length} danger={ordersWithoutDriver.length > 0} />
+            </div>
+          </aside>
+        </section>
+
+        <section className="quick-row">
+          <QuickCard title="طلبات نشطة" value={activeOrders.length} hint="غير مكتملة" icon="orders" />
+          <QuickCard title="إيراد مكتمل" value={`${revenue.toLocaleString()} د.ع`} hint="من الطلبات المسلمة" icon="database" />
+          <QuickCard title="مشاكل الداتا" value={100 - healthScore} hint="كلما قل أفضل" icon="alert" />
+          <QuickCard title="آخر تحديث" value="Live" hint={formatDate(new Date())} icon="check" />
+        </section>
+
+        <section className="layout">
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <span>Cleanup Actions</span>
+                <h2>أدوات التنظيف</h2>
+              </div>
+            </div>
+
+            <div className="tools-grid">
+              <ToolCard
+                title="تنظيف المطاعم المكررة"
+                desc="يحذف النسخ المكررة من نفس اسم المطعم ويخلي نسخة واحدة، ويفضل المفتوحة والفعالة."
+                count={restaurantDuplicates.length}
+                onClick={cleanupRestaurants}
+                disabled={restaurantDuplicates.length === 0 || working === "restaurants"}
+                working={working === "restaurants"}
+              />
+
+              <ToolCard
+                title="تنظيف السائقين المكررين"
+                desc="يحذف السائقين المكررين حسب الرقم أو الاسم، ويخلي السائق المتصل أو الأحدث."
+                count={driverDuplicates.length}
+                onClick={cleanupDrivers}
+                disabled={driverDuplicates.length === 0 || working === "drivers"}
+                working={working === "drivers"}
+              />
+
+              <ToolCard
+                title="تنظيف المنيو المكرر"
+                desc="يحذف الأصناف المكررة بنفس الاسم ونفس المطعم ونفس التصنيف، ويخلي نسخة واحدة."
+                count={menuDuplicates.length}
+                onClick={cleanupMenu}
+                disabled={menuDuplicates.length === 0 || working === "menu"}
+                working={working === "menu"}
+              />
+
+              <ToolCard
+                title="تعطيل منيو بدون مطعم"
+                desc="أي صنف مربوط بمطعم غير موجود يتم تعطيله فقط بدون حذف."
+                count={brokenMenu.length}
+                onClick={disableBrokenMenu}
+                disabled={brokenMenu.length === 0 || working === "broken-menu"}
+                working={working === "broken-menu"}
+              />
+            </div>
+          </div>
+
+          <aside className="panel">
+            <div className="panel-head">
+              <div>
+                <span>Live Diagnostics</span>
+                <h2>ملخص الفحص</h2>
+              </div>
+            </div>
+
+            <div className="list">
+              <Info
+                title="آخر حالة تشغيل"
+                value={
+                  activeOrders.length > 0
+                    ? `عدك ${activeOrders.length} طلب نشط`
+                    : "ماكو طلبات نشطة حالياً"
+                }
+              />
+
+              <Info
+                title="أسماء المطاعم المكررة"
+                value={
+                  restaurantDuplicates.length > 0
+                    ? restaurantDuplicates
+                        .slice(0, 6)
+                        .map((group) => `${group.name} ×${group.list.length}`)
+                        .join(" · ")
+                    : "ماكو تكرار"
+                }
+              />
+
+              <Info
+                title="أسماء السائقين/الأرقام المكررة"
+                value={
+                  driverDuplicates.length > 0
+                    ? driverDuplicates
+                        .slice(0, 6)
+                        .map((group) => `${group.name} ×${group.list.length}`)
+                        .join(" · ")
+                    : "ماكو تكرار"
+                }
+              />
+
+              <Info
+                title="أصناف منيو مكسورة"
+                value={
+                  brokenMenu.length > 0
+                    ? brokenMenu
+                        .slice(0, 6)
+                        .map((item) => `${item.name || "صنف"} / ${item.restaurant || item.restaurantName || "بدون مطعم"}`)
+                        .join(" · ")
+                    : "كل الأصناف مربوطة بمطاعم"
+                }
+              />
+            </div>
+          </aside>
+        </section>
+      </section>
+
+      <style jsx>{`
+        :global(*) {
+          box-sizing: border-box;
         }
 
-        * {
-          box-sizing: border-box;
+        :global(html),
+        :global(body) {
+          margin: 0;
+          padding: 0;
+          background: #050505;
         }
 
         .tools-page {
@@ -396,13 +689,7 @@ export default function SystemToolsPage() {
             radial-gradient(circle at 88% 16%, rgba(239, 68, 68, 0.1), transparent 28%),
             radial-gradient(circle at 50% 96%, rgba(56, 189, 248, 0.08), transparent 34%),
             linear-gradient(135deg, #050505, #0d0d10 55%, #050505);
-          font-family:
-            Cairo,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
-            sans-serif;
+          font-family: Cairo, system-ui, sans-serif;
         }
 
         .shell {
@@ -411,18 +698,26 @@ export default function SystemToolsPage() {
           padding: 22px 0 42px;
         }
 
+        .topbar,
+        .hero-card,
+        .side-card,
+        .quick-card,
+        .panel {
+          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(12, 12, 14, 0.78);
+          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+          backdrop-filter: blur(18px);
+        }
+
         .topbar {
           display: flex;
-          align-items: center;
           justify-content: space-between;
+          align-items: center;
           gap: 16px;
+          flex-wrap: wrap;
           padding: 18px;
           margin-bottom: 18px;
           border-radius: 30px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(10, 10, 11, 0.78);
-          backdrop-filter: blur(18px);
-          box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
         }
 
         .brand {
@@ -439,9 +734,7 @@ export default function SystemToolsPage() {
           place-items: center;
           background: linear-gradient(135deg, #ff7a00, #ffc266);
           color: #050505;
-          font-size: 24px;
-          font-weight: 1000;
-          box-shadow: 0 16px 45px rgba(255, 122, 0, 0.28);
+          box-shadow: 0 16px 45px rgba(255, 122, 0, 0.26);
         }
 
         .brand h1 {
@@ -452,7 +745,7 @@ export default function SystemToolsPage() {
 
         .brand p {
           margin: 5px 0 0;
-          color: rgba(255, 255, 255, 0.45);
+          color: rgba(255,255,255,0.45);
           font-size: 13px;
           font-weight: 850;
         }
@@ -463,7 +756,7 @@ export default function SystemToolsPage() {
           flex-wrap: wrap;
         }
 
-        .nav a {
+        .nav-link {
           text-decoration: none;
           border-radius: 999px;
           padding: 12px 16px;
@@ -474,7 +767,7 @@ export default function SystemToolsPage() {
           font-size: 13px;
         }
 
-        .nav a.main {
+        .nav-link.main {
           color: #050505;
           background: linear-gradient(135deg, #ff7a00, #ffc266);
           border: 0;
@@ -492,11 +785,12 @@ export default function SystemToolsPage() {
         .panel {
           border-radius: 36px;
           padding: 28px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .hero-card {
           background:
             linear-gradient(135deg, rgba(255, 122, 0, 0.15), transparent 48%),
             rgba(12, 12, 14, 0.82);
-          box-shadow: 0 24px 90px rgba(0, 0, 0, 0.34);
         }
 
         .kicker {
@@ -538,56 +832,109 @@ export default function SystemToolsPage() {
           margin-top: 25px;
         }
 
-        .mini {
+        .stat {
           border-radius: 24px;
           padding: 16px;
           background: rgba(0, 0, 0, 0.32);
           border: 1px solid rgba(255, 255, 255, 0.07);
         }
 
-        .mini strong {
+        .stat strong {
           display: block;
           font-size: 25px;
           font-weight: 1000;
         }
 
-        .mini small {
+        .stat small {
           display: block;
           margin-top: 6px;
           color: rgba(255, 255, 255, 0.4);
           font-weight: 900;
         }
 
-        .side-card h3 {
-          margin: 0;
-          font-size: 24px;
+        .score-ring {
+          min-height: 180px;
+          border-radius: 32px;
+          display: grid;
+          place-items: center;
+          text-align: center;
+          background:
+            radial-gradient(circle, rgba(255,122,0,0.22), transparent 62%),
+            rgba(0,0,0,0.28);
+          border: 1px solid rgba(255,122,0,0.22);
+          margin-bottom: 16px;
+        }
+
+        .score-ring strong {
+          display: block;
+          font-size: 52px;
           font-weight: 1000;
+          color: #ffb86b;
+        }
+
+        .score-ring span {
+          display: block;
+          margin-top: 6px;
+          color: rgba(255,255,255,0.48);
+          font-weight: 900;
         }
 
         .health {
           display: grid;
           gap: 12px;
-          margin-top: 18px;
         }
 
-        .health-row {
+        .health-row,
+        .info,
+        .tool-card,
+        .quick-card {
           border-radius: 22px;
           padding: 14px;
           background: rgba(0, 0, 0, 0.3);
           border: 1px solid rgba(255, 255, 255, 0.06);
         }
 
-        .health-row small {
+        .health-row small,
+        .info small,
+        .quick-card small {
           display: block;
           color: rgba(255, 255, 255, 0.38);
           font-weight: 900;
         }
 
-        .health-row strong {
+        .health-row strong,
+        .info strong {
           display: block;
           margin-top: 6px;
           font-weight: 1000;
           line-height: 1.7;
+        }
+
+        .quick-row {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 14px;
+          margin-bottom: 18px;
+        }
+
+        .quick-card {
+          min-height: 140px;
+          background:
+            linear-gradient(135deg, rgba(255,122,0,0.08), transparent),
+            rgba(12,12,14,0.74);
+        }
+
+        .quick-card svg {
+          color: #ff7a00;
+          margin-bottom: 12px;
+        }
+
+        .quick-card b {
+          display: block;
+          margin: 8px 0 6px;
+          font-size: 26px;
+          line-height: 1.12;
+          font-weight: 1000;
         }
 
         .layout {
@@ -597,6 +944,26 @@ export default function SystemToolsPage() {
           align-items: start;
         }
 
+        .panel-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: end;
+          gap: 14px;
+          margin-bottom: 16px;
+        }
+
+        .panel-head span {
+          color: #ff7a00;
+          font-size: 12px;
+          font-weight: 1000;
+        }
+
+        .panel-head h2 {
+          margin: 5px 0 0;
+          font-size: 30px;
+          font-weight: 1000;
+        }
+
         .tools-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -604,9 +971,6 @@ export default function SystemToolsPage() {
         }
 
         .tool-card {
-          border-radius: 30px;
-          padding: 18px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
           background: linear-gradient(
             180deg,
             rgba(255, 255, 255, 0.075),
@@ -628,7 +992,7 @@ export default function SystemToolsPage() {
         }
 
         .danger {
-          color: #ef4444;
+          color: #f87171;
         }
 
         .ok {
@@ -657,26 +1021,6 @@ export default function SystemToolsPage() {
           gap: 12px;
         }
 
-        .item {
-          border-radius: 22px;
-          padding: 14px;
-          background: rgba(0, 0, 0, 0.28);
-          border: 1px solid rgba(255, 255, 255, 0.055);
-        }
-
-        .item small {
-          display: block;
-          color: rgba(255, 255, 255, 0.38);
-          font-weight: 900;
-        }
-
-        .item strong {
-          display: block;
-          margin-top: 6px;
-          font-weight: 1000;
-          line-height: 1.7;
-        }
-
         .toast {
           position: fixed;
           left: 18px;
@@ -693,7 +1037,8 @@ export default function SystemToolsPage() {
 
         @media (max-width: 1180px) {
           .hero,
-          .layout {
+          .layout,
+          .quick-row {
             grid-template-columns: 1fr;
           }
         }
@@ -718,212 +1063,51 @@ export default function SystemToolsPage() {
           .side-card,
           .panel {
             padding: 18px;
+            border-radius: 28px;
+          }
+
+          .nav {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 2px;
+          }
+
+          .nav-link {
+            flex: 0 0 auto;
           }
         }
       `}</style>
-
-      {toast && <div className="toast">{toast}</div>}
-
-      <div className="shell">
-        <header className="topbar">
-          <div className="brand">
-            <div className="logo">F</div>
-            <div>
-              <h1>أدوات نظام FUSE</h1>
-              <p>تنظيف التكرارات وفحص سلامة بيانات Firestore</p>
-            </div>
-          </div>
-
-          <nav className="nav">
-            <a href="/">الرئيسية</a>
-            <a href="/restaurants-admin">المطاعم</a>
-            <a href="/menu-live">المنيو</a>
-            <a href="/drivers-admin">السائقين</a>
-            <a href="/notification-center">التنبيهات</a>
-            <a className="main" href="/system-tools">
-              أدوات النظام
-            </a>
-          </nav>
-        </header>
-
-        <section className="hero">
-          <div className="hero-card">
-            <div className="kicker">🧹 مركز تنظيف Firestore</div>
-
-            <h2>
-              صفحة تنظيف <span>الداتا التجريبية</span>
-            </h2>
-
-            <p>
-              هاي الصفحة تحل مشكلة التكرارات مثل تكرار خان قدوري أو تكرار
-              السائقين أو أصناف المنيو. ما تحذف شي تلقائياً، كل حذف لازم تضغط
-              زر وتوافق.
-            </p>
-
-            <div className="stats">
-              <div className="mini">
-                <strong>{restaurants.length}</strong>
-                <small>مطاعم</small>
-              </div>
-
-              <div className="mini">
-                <strong>{menu.length}</strong>
-                <small>أصناف منيو</small>
-              </div>
-
-              <div className="mini">
-                <strong>{drivers.length}</strong>
-                <small>سائقين</small>
-              </div>
-
-              <div className="mini">
-                <strong>{orders.length}</strong>
-                <small>طلبات</small>
-              </div>
-            </div>
-          </div>
-
-          <aside className="side-card">
-            <h3>فحص الصحة</h3>
-
-            <div className="health">
-              <Health
-                title="مطاعم مكررة"
-                value={restaurantDuplicates.length}
-                danger={restaurantDuplicates.length > 0}
-              />
-
-              <Health
-                title="سائقين مكررين"
-                value={driverDuplicates.length}
-                danger={driverDuplicates.length > 0}
-              />
-
-              <Health
-                title="أصناف مكررة"
-                value={menuDuplicates.length}
-                danger={menuDuplicates.length > 0}
-              />
-
-              <Health
-                title="منيو بدون مطعم"
-                value={brokenMenu.length}
-                danger={brokenMenu.length > 0}
-              />
-
-              <Health
-                title="طلبات بالطريق بدون سائق"
-                value={ordersWithoutDriver.length}
-                danger={ordersWithoutDriver.length > 0}
-              />
-            </div>
-          </aside>
-        </section>
-
-        <section className="layout">
-          <div className="panel">
-            <div className="tools-grid">
-              <ToolCard
-                title="تنظيف المطاعم المكررة"
-                desc="يحذف النسخ المكررة من نفس اسم المطعم ويخلي نسخة واحدة، ويفضل المفتوحة والفعالة."
-                count={restaurantDuplicates.length}
-                onClick={cleanupRestaurants}
-                disabled={
-                  restaurantDuplicates.length === 0 || working === "restaurants"
-                }
-                working={working === "restaurants"}
-              />
-
-              <ToolCard
-                title="تنظيف السائقين المكررين"
-                desc="يحذف السائقين المكررين حسب الرقم أو الاسم، ويخلي السائق المتصل أو الأحدث."
-                count={driverDuplicates.length}
-                onClick={cleanupDrivers}
-                disabled={driverDuplicates.length === 0 || working === "drivers"}
-                working={working === "drivers"}
-              />
-
-              <ToolCard
-                title="تنظيف المنيو المكرر"
-                desc="يحذف الأصناف المكررة بنفس الاسم ونفس المطعم ونفس التصنيف، ويخلي نسخة واحدة."
-                count={menuDuplicates.length}
-                onClick={cleanupMenu}
-                disabled={menuDuplicates.length === 0 || working === "menu"}
-                working={working === "menu"}
-              />
-
-              <ToolCard
-                title="تعطيل منيو بدون مطعم"
-                desc="أي صنف مربوط بمطعم غير موجود يتم تعطيله فقط بدون حذف."
-                count={brokenMenu.length}
-                onClick={disableBrokenMenu}
-                disabled={brokenMenu.length === 0 || working === "broken-menu"}
-                working={working === "broken-menu"}
-              />
-            </div>
-          </div>
-
-          <aside className="panel">
-            <div className="list">
-              <div className="item">
-                <small>آخر حالة تشغيل</small>
-                <strong>
-                  {activeOrders.length > 0
-                    ? `عدك ${activeOrders.length} طلب نشط`
-                    : "ماكو طلبات نشطة حالياً"}
-                </strong>
-              </div>
-
-              <div className="item">
-                <small>أسماء المطاعم المكررة</small>
-                <strong>
-                  {restaurantDuplicates.length > 0
-                    ? restaurantDuplicates
-                        .slice(0, 6)
-                        .map((group) => `${group.name} ×${group.list.length}`)
-                        .join(" · ")
-                    : "ماكو تكرار"}
-                </strong>
-              </div>
-
-              <div className="item">
-                <small>أسماء السائقين/الأرقام المكررة</small>
-                <strong>
-                  {driverDuplicates.length > 0
-                    ? driverDuplicates
-                        .slice(0, 6)
-                        .map((group) => `${group.name} ×${group.list.length}`)
-                        .join(" · ")
-                    : "ماكو تكرار"}
-                </strong>
-              </div>
-
-              <div className="item">
-                <small>أصناف منيو مكسورة</small>
-                <strong>
-                  {brokenMenu.length > 0
-                    ? brokenMenu
-                        .slice(0, 6)
-                        .map(
-                          (item) =>
-                            `${item.name || "صنف"} / ${
-                              item.restaurant || "بدون مطعم"
-                            }`
-                        )
-                        .join(" · ")
-                    : "كل الأصناف مربوطة بمطاعم"}
-                </strong>
-              </div>
-
-              <div className="item">
-                <small>آخر تحديث</small>
-                <strong>Live الآن</strong>
-              </div>
-            </div>
-          </aside>
-        </section>
-      </div>
     </main>
+  );
+}
+
+function Stat({ title, value }: { title: string; value: number }) {
+  return (
+    <div className="stat">
+      <strong>{value}</strong>
+      <small>{title}</small>
+    </div>
+  );
+}
+
+function QuickCard({
+  title,
+  value,
+  hint,
+  icon,
+}: {
+  title: string;
+  value: string | number;
+  hint: string;
+  icon: string;
+}) {
+  return (
+    <article className="quick-card">
+      <Icon name={icon} />
+      <small>{title}</small>
+      <b>{value}</b>
+      <small>{hint}</small>
+    </article>
   );
 }
 
@@ -942,6 +1126,15 @@ function Health({
       <strong className={danger ? "danger" : "ok"}>
         {danger ? `${value} يحتاج تنظيف` : "سليم"}
       </strong>
+    </div>
+  );
+}
+
+function Info({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="info">
+      <small>{title}</small>
+      <strong>{value}</strong>
     </div>
   );
 }
@@ -973,11 +1166,7 @@ function ToolCard({
       </p>
 
       <button onClick={onClick} disabled={disabled} className="btn">
-        {working
-          ? "جاري التنفيذ..."
-          : count > 0
-          ? "تنظيف الآن"
-          : "لا يحتاج تنظيف"}
+        {working ? "جاري التنفيذ..." : count > 0 ? "تنظيف الآن" : "لا يحتاج تنظيف"}
       </button>
     </article>
   );
