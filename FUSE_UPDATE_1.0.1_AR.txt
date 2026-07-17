@@ -1,0 +1,8 @@
+FUSE Iraq — تحديث 1.0.1 (Build 5)
+
+- اعتماد اللوجو والهوية الجديدة.
+- تحديث أيقونة iOS وAndroid وPWA.
+- تحديث Splash Screen.
+- تحديث الشعار داخل التطبيق.
+- إضافة Export Compliance داخل Info.plist.
+- Version 1.0.1 / Build 5.

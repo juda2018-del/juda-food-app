@@ -1,0 +1,117 @@
+ @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap");
+
+:root {
+  --fuse-orange: #ff5a00;
+  --fuse-orange-2: #ff7a00;
+  --fuse-orange-3: #ff3d00;
+
+  --fuse-black: #0b1220;
+  --fuse-black-2: #07101d;
+  --fuse-cream: #fff7ee;
+  --fuse-cream-2: #f4e3cf;
+
+  --fuse-title-font: "Cairo", "IBM Plex Sans Arabic", Arial, sans-serif;
+  --fuse-body-font: "IBM Plex Sans Arabic", "Cairo", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: var(--fuse-black);
+  color: var(--fuse-black);
+  font-family: var(--fuse-body-font);
+  font-feature-settings: "kern";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: var(--fuse-body-font);
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--fuse-title-font);
+  font-weight: 900;
+  letter-spacing: -0.6px;
+}
+
+p,
+span,
+small,
+label,
+input,
+button,
+a,
+b,
+strong {
+  font-family: var(--fuse-body-font);
+}
+
+input,
+textarea {
+  direction: rtl;
+}
+
+::selection {
+  background: rgba(255, 90, 0, 0.25);
+  color: var(--fuse-black);
+}
+
+/* FUSE global typography helpers */
+.fuse-title {
+  font-family: var(--fuse-title-font);
+  font-weight: 900;
+  letter-spacing: -0.7px;
+}
+
+.fuse-text {
+  font-family: var(--fuse-body-font);
+  font-weight: 500;
+}
+
+.fuse-price {
+  font-family: var(--fuse-body-font);
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+/* Mobile safe rendering */
+@media (max-width: 520px) {
+  html,
+  body {
+    background: var(--fuse-cream);
+  }
+}

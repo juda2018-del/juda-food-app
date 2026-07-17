@@ -1,0 +1,12 @@
+FUSE iOS Build 4 جاهز
+
+تم إصلاح تعارض رقم البناء مع App Store Connect:
+- CFBundleVersion صار يعتمد على CURRENT_PROJECT_VERSION
+- CURRENT_PROJECT_VERSION = 4 في Debug و Release
+- الإصدار التسويقي يبقى 1.0
+
+بعد رفع المشروع إلى GitHub شغّل Build جديد من Codemagic.
+يجب أن يظهر في App Store Connect كالتالي:
+Version 1.0 (Build 4)
+
+لا تعيد تشغيل الـ Build القديم؛ ابدأ Build جديد بعد الـ push.

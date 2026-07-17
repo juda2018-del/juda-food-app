@@ -1,0 +1,40 @@
+FUSE Iraq - App Review Notes
+
+Apple rejection fixes included in this package:
+
+1) Guideline 2.1(a) - App Completeness
+- Fixed customer cart flow.
+- Add to cart now works from the home quick items section.
+- Add to cart now works from restaurant pages.
+- The /cart page now reads the real saved cart, allows quantity changes, clearing cart, and order submission.
+- Logout now works from the profile page and home page when a user session exists.
+- Added /restaurants listing page so the Explore/Restaurants navigation no longer opens a missing route.
+- Public customer buttons that previously looked inactive now have actions or valid links.
+
+2) Guideline 1.5 - Developer Information
+- Added official support page: https://www.fuseiraq.com/support
+- The support page includes email, WhatsApp, phone, response time, support topics, and App Review support information in English.
+- Added privacy page: https://www.fuseiraq.com/privacy
+
+App Review Information to paste in App Store Connect:
+
+Demo accounts:
+Customer: customer@fuse.iq / 123456
+Restaurant: restaurant@fuse.iq / 123456
+Driver: driver@fuse.iq / 123456
+Admin: admin@fuse.iq / 123456
+
+Suggested review steps:
+1. Open the app.
+2. Use the home page quick items and tap + to add an item to the cart.
+3. Open Cart from the bottom navigation and verify the item appears.
+4. Change quantity, then submit the order using the default test phone/address fields.
+5. Open Restaurants, choose Fayrouz, and add an item from the restaurant menu.
+6. Go to Profile and tap Logout. The app clears the session and returns to Login.
+7. For support information, open https://www.fuseiraq.com/support.
+
+Support URL to set in App Store Connect:
+https://www.fuseiraq.com/support
+
+Privacy Policy URL:
+https://www.fuseiraq.com/privacy
