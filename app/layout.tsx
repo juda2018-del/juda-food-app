@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import ClientRouteGuard from "../components/ClientRouteGuard";
 import "./globals.css";
+import "./mobile-responsive.css";
 
 export const metadata: Metadata = {
   title: "FUSE Iraq",
