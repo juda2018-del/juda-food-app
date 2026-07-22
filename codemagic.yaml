@@ -81,8 +81,22 @@ workflows:
       - name: Build Next.js app
         script: npm run build
 
-      - name: Sync Capacitor Android
-        script: npx cap sync android
+      - name: Prepare Android web assets
+        script: |
+          rm -rf android/app/src/main/assets/public
+          mkdir -p android/app/src/main/assets/public
+          cp -R out/* android/app/src/main/assets/public/
+
+          cat > android/app/src/main/assets/capacitor.config.json <<'EOF'
+          {
+            "appId": "com.fuseiraq.app",
+            "appName": "Fuse Iraq",
+            "webDir": "public",
+            "packageClassList": []
+          }
+          EOF
+
+          test -f android/app/src/main/assets/public/index.html
 
       - name: Build signed Android App Bundle
         script: |
