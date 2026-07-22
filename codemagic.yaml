@@ -64,3 +64,33 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+
+  fuse-android-build:
+    name: FUSE Android AAB Build
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      node: 20
+      java: 17
+
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Build Next.js app
+        script: npm run build
+
+      - name: Sync Capacitor Android
+        script: npx cap sync android
+
+      - name: Build signed Android App Bundle
+        script: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/apk/release/*.apk
+      - android/app/build/reports/**
