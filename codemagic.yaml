@@ -81,7 +81,7 @@ workflows:
       - name: Build Next.js app
         script: npm run build
 
-      - name: Prepare Android web assets
+      - name: Prepare Android project
         script: |
           rm -rf android/app/src/main/assets/public
           mkdir -p android/app/src/main/assets/public
@@ -96,13 +96,21 @@ workflows:
           }
           EOF
 
+          mkdir -p android/capacitor-cordova-android-plugins/src/main/libs
+          mkdir -p android/capacitor-cordova-android-plugins/src/main/java
+          cat > android/capacitor-cordova-android-plugins/cordova.variables.gradle <<'EOF'
+          ext {
+          }
+          EOF
+
           test -f android/app/src/main/assets/public/index.html
+          test -f android/capacitor-cordova-android-plugins/cordova.variables.gradle
 
       - name: Build signed Android App Bundle
         script: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease --stacktrace
 
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
