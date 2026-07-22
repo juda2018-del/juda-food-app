@@ -1,4 +1,4 @@
- workflows:
+workflows:
   fuse-ios-build:
     name: FUSE iOS Build
     max_build_duration: 60
@@ -42,6 +42,10 @@
             <name>Fuse Iraq</name>
           </widget>
           EOF
+
+      - name: Set App Store build number
+        script: |
+          sed -i '' 's/CURRENT_PROJECT_VERSION = [0-9][0-9]*;/CURRENT_PROJECT_VERSION = 6;/g' ios/App/App.xcodeproj/project.pbxproj
 
       - name: Set up iOS signing
         script: xcode-project use-profiles
