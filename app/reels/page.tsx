@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
+import { addFuseCartItem } from "@/lib/fuse-cart";
 
 type ReelDoc = {
   documentId: string;
@@ -12,9 +13,13 @@ type ReelDoc = {
   restaurant?: string;
   restaurantName?: string;
   restaurantSlug?: string;
+  restaurantLogo?: string;
   category?: string;
   offer?: string;
   menuItem?: string;
+  menuItemId?: string;
+  price?: number;
+  deliveryTime?: string;
   videoUrl?: string;
   thumbnail?: string;
   image?: string;
@@ -23,89 +28,331 @@ type ReelDoc = {
   status?: string;
   likes?: number;
   views?: number;
+  orders?: number;
   createdAt?: unknown;
 };
 
 const fallbackReels: ReelDoc[] = [
-  { documentId: "fuse-reel-fayrouz-1", title: "كاهي فيروز طالع حار", caption: "لقطة سريعة من فطور فيروز، كاهي وقيمر وشاي عراقي.", restaurant: "فيروز", restaurantSlug: "fayrouz", category: "فطور", offer: "خصم 20%", menuItem: "كاهي وقيمر", image: "/images/m2.jpg", likes: 128, views: 2400 },
-  { documentId: "fuse-reel-shalteta-1", title: "مشلتت جبن يسحب", caption: "شلتتة تقدم فطائر ومشلتت حار بطريقة تخليك تطلب فوراً.", restaurant: "شلتتة", restaurantSlug: "shalteta", category: "فطور", offer: "توصيل سريع", menuItem: "مشلتت جبن", image: "/images/m3.jpg", likes: 96, views: 1800 },
-  { documentId: "fuse-reel-khan-1", title: "وجبة عراقية من خان قدوري", caption: "أكلات عراقية، رز، مرگ، ومشاوي للغداء اليومي.", restaurant: "خان قدوري", restaurantSlug: "khan", category: "مشاوي", offer: "وجبات يومية", menuItem: "دجاج مشوي", image: "/images/khan.jpg", likes: 143, views: 3100 },
-  { documentId: "fuse-reel-alforn-1", title: "مناقيش الفرن", caption: "مناقيش ومعجنات وكريب ووافل بتجربة سريعة داخل FUSE.", restaurant: "الفرن", restaurantSlug: "restaurants/alforn", category: "بيتزا", offer: "قريباً", menuItem: "مناقيش جبن", image: "/images/m5.jpg", likes: 71, views: 950 },
+  {
+    documentId: "fuse-reel-fayrouz-1",
+    title: "كاهي فيروز طالع حار",
+    caption: "كاهي وقيمر وشاي عراقي... فطور يفتح النفس.",
+    restaurant: "فيروز",
+    restaurantSlug: "fayrouz",
+    category: "فطور",
+    offer: "خصم 20%",
+    menuItem: "كاهي وقيمر",
+    price: 4500,
+    deliveryTime: "20-30 دقيقة",
+    image: "/images/m2.jpg",
+    likes: 128,
+    views: 2400,
+    orders: 74,
+  },
+  {
+    documentId: "fuse-reel-shalteta-1",
+    title: "مشلتت جبن يسحب",
+    caption: "طازج، حار، وجبن يذوب من أول لقمة.",
+    restaurant: "شلتتة",
+    restaurantSlug: "shalteta",
+    category: "فطور",
+    offer: "توصيل سريع",
+    menuItem: "مشلتت جبن",
+    price: 7500,
+    deliveryTime: "25-35 دقيقة",
+    image: "/images/m3.jpg",
+    likes: 96,
+    views: 1800,
+    orders: 52,
+  },
+  {
+    documentId: "fuse-reel-khan-1",
+    title: "وجبة عراقية من خان قدوري",
+    caption: "رز ومرگ ودجاج مشوي... غداء عراقي كامل.",
+    restaurant: "خان قدوري",
+    restaurantSlug: "khan",
+    category: "مشاوي",
+    offer: "وجبات يومية",
+    menuItem: "دجاج مشوي",
+    price: 9000,
+    deliveryTime: "30-40 دقيقة",
+    image: "/images/khan.jpg",
+    likes: 143,
+    views: 3100,
+    orders: 89,
+  },
+  {
+    documentId: "fuse-reel-alforn-1",
+    title: "مناقيش الفرن",
+    caption: "مناقيش ومعجنات حارة بطعم يوصلك للفرن مباشرة.",
+    restaurant: "الفرن",
+    restaurantSlug: "alforn",
+    category: "بيتزا",
+    offer: "جديد",
+    menuItem: "مناقيش جبن",
+    price: 6000,
+    deliveryTime: "25-35 دقيقة",
+    image: "/images/m5.jpg",
+    likes: 71,
+    views: 950,
+    orders: 31,
+  },
 ];
 
-const categories = ["الكل", "فطور", "مشاوي", "بيتزا", "مشروبات"];
-const clean = (value: string | null | undefined) => (value || "").trim();
-
-function toDate(value: unknown): Date | null {
-  try {
-    if (!value) return null;
-    if (typeof value === "object" && value !== null && "toDate" in value && typeof (value as { toDate?: unknown }).toDate === "function") return (value as { toDate: () => Date }).toDate();
-    if (value instanceof Date) return value;
-    const date = new Date(value as string | number);
-    return Number.isNaN(date.getTime()) ? null : date;
-  } catch { return null; }
+function clean(value?: string | null) {
+  return (value || "").trim();
 }
 
-const createdMs = (value: unknown) => toDate(value)?.getTime() || 0;
-const restaurantName = (reel: ReelDoc) => clean(reel.restaurantName || reel.restaurant || "FUSE");
-function restaurantHref(reel: ReelDoc) {
-  const slug = clean(reel.restaurantSlug);
-  if (slug.startsWith("/")) return slug;
-  if (slug) return slug.startsWith("restaurants/") ? `/${slug}` : `/restaurants/${slug}`;
+function restaurantName(reel: ReelDoc) {
+  return clean(reel.restaurantName || reel.restaurant || "FUSE");
+}
+
+function restaurantSlug(reel: ReelDoc) {
+  const explicit = clean(reel.restaurantSlug).replace(/^\/|restaurants\//g, "");
+  if (explicit) return explicit;
   const name = restaurantName(reel);
-  if (name.includes("فيروز")) return "/restaurants/fayrouz";
-  if (name.includes("شلتتة")) return "/restaurants/shalteta";
-  if (name.includes("خان")) return "/restaurants/khan";
-  return "/";
+  if (name.includes("فيروز")) return "fayrouz";
+  if (name.includes("شلتتة")) return "shalteta";
+  if (name.includes("خان")) return "khan";
+  if (name.includes("الفرن")) return "alforn";
+  return "fayrouz";
 }
-const isVisibleReel = (reel: ReelDoc) => reel.active !== false && reel.approved !== false && reel.status !== "rejected";
-const imageForReel = (reel: ReelDoc, index: number) => reel.thumbnail || reel.image || `/images/m${(index % 9) + 1}.jpg`;
+
+function isVisible(reel: ReelDoc) {
+  return reel.active !== false && reel.approved !== false && reel.status !== "rejected";
+}
+
+function mediaFor(reel: ReelDoc, index: number) {
+  return reel.thumbnail || reel.image || `/images/m${(index % 9) + 1}.jpg`;
+}
+
+function formatIQD(value?: number) {
+  return `${Number(value || 0).toLocaleString("ar-IQ")} د.ع`;
+}
 
 function Icon({ name }: { name: string }) {
-  const p = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  if (name === "play") return <svg {...p}><circle cx="12" cy="12" r="9" /><path d="M10 8l6 4-6 4V8z" fill="currentColor" stroke="none" /></svg>;
+  const p = {
+    width: 25,
+    height: 25,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (name === "back") return <svg {...p}><path d="M15 18l-6-6 6-6" /></svg>;
   if (name === "heart") return <svg {...p}><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.6-7 10-7 10z" /></svg>;
-  if (name === "eye") return <svg {...p}><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="2.8" /></svg>;
-  if (name === "flag") return <svg {...p}><path d="M5 21V4" /><path d="M5 5h12l-1.5 4L17 13H5" /></svg>;
-  return <svg {...p}><circle cx="12" cy="12" r="8" /></svg>;
+  if (name === "comment") return <svg {...p}><path d="M21 12a8 8 0 01-8 8 8.5 8.5 0 01-4-.9L3 21l1.8-5A8 8 0 1121 12z" /></svg>;
+  if (name === "share") return <svg {...p}><circle cx="18" cy="5" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="19" r="2"/><path d="M8 11l8-5M8 13l8 5"/></svg>;
+  if (name === "save") return <svg {...p}><path d="M6 4h12v17l-6-4-6 4V4z" /></svg>;
+  if (name === "volume") return <svg {...p}><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M18 9a4 4 0 010 6"/></svg>;
+  if (name === "mute") return <svg {...p}><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M18 9l4 4M22 9l-4 4"/></svg>;
+  if (name === "cart") return <svg {...p}><path d="M4 6h2l1.5 8h8l2-6H8"/><circle cx="10" cy="18" r="1.3"/><circle cx="16" cy="18" r="1.3"/></svg>;
+  return <svg {...p}><circle cx="12" cy="12" r="9" /></svg>;
 }
 
 export default function ReelsPage() {
   const [reels, setReels] = useState<ReelDoc[]>([]);
-  const [activeCategory, setActiveCategory] = useState("الكل");
   const [liked, setLiked] = useState<Record<string, boolean>>({});
-  const [reported, setReported] = useState<Record<string, boolean>>({});
+  const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [muted, setMuted] = useState(true);
+  const [notice, setNotice] = useState("");
+  const [activeId, setActiveId] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(query(collection(db, "reels")), (snapshot) => {
-      const data = snapshot.docs.map((item) => ({ ...(item.data() as Omit<ReelDoc, "documentId">), documentId: item.id }));
-      data.sort((a, b) => createdMs(b.createdAt) - createdMs(a.createdAt));
-      setReels(data.filter(isVisibleReel));
-    }, () => setReels([]));
-    return () => unsubscribe();
+    const unsubscribe = onSnapshot(
+      query(collection(db, "reels")),
+      (snapshot) => {
+        const next = snapshot.docs
+          .map((item) => ({ ...(item.data() as Omit<ReelDoc, "documentId">), documentId: item.id }))
+          .filter(isVisible);
+        setReels(next);
+      },
+      () => setReels([])
+    );
+    return unsubscribe;
   }, []);
 
-  const sourceReels = reels.length ? reels : fallbackReels;
-  const visibleReels = useMemo(() => activeCategory === "الكل" ? sourceReels : sourceReels.filter((reel) => clean(reel.category) === activeCategory), [activeCategory, sourceReels]);
+  const visibleReels = useMemo(() => (reels.length ? reels : fallbackReels), [reels]);
 
-  return <main dir="rtl" className="page"><section className="shell">
-    <header className="topbar">
-      <Link href="/" className="back-btn" aria-label="رجوع">←</Link>
-      <div className="brand"><div className="brand-icon"><Icon name="play" /></div><div><b>FUSE Reels</b><span>ريلز المطاعم والعروض</span></div></div>
-      <nav className="nav"><Link href="/customer" className="pill">الزبون</Link><Link href="/" className="pill">الرئيسية</Link><Link href="/cart" className="pill">السلة</Link><Link href="/reels" className="pill active">الريلز</Link></nav>
-    </header>
+  useEffect(() => {
+    setActiveId(visibleReels[0]?.documentId || "");
+  }, [visibleReels]);
 
-    <section className="hero"><div><span>Short Food Videos</span><h1>ريلز أكل<br /><em>تبيع قبل المنيو</em></h1><p>فيديوهات قصيرة للمطاعم والعروض والأصناف المميزة.</p></div><div className="hero-card"><Icon name="eye" /><b>{visibleReels.length}</b><span>ريلز ظاهرة</span></div></section>
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-reel-id]"));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.7) {
+            setActiveId((entry.target as HTMLElement).dataset.reelId || "");
+          }
+        });
+      },
+      { root, threshold: [0.7] }
+    );
+    cards.forEach((card) => observer.observe(card));
+    return () => observer.disconnect();
+  }, [visibleReels]);
 
-    <section className="category-strip">{categories.map((category) => <button type="button" key={category} onClick={() => setActiveCategory(category)} className={activeCategory === category ? "active" : ""}>{category}</button>)}</section>
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+    root.querySelectorAll<HTMLVideoElement>("video").forEach((video) => {
+      video.muted = muted;
+      const id = video.closest<HTMLElement>("[data-reel-id]")?.dataset.reelId;
+      if (id === activeId) video.play().catch(() => undefined);
+      else video.pause();
+    });
+  }, [activeId, muted]);
 
-    <section className="reels-layout">{visibleReels.map((reel, index) => {
-      const reelLiked = Boolean(liked[reel.documentId]);
-      const reelReported = Boolean(reported[reel.documentId]);
-      return <article key={reel.documentId} className="reel-card"><div className="media-wrap">{reel.videoUrl ? <video src={reel.videoUrl} poster={imageForReel(reel, index)} controls playsInline loop /> : <img src={imageForReel(reel, index)} alt={reel.title || "FUSE Reel"} />}<div className="media-overlay" /><div className="play-chip"><Icon name="play" /><span>{reel.videoUrl ? "Video" : "Preview"}</span></div>{reel.offer ? <div className="offer-chip">{reel.offer}</div> : null}</div><div className="reel-body"><div><span className="restaurant">{restaurantName(reel)}</span><h2>{reel.title || reel.menuItem || "ريل FUSE"}</h2><p>{reel.caption || "لقطة قصيرة من المطعم."}</p></div><div className="meta-row"><span>{reel.category || "عام"}</span><span>{reel.menuItem || "صنف مميز"}</span></div><div className="actions"><button type="button" onClick={() => setLiked((prev) => ({ ...prev, [reel.documentId]: !reelLiked }))} className={reelLiked ? "liked" : ""}><Icon name="heart" />{(reel.likes || 0) + (reelLiked ? 1 : 0)}</button><button type="button"><Icon name="eye" />{(reel.views || 0).toLocaleString()}</button><button type="button" onClick={() => setReported((prev) => ({ ...prev, [reel.documentId]: true }))} className={reelReported ? "reported" : ""}><Icon name="flag" />{reelReported ? "تم التبليغ" : "تبليغ"}</button></div><Link href={restaurantHref(reel)} className="order-link">اطلب من المطعم</Link></div></article>;
-    })}</section>
-  </section>
-  <style jsx>{`
-    :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;padding:0;background:#050505}.page{min-height:100vh;padding:24px 16px 42px;color:#fff;font-family:Cairo,system-ui,sans-serif;background:radial-gradient(circle at top right,rgba(255,122,0,.18),transparent 34%),radial-gradient(circle at bottom left,rgba(255,61,0,.11),transparent 34%),#050505}.shell{width:min(1180px,100%);margin:0 auto}.topbar,.hero,.reel-card,.category-strip{border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.055);box-shadow:0 24px 70px rgba(0,0,0,.28);backdrop-filter:blur(18px)}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-radius:28px;padding:14px;margin-bottom:16px}.back-btn{width:44px;height:44px;border-radius:15px;display:grid;place-items:center;background:rgba(255,255,255,.08);color:#fff;text-decoration:none;font-size:25px;font-weight:900;flex:0 0 auto}.brand{display:flex;align-items:center;gap:12px}.brand-icon{width:52px;height:52px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,#ff8a00,#ff3d00);color:#101010}.brand b{display:block;font-size:20px;font-weight:950}.brand span{display:block;color:rgba(255,255,255,.55);font-size:12px;font-weight:850;margin-top:4px}.nav{display:flex;flex-wrap:wrap;gap:9px}.pill{border-radius:999px;padding:11px 15px;color:rgba(255,255,255,.74);text-decoration:none;background:rgba(255,255,255,.065);font-size:13px;font-weight:950}.pill.active{background:#ff7a00;color:#101010}.hero{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:16px;align-items:stretch;border-radius:34px;padding:26px;margin-bottom:16px;background:radial-gradient(circle at 85% 20%,rgba(255,255,255,.13),transparent 24%),linear-gradient(135deg,rgba(255,255,255,.075),rgba(255,122,0,.11))}.hero span{color:#ff7a00;font-size:12px;font-weight:950}.hero h1{margin:12px 0;font-size:clamp(46px,6vw,86px);line-height:.96;font-weight:950;letter-spacing:-1px}.hero em{color:#ff7a00;font-style:normal}.hero p{margin:0;max-width:740px;color:rgba(255,255,255,.66);line-height:1.9;font-weight:750}.hero-card{border-radius:26px;padding:20px;display:grid;place-items:center;text-align:center;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.09)}.hero-card svg{color:#ff7a00}.hero-card b{display:block;font-size:46px;font-weight:950}.category-strip{display:flex;gap:10px;overflow-x:auto;border-radius:24px;padding:12px;margin-bottom:16px}.category-strip button{flex:0 0 auto;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:12px 18px;background:rgba(255,255,255,.055);color:rgba(255,255,255,.76);font-family:inherit;font-weight:950;cursor:pointer}.category-strip button.active{background:#ff7a00;color:#101010;border-color:transparent}.reels-layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.reel-card{overflow:hidden;border-radius:34px;background:rgba(12,12,14,.78)}.media-wrap{position:relative;aspect-ratio:9/14;min-height:430px;background:#111}.media-wrap img,.media-wrap video{width:100%;height:100%;object-fit:cover;display:block}.media-overlay{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.72));pointer-events:none}.play-chip,.offer-chip{position:absolute;z-index:2;border-radius:999px;font-size:12px;font-weight:950}.play-chip{top:14px;right:14px;display:inline-flex;align-items:center;gap:7px;padding:9px 12px;color:#fff;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12)}.offer-chip{left:14px;top:14px;padding:9px 12px;color:#101010;background:#ff7a00}.reel-body{display:grid;gap:12px;padding:18px}.restaurant{display:inline-flex;color:#ff9a31;font-size:12px;font-weight:950;margin-bottom:8px}.reel-body h2{margin:0;font-size:28px;line-height:1.08;font-weight:950}.reel-body p{margin:8px 0 0;color:rgba(255,255,255,.62);line-height:1.7;font-weight:700}.meta-row,.actions{display:flex;flex-wrap:wrap;gap:8px}.meta-row span,.actions button{border-radius:999px;padding:9px 11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);color:rgba(255,255,255,.78);font-size:12px;font-weight:950}.actions button{cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit}.actions button.liked{color:#fca5a5;background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.26)}.actions button.reported{color:#fbbf24;background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.26)}.order-link{min-height:50px;border-radius:18px;display:grid;place-items:center;background:linear-gradient(135deg,#ff8a00,#ff3d00);color:#101010;text-decoration:none;font-weight:950}@media(max-width:760px){.page{padding:12px}.topbar,.hero,.reel-card{border-radius:26px}.hero{grid-template-columns:1fr;padding:20px}.media-wrap{min-height:0;aspect-ratio:9/14}.brand{flex:1;min-width:0}.brand b{font-size:17px}.hero h1{font-size:42px}.hero p{font-size:14px;line-height:1.75}.nav{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.pill{flex:0 0 auto}}
-  `}</style></main>;
+  function flash(message: string) {
+    setNotice(message);
+    window.setTimeout(() => setNotice(""), 1800);
+  }
+
+  function addToCart(reel: ReelDoc) {
+    addFuseCartItem({
+      id: reel.menuItemId || reel.documentId,
+      name: reel.menuItem || reel.title || "وجبة FUSE",
+      restaurant: restaurantName(reel),
+      restaurantId: restaurantSlug(reel),
+      category: reel.category || "عام",
+      price: Number(reel.price || 0),
+      qty: 1,
+      image: reel.thumbnail || reel.image,
+    });
+    if (navigator.vibrate) navigator.vibrate(40);
+    flash("تمت إضافة الوجبة للسلة");
+  }
+
+  async function shareReel(reel: ReelDoc) {
+    const url = `${window.location.origin}/reels#${reel.documentId}`;
+    try {
+      if (navigator.share) await navigator.share({ title: reel.title || "FUSE Reels", text: reel.caption, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        flash("تم نسخ رابط الريل");
+      }
+    } catch {
+      // User cancelled share.
+    }
+  }
+
+  return (
+    <main dir="rtl" className="page">
+      <div className="feed" ref={containerRef}>
+        {visibleReels.map((reel, index) => {
+          const id = reel.documentId;
+          const isLiked = Boolean(liked[id]);
+          const isSaved = Boolean(saved[id]);
+          const slug = restaurantSlug(reel);
+          return (
+            <article className="reel" data-reel-id={id} key={id}>
+              {reel.videoUrl ? (
+                <video src={reel.videoUrl} poster={mediaFor(reel, index)} loop playsInline muted={muted} preload={index < 2 ? "auto" : "metadata"} />
+              ) : (
+                <img src={mediaFor(reel, index)} alt={reel.title || "FUSE Reel"} />
+              )}
+
+              <div className="shade" />
+              <header className="topbar">
+                <Link href="/" className="glass" aria-label="رجوع"><Icon name="back" /></Link>
+                <div className="tabs"><b>لك</b><span>متابعة</span></div>
+                <button className="glass" onClick={() => setMuted((value) => !value)} aria-label="الصوت">
+                  <Icon name={muted ? "mute" : "volume"} />
+                </button>
+              </header>
+
+              <aside className="actions">
+                <Link href={`/restaurants/${slug}`} className="avatar">
+                  <img src={reel.restaurantLogo || mediaFor(reel, index)} alt={restaurantName(reel)} />
+                  <i>+</i>
+                </Link>
+                <button className={isLiked ? "active" : ""} onClick={() => setLiked((prev) => ({ ...prev, [id]: !isLiked }))}>
+                  <span><Icon name="heart" /></span><b>{(reel.likes || 0) + (isLiked ? 1 : 0)}</b>
+                </button>
+                <button onClick={() => flash("التعليقات قريباً داخل FUSE")}><span><Icon name="comment" /></span><b>تعليق</b></button>
+                <button className={isSaved ? "active" : ""} onClick={() => setSaved((prev) => ({ ...prev, [id]: !isSaved }))}>
+                  <span><Icon name="save" /></span><b>حفظ</b>
+                </button>
+                <button onClick={() => shareReel(reel)}><span><Icon name="share" /></span><b>مشاركة</b></button>
+              </aside>
+
+              <section className="content">
+                <div className="restaurant-line">
+                  <b>@{restaurantName(reel)}</b><em>✓</em>
+                  {reel.offer ? <strong>{reel.offer}</strong> : null}
+                </div>
+                <h1>{reel.title || reel.menuItem || "وجبة مميزة من FUSE"}</h1>
+                <p>{reel.caption || "شاهد، اختار، واطلب مباشرة من داخل الريل."}</p>
+                <div className="stats">
+                  <span>{reel.category || "عام"}</span>
+                  <span>{reel.deliveryTime || "30-45 دقيقة"}</span>
+                  <span>{(reel.views || 0).toLocaleString("ar-IQ")} مشاهدة</span>
+                </div>
+
+                <div className="product-card">
+                  <div>
+                    <small>اطلب من داخل الريل</small>
+                    <b>{reel.menuItem || reel.title || "وجبة FUSE"}</b>
+                    <strong>{formatIQD(reel.price)}</strong>
+                  </div>
+                  <button onClick={() => addToCart(reel)} aria-label="إضافة للسلة">+</button>
+                </div>
+
+                <div className="cta-row">
+                  <Link href={`/restaurants/${slug}`} className="order-btn"><Icon name="cart" /> اطلب الآن</Link>
+                  <button onClick={() => addToCart(reel)} className="quick-add">إضافة سريعة</button>
+                </div>
+              </section>
+
+              {activeId === id && !reel.videoUrl ? <div className="photo-label">صورة تجريبية — أضف videoUrl من لوحة الإدارة</div> : null}
+            </article>
+          );
+        })}
+      </div>
+
+      {notice ? <div className="toast">{notice}</div> : null}
+
+      <style jsx>{`
+        :global(*){box-sizing:border-box} :global(html),:global(body){margin:0;background:#000;overflow:hidden}
+        .page{height:100dvh;background:#000;color:#fff;font-family:var(--fuse-body-font);overflow:hidden}
+        .feed{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none}
+        .feed::-webkit-scrollbar{display:none}
+        .reel{position:relative;height:100dvh;min-height:640px;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;background:#090909}
+        .reel>video,.reel>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+        .reel>img{transform:scale(1.02)}
+        .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.36) 0%,transparent 24%,transparent 50%,rgba(0,0,0,.25) 66%,rgba(0,0,0,.94) 100%)}
+        .topbar{position:absolute;top:0;left:0;right:0;z-index:5;padding:max(14px,env(safe-area-inset-top)) 16px 8px;display:grid;grid-template-columns:46px 1fr 46px;align-items:center}
+        .glass{width:44px;height:44px;border:1px solid rgba(255,255,255,.18);border-radius:50%;display:grid;place-items:center;background:rgba(10,10,10,.35);backdrop-filter:blur(14px);color:#fff;text-decoration:none}
+        button.glass{cursor:pointer}
+        .tabs{justify-self:center;display:flex;align-items:center;gap:20px;font-size:15px;text-shadow:0 2px 8px #000}
+        .tabs b{position:relative}.tabs b:after{content:"";position:absolute;width:20px;height:3px;border-radius:9px;background:#ff6700;bottom:-8px;left:50%;transform:translateX(-50%)}
+        .tabs span{color:rgba(255,255,255,.68)}
+        .actions{position:absolute;z-index:6;left:12px;bottom:178px;display:grid;gap:14px;justify-items:center}
+        .actions button{border:0;background:none;color:#fff;padding:0;display:grid;justify-items:center;gap:4px;text-shadow:0 2px 8px #000}
+        .actions button span{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(15,15,15,.42);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(12px)}
+        .actions button b{font-size:10px}.actions button.active span{color:#ff5a36;background:rgba(255,255,255,.92)}
+        .avatar{position:relative;width:50px;height:50px;border-radius:50%;padding:2px;border:2px solid #fff;display:block;margin-bottom:4px}
+        .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}.avatar i{position:absolute;right:50%;bottom:-9px;transform:translateX(50%);width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#ff5a00;color:#fff;font-style:normal;font-weight:900}
+        .content{position:absolute;z-index:5;right:16px;left:74px;bottom:max(18px,env(safe-area-inset-bottom));text-shadow:0 2px 10px rgba(0,0,0,.85)}
+        .restaurant-line{display:flex;align-items:center;gap:7px;margin-bottom:7px}.restaurant-line b{font-size:15px}.restaurant-line em{width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:#ff6200;font-size:11px;font-style:normal}.restaurant-line strong{font-size:10px;padding:5px 8px;border-radius:999px;background:#ff5a00}
+        h1{margin:0 0 6px;font-size:22px;line-height:1.2;font-weight:900}p{margin:0 0 9px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.88);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .stats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.stats span{font-size:9px;padding:5px 8px;border-radius:999px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}
+        .product-card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-radius:18px;background:rgba(12,12,12,.58);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(16px);margin-bottom:9px;text-shadow:none}
+        .product-card div{min-width:0;display:grid;gap:2px}.product-card small{font-size:9px;color:#ff9a55}.product-card b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.product-card strong{font-size:13px;color:#ff7a00}
+        .product-card button{flex:0 0 42px;width:42px;height:42px;border:0;border-radius:50%;background:linear-gradient(135deg,#ff8a00,#ff3d00);color:#fff;font-size:25px;font-weight:900}
+        .cta-row{display:grid;grid-template-columns:1.25fr .75fr;gap:8px;text-shadow:none}.order-btn,.quick-add{height:46px;border-radius:15px;border:0;display:flex;align-items:center;justify-content:center;gap:7px;font-weight:900;font-family:inherit}.order-btn{background:linear-gradient(135deg,#ff7a00,#ff3d00);color:#fff;text-decoration:none}.quick-add{background:#fff;color:#101010}
+        .photo-label{position:absolute;z-index:4;top:82px;right:16px;font-size:9px;padding:6px 9px;border-radius:999px;background:rgba(0,0,0,.45);color:rgba(255,255,255,.65)}
+        .toast{position:fixed;z-index:30;left:50%;bottom:110px;transform:translateX(-50%);background:#fff;color:#111;padding:12px 18px;border-radius:999px;font-weight:900;box-shadow:0 12px 40px rgba(0,0,0,.35);white-space:nowrap}
+        @media (min-width:700px){.feed{width:min(430px,100%);margin:auto;background:#000;box-shadow:0 0 80px rgba(0,0,0,.7)}.reel{border-left:1px solid #222;border-right:1px solid #222}}
+        @media (max-width:360px){.content{right:12px;left:67px}.actions{left:8px}.actions button span{width:42px;height:42px}h1{font-size:19px}.product-card{padding:9px 10px}}
+      `}</style>
+    </main>
+  );
 }
