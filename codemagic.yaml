@@ -72,11 +72,16 @@ workflows:
 
     environment:
       node: 20
-      java: 17
+      java: 21
 
     scripts:
       - name: Install dependencies
         script: npm ci
+
+      - name: Verify Java 21
+        script: |
+          java -version
+          javac -version
 
       - name: Build Next.js app
         script: npm run build
@@ -96,21 +101,13 @@ workflows:
           }
           EOF
 
-          mkdir -p android/capacitor-cordova-android-plugins/src/main/libs
-          mkdir -p android/capacitor-cordova-android-plugins/src/main/java
-          cat > android/capacitor-cordova-android-plugins/cordova.variables.gradle <<'EOF'
-          ext {
-          }
-          EOF
-
           test -f android/app/src/main/assets/public/index.html
-          test -f android/capacitor-cordova-android-plugins/cordova.variables.gradle
 
       - name: Build signed Android App Bundle
         script: |
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease --stacktrace
+          ./gradlew clean bundleRelease --stacktrace
 
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
