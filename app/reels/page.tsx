@@ -261,7 +261,7 @@ export default function ReelsPage() {
 
               <div className="shade" />
               <header className="topbar">
-                <Link href="/" className="glass" aria-label="رجوع"><Icon name="back" /></Link>
+                <button type="button" className="glass" aria-label="رجوع" onClick={() => window.location.assign("/")}><Icon name="back" /></button>
                 <div className="tabs"><b>لك</b><span>متابعة</span></div>
                 <button className="glass" onClick={() => setMuted((value) => !value)} aria-label="الصوت">
                   <Icon name={muted ? "mute" : "volume"} />
@@ -320,15 +320,15 @@ export default function ReelsPage() {
       {notice ? <div className="toast">{notice}</div> : null}
 
       <style jsx>{`
-        :global(*){box-sizing:border-box} :global(html),:global(body){margin:0;background:#000;overflow:hidden}
-        .page{height:100dvh;background:#000;color:#fff;font-family:var(--fuse-body-font);overflow:hidden}
+        :global(*){box-sizing:border-box} :global(html),:global(body){margin:0;background:#000;overflow:hidden;width:100%;height:100%;padding:0!important}
+        .page{height:100vh;height:100dvh;min-height:-webkit-fill-available;width:100%;background:#000;color:#fff;font-family:var(--fuse-body-font);overflow:hidden;padding:0}
         .feed{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none}
         .feed::-webkit-scrollbar{display:none}
-        .reel{position:relative;height:100dvh;min-height:640px;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;background:#090909}
+        .reel{position:relative;height:100%;min-height:0;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;background:#090909}
         .reel>video,.reel>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block}
         .reel>img{transform:scale(1.02)}
         .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.36) 0%,transparent 24%,transparent 50%,rgba(0,0,0,.25) 66%,rgba(0,0,0,.94) 100%)}
-        .topbar{position:absolute;top:0;left:0;right:0;z-index:5;padding:max(14px,env(safe-area-inset-top)) 16px 8px;display:grid;grid-template-columns:46px 1fr 46px;align-items:center}
+        .topbar{position:absolute;top:0;left:0;right:0;z-index:5;padding:calc(max(10px,env(safe-area-inset-top)) + 2px) max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left));display:grid;grid-template-columns:46px 1fr 46px;align-items:center}
         .glass{width:44px;height:44px;border:1px solid rgba(255,255,255,.18);border-radius:50%;display:grid;place-items:center;background:rgba(10,10,10,.35);backdrop-filter:blur(14px);color:#fff;text-decoration:none}
         button.glass{cursor:pointer}
         .tabs{justify-self:center;display:flex;align-items:center;gap:20px;font-size:15px;text-shadow:0 2px 8px #000}
@@ -340,7 +340,7 @@ export default function ReelsPage() {
         .actions button b{font-size:10px}.actions button.active span{color:#ff5a36;background:rgba(255,255,255,.92)}
         .avatar{position:relative;width:50px;height:50px;border-radius:50%;padding:2px;border:2px solid #fff;display:block;margin-bottom:4px}
         .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}.avatar i{position:absolute;right:50%;bottom:-9px;transform:translateX(50%);width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:#ff5a00;color:#fff;font-style:normal;font-weight:900}
-        .content{position:absolute;z-index:5;right:16px;left:74px;bottom:max(18px,env(safe-area-inset-bottom));text-shadow:0 2px 10px rgba(0,0,0,.85)}
+        .content{position:absolute;z-index:5;right:max(14px,env(safe-area-inset-right));left:max(70px,calc(env(safe-area-inset-left) + 70px));bottom:calc(max(10px,env(safe-area-inset-bottom)) + 2px);text-shadow:0 2px 10px rgba(0,0,0,.85)}
         .restaurant-line{display:flex;align-items:center;gap:7px;margin-bottom:7px}.restaurant-line b{font-size:15px}.restaurant-line em{width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:#ff6200;font-size:11px;font-style:normal}.restaurant-line strong{font-size:10px;padding:5px 8px;border-radius:999px;background:#ff5a00}
         h1{margin:0 0 6px;font-size:22px;line-height:1.2;font-weight:900}p{margin:0 0 9px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.88);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
         .stats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.stats span{font-size:9px;padding:5px 8px;border-radius:999px;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}
