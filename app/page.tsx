@@ -1383,9 +1383,32 @@ export default function HomePage() {
 
           .phone {
             width: 100%;
-            min-height: 100vh;
+            min-height: 100dvh;
             border-radius: 0;
             box-shadow: none;
+            padding-top: max(18px, env(safe-area-inset-top));
+            padding-left: max(12px, env(safe-area-inset-left));
+            padding-right: max(12px, env(safe-area-inset-right));
+          }
+
+          .categories {
+            grid-auto-flow: row;
+            grid-auto-columns: auto;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 4px;
+            overflow: visible;
+            width: 100%;
+          }
+
+          .categories span {
+            width: clamp(44px, 13vw, 54px);
+            height: clamp(44px, 13vw, 54px);
+            border-radius: 17px;
+          }
+
+          .categories b {
+            font-size: clamp(10px, 2.8vw, 12px);
+            white-space: nowrap;
           }
 
           .bottom-nav {
