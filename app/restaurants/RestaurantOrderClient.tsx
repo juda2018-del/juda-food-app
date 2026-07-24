@@ -7,6 +7,17 @@ import { addDoc, collection, onSnapshot, query, serverTimestamp } from "firebase
 import { db } from "../firebase";
 import { addFuseCartItem } from "@/lib/fuse-cart";
 
+type RestaurantState = {
+  documentId: string;
+  name?: string;
+  title?: string;
+  restaurantName?: string;
+  open?: boolean;
+  isOpen?: boolean;
+  active?: boolean;
+  status?: string;
+};
+
 type MenuDoc = {
   documentId: string;
   name?: string;
@@ -263,6 +274,7 @@ const styles: Record<string, CSSProperties> = {
 export default function RestaurantOrderClient({ restaurant }: { restaurant: string }) {
   const router = useRouter();
   const [menu, setMenu] = useState<MenuDoc[]>([]);
+  const [restaurantOpen, setRestaurantOpen] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("الكل");
@@ -290,6 +302,22 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      query(collection(db, "restaurants")),
+      (snapshot) => {
+        const restaurants = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<RestaurantState, "documentId">),
+          documentId: item.id,
+        }));
+        const current = restaurants.find((item) => (item.restaurantName || item.name || item.title || "") === restaurant);
+        setRestaurantOpen(current ? current.active !== false && current.open !== false && current.isOpen !== false && current.status !== "مغلق" : true);
+      },
+      () => setRestaurantOpen(true)
+    );
+    return unsubscribe;
+  }, [restaurant]);
 
   const restaurantMenu = useMemo(() => {
     const firestoreItems = menu.filter((item) => getRestaurant(item) === restaurant).filter(menuAvailable);
@@ -320,6 +348,10 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
   const total = subtotal + deliveryFee;
 
   function addToCart(item: MenuDoc) {
+    if (!restaurantOpen) {
+      setError("المطعم مغلق حالياً ولا يستقبل طلبات.");
+      return;
+    }
     const id = item.documentId;
     const name = getMenuName(item);
     const selectedPrice = itemPrice(item.price);
@@ -364,6 +396,11 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
     setMessage("");
     setError("");
     setOrderId("");
+
+    if (!restaurantOpen) {
+      setError("المطعم مغلق حالياً ولا يستقبل طلبات.");
+      return;
+    }
 
     if (!cart.length) {
       setError("السلة فارغة.");
@@ -455,6 +492,14 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
 
           <Link href="/" style={styles.activePill}>رجوع للمطاعم</Link>
         </header>
+
+        {!restaurantOpen ? (
+          <section style={{ ...styles.card, marginBottom: 16, borderColor: "rgba(248,113,113,.55)", background: "rgba(127,29,29,.45)" }}>
+            <h2 style={{ marginTop: 0 }}>المطعم مغلق حالياً</h2>
+            <p style={styles.muted}>تم إيقاف استقبال الطلبات مؤقتاً. ارجع لقائمة المطاعم واختار مطعماً متاحاً.</p>
+            <Link href="/" style={styles.activePill}>رجوع للمطاعم</Link>
+          </section>
+        ) : null}
 
         <section style={styles.hero}>
           <div style={styles.heroGrid}>
