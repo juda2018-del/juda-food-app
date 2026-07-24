@@ -6,6 +6,17 @@ import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
 import { addFuseCartItem } from "@/lib/fuse-cart";
 
+type RestaurantState = {
+  documentId: string;
+  name?: string;
+  title?: string;
+  restaurantName?: string;
+  open?: boolean;
+  isOpen?: boolean;
+  active?: boolean;
+  status?: string;
+};
+
 type ReelDoc = {
   documentId: string;
   title?: string;
@@ -161,6 +172,7 @@ function Icon({ name }: { name: string }) {
 
 export default function ReelsPage() {
   const [reels, setReels] = useState<ReelDoc[]>([]);
+  const [restaurants, setRestaurants] = useState<RestaurantState[]>([]);
   const [liked, setLiked] = useState<Record<string, boolean>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [muted, setMuted] = useState(true);
@@ -182,7 +194,32 @@ export default function ReelsPage() {
     return unsubscribe;
   }, []);
 
-  const visibleReels = useMemo(() => (reels.length ? reels : fallbackReels), [reels]);
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      query(collection(db, "restaurants")),
+      (snapshot) => setRestaurants(snapshot.docs.map((item) => ({
+        ...(item.data() as Omit<RestaurantState, "documentId">),
+        documentId: item.id,
+      }))),
+      () => setRestaurants([])
+    );
+    return unsubscribe;
+  }, []);
+
+  const visibleReels = useMemo(() => {
+    const source = reels.length ? reels : fallbackReels;
+    if (!restaurants.length) return source;
+    return source.filter((reel) => {
+      const slug = restaurantSlug(reel);
+      const name = restaurantName(reel);
+      const matchingRestaurant = restaurants.find((item) => {
+        const itemName = clean(item.restaurantName || item.name || item.title);
+        return item.documentId === slug || itemName === name;
+      });
+      if (!matchingRestaurant) return true;
+      return matchingRestaurant.active !== false && matchingRestaurant.open !== false && matchingRestaurant.isOpen !== false && matchingRestaurant.status !== "مغلق";
+    });
+  }, [reels, restaurants]);
 
   useEffect(() => {
     setActiveId(visibleReels[0]?.documentId || "");
