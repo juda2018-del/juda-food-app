@@ -30,9 +30,12 @@ const ACCESS_RULES: AccessRule[] = [
       "/restaurant-admin",
       "/restaurant-live",
       "/restaurants-admin",
-      "/restaurant-reels",
     ],
     roles: ["admin", "restaurant"],
+  },
+  {
+    prefixes: ["/restaurant-reels"],
+    roles: ["admin", "restaurant", "customer"],
   },
   {
     prefixes: ["/driver-app"],
