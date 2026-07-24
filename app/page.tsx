@@ -621,7 +621,7 @@ export default function HomePage() {
 
         {notice ? <div className="toast">{notice}</div> : null}
 
-        <footer className="bottom-nav">
+        <footer className="home-nav">
           <Link href="/" className="active">
             <Icon name="home" />
             <b>الرئيسية</b>
@@ -1276,7 +1276,7 @@ export default function HomePage() {
           cursor: pointer;
         }
 
-        .bottom-nav {
+        .home-nav {
           position: absolute;
           left: 14px;
           right: 14px;
@@ -1293,7 +1293,7 @@ export default function HomePage() {
           box-shadow: 0 14px 38px rgba(11, 18, 32, 0.2);
         }
 
-        .bottom-nav a {
+        .home-nav a {
           color: #0b1220;
           text-decoration: none;
           display: grid;
@@ -1305,17 +1305,17 @@ export default function HomePage() {
           border-radius: 50%;
         }
 
-        .bottom-nav a.active {
+        .home-nav a.active {
           color: #0b1220;
           background: rgba(255, 255, 255, 0.72);
           box-shadow: 0 8px 22px rgba(11, 18, 32, 0.12);
         }
 
-        .bottom-nav b {
+        .home-nav b {
           display: none;
         }
 
-        .bottom-nav svg {
+        .home-nav svg {
           width: 27px;
           height: 27px;
         }
@@ -1425,10 +1425,16 @@ export default function HomePage() {
             white-space: nowrap;
           }
 
-          .bottom-nav {
+          .home-nav {
             position: fixed;
-            max-width: 430px;
-            margin: 0 auto;
+            left: 12px;
+            right: 12px;
+            bottom: max(8px, env(safe-area-inset-bottom));
+            width: auto;
+            max-width: none;
+            margin: 0;
+            transform: none;
+            z-index: 9999;
           }
         }
 
