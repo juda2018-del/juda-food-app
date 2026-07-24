@@ -1281,7 +1281,7 @@ export default function HomePage() {
           left: 14px;
           right: 14px;
           bottom: 12px;
-          height: 66px;
+          height: 82px;
           border: 1px solid rgba(255, 255, 255, 0.62);
           border-radius: 999px;
           background: rgba(255, 248, 237, 0.7);
@@ -1296,13 +1296,15 @@ export default function HomePage() {
         .home-nav a {
           color: #0b1220;
           text-decoration: none;
-          display: grid;
-          justify-items: center;
-          align-content: center;
-          width: 52px;
-          height: 52px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 3px;
+          width: 100%;
+          height: 66px;
           margin: auto;
-          border-radius: 50%;
+          border-radius: 18px;
         }
 
         .home-nav a.active {
@@ -1312,12 +1314,17 @@ export default function HomePage() {
         }
 
         .home-nav b {
-          display: none;
+          display: block;
+          font-size: 12px;
+          line-height: 1.1;
+          font-weight: 900;
+          white-space: nowrap;
         }
 
         .home-nav svg {
-          width: 27px;
-          height: 27px;
+          width: 24px;
+          height: 24px;
+          flex: 0 0 auto;
         }
 
         .image-fallback {
