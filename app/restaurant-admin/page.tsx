@@ -58,6 +58,8 @@ type MenuDoc = {
 
 type OrderDoc = {
   documentId: string;
+  name?: string;
+  title?: string;
   customerName?: string;
   customer?: string;
   phone?: string;
