@@ -21,11 +21,17 @@ const ACCESS_RULES: AccessRule[] = [
       "/auto-dispatch",
       "/reports",
       "/notification-center",
+      "/reels-review",
     ],
     roles: ["admin"],
   },
   {
-    prefixes: ["/restaurant-admin", "/restaurant-live", "/restaurants-admin"],
+    prefixes: [
+      "/restaurant-admin",
+      "/restaurant-live",
+      "/restaurants-admin",
+      "/restaurant-reels",
+    ],
     roles: ["admin", "restaurant"],
   },
   {
