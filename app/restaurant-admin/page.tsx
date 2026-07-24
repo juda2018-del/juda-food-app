@@ -42,6 +42,7 @@ type RestaurantDoc = {
   open?: boolean;
   isOpen?: boolean;
   active?: boolean;
+  status?: string;
 };
 
 type MenuDoc = {
