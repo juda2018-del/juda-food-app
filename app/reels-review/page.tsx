@@ -20,6 +20,8 @@ type ReelDoc = {
   offer?: string;
   videoUrl?: string;
   status?: string;
+  submitterType?: string;
+  submittedByName?: string;
   createdAt?: unknown;
 };
 
@@ -100,7 +102,11 @@ export default function ReelsReviewPage() {
             <article key={reel.documentId}>
               <video src={reel.videoUrl} controls playsInline preload="metadata" />
               <div className="copy">
-                <small>{reel.restaurantName || reel.restaurant || "مطعم"}</small>
+                <small>
+                  {reel.submitterType === "customer"
+                    ? `زبون: ${reel.submittedByName || "مجتمع FUSE"}`
+                    : reel.restaurantName || reel.restaurant || "مطعم"}
+                </small>
                 <h2>{reel.title || "ريل بدون عنوان"}</h2>
                 <p>{reel.caption || "بدون وصف"}</p>
                 {reel.offer ? <span>{reel.offer}</span> : null}
