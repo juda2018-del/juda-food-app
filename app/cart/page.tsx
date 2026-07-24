@@ -262,7 +262,7 @@ export default function CartPage() {
           display: grid;
           place-items: center;
           padding: 0 12px;
-          font-size: 20px;
+          font-size: 32px;
           font-weight: 900;
           box-shadow: 0 12px 28px rgba(0,0,0,.07);
         }
@@ -324,7 +324,7 @@ export default function CartPage() {
           transform: translateX(-50%);
           width: 100%;
           max-width: 430px;
-          height: 76px;
+          height: 86px;
           background: #ffffff;
           box-shadow: 0 -12px 32px rgba(0,0,0,.08);
           display: grid;
@@ -332,12 +332,12 @@ export default function CartPage() {
           align-items: center;
           text-align: center;
           color: #777;
-          font-size: 11px;
+          font-size: 14px;
           font-weight: 800;
           z-index: 50;
           border-top: 1px solid rgba(0,0,0,.04);
         }
-        .nav a { text-decoration: none; color: inherit; line-height: 1.6; }
+        .nav a { min-height: 64px; text-decoration: none; color: inherit; line-height: 1.45; display: grid; place-content: center; font-size: 14px; font-weight: 900; }
         .nav .active { color: #ff4d00; font-weight: 900; }
       `}</style>
     </main>
