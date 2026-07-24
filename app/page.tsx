@@ -1281,16 +1281,16 @@ export default function HomePage() {
           left: 14px;
           right: 14px;
           bottom: 12px;
-          height: 82px;
+          height: 72px;
           border: 1px solid rgba(255, 255, 255, 0.62);
-          border-radius: 999px;
-          background: rgba(255, 248, 237, 0.7);
+          border-radius: 24px;
+          background: rgba(255, 250, 244, 0.96);
           backdrop-filter: blur(22px) saturate(145%);
           -webkit-backdrop-filter: blur(22px) saturate(145%);
           display: grid;
           grid-template-columns: repeat(5, 1fr);
-          padding: 6px 10px;
-          box-shadow: 0 14px 38px rgba(11, 18, 32, 0.2);
+          padding: 5px 8px;
+          box-shadow: 0 10px 28px rgba(11, 18, 32, 0.2);
         }
 
         .home-nav a {
@@ -1302,28 +1302,28 @@ export default function HomePage() {
           justify-content: center;
           gap: 3px;
           width: 100%;
-          height: 66px;
+          height: 58px;
           margin: auto;
           border-radius: 18px;
         }
 
         .home-nav a.active {
-          color: #0b1220;
-          background: rgba(255, 255, 255, 0.72);
-          box-shadow: 0 8px 22px rgba(11, 18, 32, 0.12);
+          color: #ff5a00;
+          background: rgba(255, 90, 0, 0.10);
+          box-shadow: none;
         }
 
         .home-nav b {
           display: block;
-          font-size: 12px;
-          line-height: 1.1;
+          font-size: 11px;
+          line-height: 1.15;
           font-weight: 900;
           white-space: nowrap;
         }
 
         .home-nav svg {
-          width: 24px;
-          height: 24px;
+          width: 22px;
+          height: 22px;
           flex: 0 0 auto;
         }
 
@@ -1410,6 +1410,7 @@ export default function HomePage() {
             padding-top: max(18px, env(safe-area-inset-top));
             padding-left: max(12px, env(safe-area-inset-left));
             padding-right: max(12px, env(safe-area-inset-right));
+            padding-bottom: calc(128px + env(safe-area-inset-bottom));
           }
 
           .categories {
@@ -1436,7 +1437,7 @@ export default function HomePage() {
             position: fixed;
             left: 12px;
             right: 12px;
-            bottom: max(8px, env(safe-area-inset-bottom));
+            bottom: max(5px, env(safe-area-inset-bottom));
             width: auto;
             max-width: none;
             margin: 0;
