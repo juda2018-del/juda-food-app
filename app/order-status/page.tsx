@@ -417,20 +417,9 @@ export default function OrderStatusPage() {
             الرئيسية
           </Link>
 
-          <button
-            type="button"
-            style={{ ...styles.pill, cursor: "pointer" }}
-            onClick={() => {
-              if (window.history.length > 1) {
-                window.history.back();
-                return;
-              }
-
-              window.location.assign("/");
-            }}
-          >
-            ← رجوع
-          </button>
+          <Link href="/orders" style={{ ...styles.pill, fontSize: 16, padding: "13px 20px" }}>
+            ← طلباتي
+          </Link>
         </header>
 
         <section style={styles.hero}>
