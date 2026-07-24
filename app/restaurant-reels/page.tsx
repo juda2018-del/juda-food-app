@@ -19,6 +19,7 @@ type ReelDoc = {
   restaurantName?: string;
   status?: string;
   videoUrl?: string;
+  submittedBy?: string;
   createdAt?: unknown;
 };
 
@@ -61,16 +62,23 @@ export default function RestaurantReelsPage() {
       window.location.href = "/login?next=/restaurant-reels";
       return;
     }
-    if (saved.role !== "restaurant" && saved.role !== "admin") {
+    if (saved.role !== "restaurant" && saved.role !== "admin" && saved.role !== "customer") {
       window.location.href = roleHome[saved.role] || "/login";
       return;
     }
     setSession(saved);
   }, []);
 
+  const isCustomer = session?.role === "customer";
+  const creatorName = useMemo(
+    () => session?.name || session?.displayName || (isCustomer ? "زبون FUSE" : "مطعم FUSE"),
+    [isCustomer, session]
+  );
   const restaurantName = useMemo(
-    () => session?.restaurantName || session?.restaurant || session?.name || "مطعم FUSE",
-    [session]
+    () => isCustomer
+      ? "مجتمع FUSE"
+      : session?.restaurantName || session?.restaurant || session?.name || "مطعم FUSE",
+    [isCustomer, session]
   );
 
   useEffect(() => {
@@ -83,7 +91,7 @@ export default function RestaurantReelsPage() {
         }))
         .filter((item) => {
           if (session.role === "admin") return true;
-          return (item.restaurantName || item.restaurant) === restaurantName;
+          return item.submittedBy === session.email;
         });
       setReels(own);
     });
@@ -127,6 +135,8 @@ export default function RestaurantReelsPage() {
         restaurantName,
         restaurantId: session?.restaurantId || "",
         submittedBy: session?.email || "",
+        submittedByName: creatorName,
+        submitterType: isCustomer ? "customer" : "restaurant",
         status: "pending",
         approved: false,
         active: false,
@@ -153,23 +163,25 @@ export default function RestaurantReelsPage() {
       <section className="shell">
         <header>
           <div><small>FUSE Reels</small><h1>نشر ريل جديد</h1></div>
-          <Link href="/restaurant-admin">رجوع للوحة المطعم</Link>
+          <Link href={isCustomer ? "/reels" : "/restaurant-admin"}>رجوع</Link>
         </header>
 
         <section className="hero">
-          <p>المطعم</p>
-          <h2>{restaurantName}</h2>
+          <p>{isCustomer ? "حساب الزبون" : "المطعم"}</p>
+          <h2>{isCustomer ? creatorName : restaurantName}</h2>
           <span>كل ريل يروح أولاً إلى مراجعة إدارة FUSE.</span>
         </section>
 
         <form className="panel" onSubmit={submitReel}>
           <label>عنوان الريل<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: وجبة اليوم وصلت حارة" /></label>
           <label>الوصف<textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="اكتب وصفاً مختصراً وجذاباً" /></label>
-          <div className="grid">
-            <label>العرض<input value={offer} onChange={(e) => setOffer(e.target.value)} placeholder="خصم 20%" /></label>
-            <label>اسم الوجبة<input value={menuItem} onChange={(e) => setMenuItem(e.target.value)} placeholder="برغر دبل" /></label>
-            <label>السعر<input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="7500" /></label>
-          </div>
+          {!isCustomer ? (
+            <div className="grid">
+              <label>العرض<input value={offer} onChange={(e) => setOffer(e.target.value)} placeholder="خصم 20%" /></label>
+              <label>اسم الوجبة<input value={menuItem} onChange={(e) => setMenuItem(e.target.value)} placeholder="برغر دبل" /></label>
+              <label>السعر<input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="7500" /></label>
+            </div>
+          ) : null}
           <label className="upload">
             <b>{file ? file.name : "اختر فيديو من الهاتف"}</b>
             <span>MP4 أو MOV — الحد الأعلى 80MB</span>
@@ -183,7 +195,7 @@ export default function RestaurantReelsPage() {
         </form>
 
         <section className="panel">
-          <div className="head"><h2>ريلز المطعم</h2><b>{reels.length}</b></div>
+          <div className="head"><h2>{isCustomer ? "ريلز حسابي" : "ريلز المطعم"}</h2><b>{reels.length}</b></div>
           <div className="list">
             {reels.map((reel) => (
               <article key={reel.documentId}>
