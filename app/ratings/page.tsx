@@ -110,10 +110,11 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(255,255,255,0.13)",
     borderRadius: 999,
     background: "rgba(255,255,255,0.05)",
-    padding: "11px 16px",
-    color: "rgba(255,255,255,0.82)",
+    minHeight: 52,
+    padding: "13px 20px",
+    color: "white",
     textDecoration: "none",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 900,
   },
   hero: {
@@ -386,12 +387,12 @@ export default function RatingsPage() {
     <main dir="rtl" style={styles.page}>
       <section style={styles.shell}>
         <div style={styles.topBar}>
-          <Link href="/" style={styles.pill}>
-            الرئيسية
+          <Link href="/order-status" style={styles.pill}>
+            ← طلباتي
           </Link>
 
-          <Link href="/order-status" style={styles.pill}>
-            حالة الطلب
+          <Link href="/" style={styles.pill}>
+            الرئيسية
           </Link>
         </div>
 
