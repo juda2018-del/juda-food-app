@@ -574,6 +574,7 @@ export default function FuseAdminPage() {
     { title: "التوزيع التلقائي", desc: "ربط الطلبات بالسائقين", href: "/auto-dispatch", icon: "⚡" },
     { title: "إدارة السائقين", desc: "تشغيل وإيقاف السائقين", href: "/drivers-admin", icon: "🛵" },
     { title: "التقارير", desc: "المبيعات والأداء", href: "/reports", icon: "📊" },
+    { title: "مراجعة الريلز", desc: "قبول أو رفض ريلز المطاعم", href: "/reels-review", icon: "🎬" },
     { title: "أدوات النظام", desc: "تنظيف وفحص Firestore", href: "/system-tools", icon: "🧰" },
   ];
 
