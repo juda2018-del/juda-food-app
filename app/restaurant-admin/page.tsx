@@ -24,6 +24,8 @@ type RestaurantDoc = {
   documentId: string;
   name?: string;
   title?: string;
+  restaurantName?: string;
+  restaurant?: string;
   description?: string;
   desc?: string;
   cuisine?: string;
