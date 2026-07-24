@@ -119,7 +119,12 @@ function restaurantSlug(reel: ReelDoc) {
 }
 
 function isVisible(reel: ReelDoc) {
-  return reel.active !== false && reel.approved !== false && reel.status !== "rejected";
+  return (
+    reel.active !== false &&
+    reel.approved !== false &&
+    reel.status !== "rejected" &&
+    reel.status !== "pending"
+  );
 }
 
 function mediaFor(reel: ReelDoc, index: number) {
