@@ -639,10 +639,6 @@ export default function HomePage() {
             <b>طلباتي</b>
           </Link>
 
-          <Link href="/profile">
-            <Icon name="user" />
-            <b>حسابي</b>
-          </Link>
         </footer>
 
         {session ? (
@@ -1277,33 +1273,43 @@ export default function HomePage() {
           left: 14px;
           right: 14px;
           bottom: 12px;
-          height: 70px;
-          border-radius: 26px;
-          background: #0b1220;
+          height: 66px;
+          border: 1px solid rgba(255, 255, 255, 0.62);
+          border-radius: 999px;
+          background: rgba(255, 248, 237, 0.7);
+          backdrop-filter: blur(22px) saturate(145%);
+          -webkit-backdrop-filter: blur(22px) saturate(145%);
           display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          padding: 8px;
-          box-shadow: 0 22px 52px rgba(11, 18, 32, 0.3);
+          grid-template-columns: repeat(5, 1fr);
+          padding: 6px 10px;
+          box-shadow: 0 14px 38px rgba(11, 18, 32, 0.2);
         }
 
         .bottom-nav a {
-          color: rgba(255, 247, 238, 0.66);
+          color: #0b1220;
           text-decoration: none;
           display: grid;
           justify-items: center;
           align-content: center;
-          gap: 4px;
-          font-size: 11px;
-          font-weight: 700;
+          width: 52px;
+          height: 52px;
+          margin: auto;
+          border-radius: 50%;
         }
 
         .bottom-nav a.active {
-          color: #ff6a00;
+          color: #0b1220;
+          background: rgba(255, 255, 255, 0.72);
+          box-shadow: 0 8px 22px rgba(11, 18, 32, 0.12);
+        }
+
+        .bottom-nav b {
+          display: none;
         }
 
         .bottom-nav svg {
-          width: 21px;
-          height: 21px;
+          width: 27px;
+          height: 27px;
         }
 
         .image-fallback {
