@@ -32,6 +32,7 @@ type RestaurantDoc = {
   area?: string;
   open?: boolean;
   isOpen?: boolean;
+  active?: boolean;
   status?: string;
   rating?: number;
   deliveryTime?: string;
@@ -202,7 +203,13 @@ function getRestaurantName(item: RestaurantDoc | MenuDoc) {
 }
 
 function isOpen(item: RestaurantDoc) {
-  return item.open !== false && item.isOpen !== false && item.status !== "مغلق";
+  return item.active !== false && item.open !== false && item.isOpen !== false && item.status !== "مغلق";
+}
+
+function menuBelongsToRestaurant(menuItem: MenuDoc, restaurant: RestaurantDoc) {
+  const restaurantName = getRestaurantName(restaurant);
+  const menuRestaurant = menuItem.restaurantName || menuItem.restaurant || "";
+  return menuItem.restaurantId === restaurant.documentId || menuRestaurant === restaurantName;
 }
 
 function menuAvailable(item: MenuDoc) {
@@ -376,11 +383,12 @@ export default function HomePage() {
     : fallbackMenu;
 
   const role = session?.role || null;
+  const availableRestaurants = useMemo(() => sourceRestaurants.filter(isOpen), [sourceRestaurants]);
 
   const visibleRestaurants = useMemo(() => {
     const cleanSearch = search.trim().toLowerCase();
 
-    return sourceRestaurants.filter((restaurant) => {
+    return availableRestaurants.filter((restaurant) => {
       const name = getRestaurantName(restaurant);
       const haystack = `${name} ${restaurant.description || ""} ${restaurant.cuisine || ""}`.toLowerCase();
 
@@ -389,10 +397,10 @@ export default function HomePage() {
 
       return matchesSearch && matchesCategory;
     });
-  }, [category, search, sourceRestaurants]);
+  }, [availableRestaurants, category, search]);
 
   const featuredRestaurants = visibleRestaurants.slice(0, 8);
-  const popularMenu = sourceMenu.filter(menuAvailable).slice(0, 6);
+  const popularMenu = sourceMenu.filter((item) => menuAvailable(item) && availableRestaurants.some((restaurant) => menuBelongsToRestaurant(item, restaurant))).slice(0, 6);
 
   function showNotice(text: string) {
     setNotice(text);
