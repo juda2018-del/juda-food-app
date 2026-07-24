@@ -29,6 +29,8 @@ type ReelDoc = {
   likes?: number;
   views?: number;
   orders?: number;
+  submitterType?: string;
+  submittedByName?: string;
   createdAt?: unknown;
 };
 
@@ -256,6 +258,7 @@ export default function ReelsPage() {
           const isLiked = Boolean(liked[id]);
           const isSaved = Boolean(saved[id]);
           const slug = restaurantSlug(reel);
+          const isCustomerReel = reel.submitterType === "customer";
           return (
             <article className="reel" data-reel-id={id} key={id}>
               {reel.videoUrl ? (
@@ -268,13 +271,16 @@ export default function ReelsPage() {
               <header className="topbar">
                 <button type="button" className="glass" aria-label="رجوع" onClick={() => window.location.assign("/")}><Icon name="back" /></button>
                 <div className="tabs"><b>لك</b><span>متابعة</span></div>
-                <button className="glass" onClick={() => setMuted((value) => !value)} aria-label="الصوت">
-                  <Icon name={muted ? "mute" : "volume"} />
-                </button>
+                <div className="top-actions">
+                  <Link href="/restaurant-reels" className="glass create" aria-label="نشر ريل">+</Link>
+                  <button className="glass" onClick={() => setMuted((value) => !value)} aria-label="الصوت">
+                    <Icon name={muted ? "mute" : "volume"} />
+                  </button>
+                </div>
               </header>
 
               <aside className="actions">
-                <Link href={`/restaurants/${slug}`} className="avatar">
+                <Link href={isCustomerReel ? "/reels" : `/restaurants/${slug}`} className="avatar">
                   <img src={reel.restaurantLogo || mediaFor(reel, index)} alt={restaurantName(reel)} />
                   <i>+</i>
                 </Link>
@@ -290,7 +296,8 @@ export default function ReelsPage() {
 
               <section className="content">
                 <div className="restaurant-line">
-                  <b>@{restaurantName(reel)}</b><em>✓</em>
+                  <b>@{isCustomerReel ? reel.submittedByName || "مجتمع FUSE" : restaurantName(reel)}</b>
+                  {!isCustomerReel ? <em>✓</em> : null}
                   {reel.offer ? <strong>{reel.offer}</strong> : null}
                 </div>
                 <h1>{reel.title || reel.menuItem || "وجبة مميزة من FUSE"}</h1>
@@ -301,19 +308,23 @@ export default function ReelsPage() {
                   <span>{(reel.views || 0).toLocaleString("ar-IQ")} مشاهدة</span>
                 </div>
 
-                <div className="product-card">
-                  <div>
-                    <small>اطلب من داخل الريل</small>
-                    <b>{reel.menuItem || reel.title || "وجبة FUSE"}</b>
-                    <strong>{formatIQD(reel.price)}</strong>
-                  </div>
-                  <button onClick={() => addToCart(reel)} aria-label="إضافة للسلة">+</button>
-                </div>
+                {!isCustomerReel ? (
+                  <>
+                    <div className="product-card">
+                      <div>
+                        <small>اطلب من داخل الريل</small>
+                        <b>{reel.menuItem || reel.title || "وجبة FUSE"}</b>
+                        <strong>{formatIQD(reel.price)}</strong>
+                      </div>
+                      <button onClick={() => addToCart(reel)} aria-label="إضافة للسلة">+</button>
+                    </div>
 
-                <div className="cta-row">
-                  <Link href={`/restaurants/${slug}`} className="order-btn"><Icon name="cart" /> اطلب الآن</Link>
-                  <button onClick={() => addToCart(reel)} className="quick-add">إضافة سريعة</button>
-                </div>
+                    <div className="cta-row">
+                      <Link href={`/restaurants/${slug}`} className="order-btn"><Icon name="cart" /> اطلب الآن</Link>
+                      <button onClick={() => addToCart(reel)} className="quick-add">إضافة سريعة</button>
+                    </div>
+                  </>
+                ) : null}
               </section>
 
               {activeId === id && !reel.videoUrl ? <div className="photo-label">صورة تجريبية — أضف videoUrl من لوحة الإدارة</div> : null}
@@ -327,6 +338,7 @@ export default function ReelsPage() {
       <style jsx>{`
         :global(*){box-sizing:border-box} :global(html),:global(body){margin:0;background:#000;overflow:hidden;width:100%;height:100%;padding:0!important}
         .page{height:100vh;height:100dvh;min-height:-webkit-fill-available;width:100%;background:#000;color:#fff;font-family:var(--fuse-body-font);overflow:hidden;padding:0}
+        .top-actions{display:flex;gap:8px;align-items:center}.top-actions :global(.create){font-size:29px;font-weight:400;text-decoration:none;line-height:1}
         .feed{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none}
         .feed::-webkit-scrollbar{display:none}
         .reel{position:relative;height:100%;min-height:0;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;background:#090909}
