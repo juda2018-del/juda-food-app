@@ -224,7 +224,8 @@ export default function RestaurantAdminPage() {
         minOrder: Number(restaurantForm.minOrder || 0),
         open: restaurantForm.open,
         isOpen: restaurantForm.open,
-        active: true,
+        active: restaurantForm.open,
+        status: restaurantForm.open ? "مفتوح" : "مغلق",
         updatedAt: serverTimestamp(),
       };
 
@@ -266,6 +267,26 @@ export default function RestaurantAdminPage() {
       open: item.open !== false && item.isOpen !== false,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function toggleRestaurant(item: RestaurantDoc) {
+    const currentlyOpen = item.active !== false && item.open !== false && item.isOpen !== false && item.status !== "مغلق";
+    const next = !currentlyOpen;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "restaurants", item.documentId), {
+        active: next,
+        open: next,
+        isOpen: next,
+        status: next ? "مفتوح" : "مغلق",
+        updatedAt: serverTimestamp(),
+      });
+      flash(next ? "تم تشغيل المطعم وظهر للزبائن." : "تم إطفاء المطعم وإخفاؤه من التطبيق.");
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "تعذر تغيير حالة المطعم.", true);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function addMenuItem() {
@@ -362,7 +383,12 @@ export default function RestaurantAdminPage() {
             <div className="restaurant-summary">
               <div><h3>{selectedName}</h3><p>{selectedRestaurant.description || selectedRestaurant.desc || "بدون وصف"}</p></div>
               <div className="stats"><span>{selectedRestaurant.deliveryTime || "غير محدد"}</span><span>{money(selectedRestaurant.deliveryFee)}</span><span>أقل طلب {money(selectedRestaurant.minOrder)}</span></div>
-              {role === "admin" ? <button onClick={() => editRestaurant(selectedRestaurant)}>تعديل التفاصيل</button> : null}
+              <div className="restaurant-actions">
+                <button className={selectedRestaurant.active !== false && selectedRestaurant.open !== false && selectedRestaurant.isOpen !== false && selectedRestaurant.status !== "مغلق" ? "danger" : "success"} onClick={() => toggleRestaurant(selectedRestaurant)} disabled={saving}>
+                  {selectedRestaurant.active !== false && selectedRestaurant.open !== false && selectedRestaurant.isOpen !== false && selectedRestaurant.status !== "مغلق" ? "إطفاء المطعم وإخفاؤه" : "تشغيل المطعم وإظهاره"}
+                </button>
+                {role === "admin" ? <button onClick={() => editRestaurant(selectedRestaurant)}>تعديل التفاصيل</button> : null}
+              </div>
             </div>
           ) : <div className="empty">ماكو مطاعم حالياً. أضف أول مطعم من الأعلى.</div>}
         </section>
