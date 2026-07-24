@@ -784,10 +784,6 @@ export default function CustomerClient() {
             <b>طلباتي</b>
           </Link>
 
-          <Link href="/profile">
-            <Icon name="user" />
-            <b>حسابي</b>
-          </Link>
         </nav>
       </section>
 
@@ -1482,37 +1478,46 @@ export default function CustomerClient() {
           z-index: 30;
           left: 50%;
           bottom: 18px;
-          width: min(680px, calc(100% - 28px));
+          width: min(430px, calc(100% - 28px));
           transform: translateX(-50%);
           display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 6px;
-          border-radius: 28px;
-          padding: 9px;
-          background: rgba(12,12,12,0.84);
+          grid-template-columns: repeat(5, 1fr);
+          gap: 4px;
+          border: 1px solid rgba(255,255,255,0.24);
+          border-radius: 999px;
+          padding: 6px 10px;
+          background: rgba(255,248,237,0.76);
+          backdrop-filter: blur(22px) saturate(145%);
+          -webkit-backdrop-filter: blur(22px) saturate(145%);
+          box-shadow: 0 14px 40px rgba(0,0,0,0.24);
         }
 
         .bottom-nav a {
-          min-height: 58px;
-          border-radius: 20px;
+          width: 52px;
+          height: 52px;
+          min-height: 52px;
+          margin: auto;
+          border-radius: 50%;
           display: grid;
           justify-items: center;
           align-content: center;
-          gap: 4px;
-          color: rgba(255,255,255,0.56);
+          color: #0b1220;
           text-decoration: none;
-          font-size: 11px;
-          font-weight: 950;
         }
 
         .bottom-nav a.active {
-          background: #ff7a00;
-          color: #101010;
+          background: rgba(255,255,255,0.78);
+          color: #0b1220;
+          box-shadow: 0 8px 22px rgba(0,0,0,0.14);
+        }
+
+        .bottom-nav b {
+          display: none;
         }
 
         .bottom-nav svg {
-          width: 21px;
-          height: 21px;
+          width: 27px;
+          height: 27px;
         }
 
         .fuse-logo {
