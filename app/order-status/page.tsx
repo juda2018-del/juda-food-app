@@ -417,9 +417,20 @@ export default function OrderStatusPage() {
             الرئيسية
           </Link>
 
-          <Link href="/live-orders" style={styles.pill}>
-            الطلبات المباشرة
-          </Link>
+          <button
+            type="button"
+            style={{ ...styles.pill, cursor: "pointer" }}
+            onClick={() => {
+              if (window.history.length > 1) {
+                window.history.back();
+                return;
+              }
+
+              window.location.assign("/");
+            }}
+          >
+            ← رجوع
+          </button>
         </header>
 
         <section style={styles.hero}>
