@@ -316,7 +316,11 @@ export default function RestaurantAdminPage() {
       <section className="shell">
         <header className="topbar">
           <div><small>FUSE Restaurant</small><h1>إدارة المطاعم والمنيو</h1></div>
-          <nav><Link href="/">الرئيسية</Link><Link href="/fuse-admin">الإدارة</Link></nav>
+          <nav>
+            <Link href="/">الرئيسية</Link>
+            <Link href="/restaurant-reels">نشر ريل</Link>
+            {role === "admin" ? <Link href="/fuse-admin">الإدارة</Link> : null}
+          </nav>
         </header>
 
         {message ? <div className="alert ok">{message}</div> : null}
