@@ -111,64 +111,6 @@ svg {
     object-fit: cover !important;
   }
 
-  .bottom-nav {
-    position: fixed !important;
-    left: 12px !important;
-    right: 12px !important;
-    bottom: max(8px, var(--fuse-safe-bottom)) !important;
-    z-index: 9999 !important;
-    width: auto !important;
-    max-width: none !important;
-    height: 72px !important;
-    min-height: 72px !important;
-    margin: 0 !important;
-    padding: 7px 8px !important;
-    transform: none !important;
-    overflow: hidden !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 24px !important;
-    background: rgba(8, 8, 10, 0.98) !important;
-    box-shadow: 0 14px 34px rgba(0,0,0,0.28) !important;
-    display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-  }
-
-  .bottom-nav > a,
-  .bottom-nav > button {
-    min-width: 0 !important;
-    width: 100% !important;
-    height: 58px !important;
-    margin: 0 !important;
-    padding: 5px 2px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 2px !important;
-    color: #ffffff !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    font-size: 10px !important;
-  }
-
-  .bottom-nav > a.active {
-    color: #ff6a00 !important;
-    background: rgba(255,106,0,0.10) !important;
-  }
-
-  .bottom-nav > a b {
-    display: block !important;
-    color: currentColor !important;
-    font-size: 10px !important;
-    line-height: 1 !important;
-  }
-
-  .bottom-nav > a svg {
-    width: 23px !important;
-    height: 23px !important;
-    color: currentColor !important;
-  }
-
   /* Restaurant menu/order page uses inline styles; override them safely on phones. */
   main[dir="rtl"] > section {
     width: 100% !important;
@@ -225,8 +167,12 @@ svg {
     padding-inline: 9px !important;
   }
 
-  .bottom-nav a,
-  .bottom-nav button {
-    font-size: 10px !important;
+  .fuse-customer-nav {
+    width: calc(100% - 20px);
+    padding-inline: 5px;
+  }
+
+  .fuse-nav-icon {
+    width: 40px;
   }
 }
