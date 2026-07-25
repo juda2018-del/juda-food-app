@@ -29,7 +29,7 @@ export default function FavoritesPage() {
 
         body{
           margin:0;
-          background:#efe8df;
+          background:#071f67;
           font-family:"Cairo",sans-serif;
         }
 
@@ -40,7 +40,7 @@ export default function FavoritesPage() {
           margin:0 auto;
           padding:18px 18px 95px;
           direction:rtl;
-          background:linear-gradient(180deg,#fffaf4 0%,#fff 100%);
+          background:linear-gradient(180deg,#fffaf1 0%,#fff 100%);
         }
 
         .top{
@@ -82,12 +82,12 @@ export default function FavoritesPage() {
         }
 
         .hero{
-          background:linear-gradient(135deg,#ff4d00,#ff8a00);
+          background:linear-gradient(135deg,#082d8f,#123fbd);
           color:white;
           border-radius:30px;
           padding:22px;
           margin-bottom:18px;
-          box-shadow:0 18px 42px rgba(255,77,0,.22);
+          box-shadow:0 18px 42px rgba(8,45,143,.24);
         }
 
         .hero h2{
@@ -241,14 +241,6 @@ export default function FavoritesPage() {
             </Link>
           ))}
         </section>
-
-        <nav className="nav">
-          <Link href="/">⌂<br/>الرئيسية</Link>
-          <Link href="/explore">⌕<br/>استكشف</Link>
-          <Link href="/cart">▱<br/>السلة</Link>
-          <Link href="/order-status">▣<br/>طلباتي</Link>
-          <Link href="/profile" className="active">○<br/>حسابي</Link>
-        </nav>
 
       </main>
     </>
