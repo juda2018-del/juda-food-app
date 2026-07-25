@@ -758,33 +758,6 @@ export default function CustomerClient() {
           <Link href="/profile">الملف الشخصي</Link>
         </section>
 
-        <nav className="bottom-nav">
-          <Link href="/customer" className="active">
-            <Icon name="home" />
-            <b>الرئيسية</b>
-          </Link>
-
-          <Link href="/">
-            <Icon name="search" />
-            <b>استكشف</b>
-          </Link>
-
-          <Link href="/reels">
-            <Icon name="reels" />
-            <b>ريلز</b>
-          </Link>
-
-          <Link href="/cart">
-            <Icon name="cart" />
-            <b>السلة</b>
-          </Link>
-
-          <Link href="/order-status">
-            <Icon name="orders" />
-            <b>طلباتي</b>
-          </Link>
-
-        </nav>
       </section>
 
       <style jsx>{`
