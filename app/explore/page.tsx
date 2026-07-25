@@ -400,13 +400,6 @@ export default function ExplorePage() {
           )}
         </section>
 
-        <nav className="nav">
-          <Link href="/">⌂<br />الرئيسية</Link>
-          <Link href="/explore" className="active">⌕<br />استكشف</Link>
-          <Link href="/cart">▱<br />السلة</Link>
-          <Link href="/order-status">▣<br />طلباتي</Link>
-          <Link href="/profile">○<br />حسابي</Link>
-        </nav>
       </main>
     </>
   );
