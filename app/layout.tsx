@@ -1,6 +1,7 @@
 ﻿import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import ClientRouteGuard from "../components/ClientRouteGuard";
+import FuseCustomerNav from "../components/FuseCustomerNav";
 import "./globals.css";
 import "./mobile-responsive.css";
 
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body>
         <ClientRouteGuard />
         {children}
+        <FuseCustomerNav />
       </body>
     </html>
   );
