@@ -18,7 +18,7 @@ export default function ProfilePage() {
         body {
           margin: 0;
           font-family: "Cairo", sans-serif;
-          background: #efe8df;
+          background: #071f67;
         }
 
         .app {
@@ -28,7 +28,7 @@ export default function ProfilePage() {
           margin: 0 auto;
           direction: rtl;
           padding: 18px 18px 96px;
-          background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
+          background: linear-gradient(180deg, #fffaf1 0%, #ffffff 100%);
           color: #151515;
         }
 
@@ -71,11 +71,11 @@ export default function ProfilePage() {
         }
 
         .hero {
-          background: linear-gradient(135deg, #ff4d00, #ff8a00);
+          background: linear-gradient(135deg, #082d8f, #123fbd);
           border-radius: 30px;
           padding: 20px;
           color: white;
-          box-shadow: 0 18px 42px rgba(255,77,0,.22);
+          box-shadow: 0 18px 42px rgba(8,45,143,.24);
           margin-bottom: 16px;
         }
 
@@ -90,7 +90,7 @@ export default function ProfilePage() {
           height: 74px;
           border-radius: 24px;
           background: white;
-          color: #ff4d00;
+          color: #123fbd;
           display: grid;
           place-items: center;
           font-size: 34px;
@@ -168,7 +168,7 @@ export default function ProfilePage() {
           width: 48px;
           height: 48px;
           border-radius: 17px;
-          background: #fff3e9;
+          background: #eef3ff;
           display: grid;
           place-items: center;
           font-size: 22px;
@@ -193,7 +193,7 @@ export default function ProfilePage() {
         }
 
         .arrow {
-          color: #ff4d00;
+          color: #ff6500;
           font-size: 22px;
           font-weight: 900;
         }
@@ -203,7 +203,7 @@ export default function ProfilePage() {
           width: 100%;
           border: 0;
           border-radius: 22px;
-          background: #151515;
+          background: #082d8f;
           color: white;
           padding: 15px;
           font-family: inherit;
@@ -372,13 +372,6 @@ export default function ProfilePage() {
 
         <button type="button" onClick={handleLogout} className="logout">تسجيل خروج</button>
 
-        <nav className="nav">
-          <Link href="/">⌂<br />الرئيسية</Link>
-          <Link href="/explore">⌕<br />استكشف</Link>
-          <Link href="/cart">▱<br />السلة</Link>
-          <Link href="/order-status">▣<br />طلباتي</Link>
-          <Link href="/profile" className="active">○<br />حسابي</Link>
-        </nav>
       </main>
     </>
   );
