@@ -621,34 +621,6 @@ export default function HomePage() {
 
         {notice ? <div className="toast">{notice}</div> : null}
 
-        <footer className="home-nav">
-          <Link href="/" className="active">
-            <Icon name="home" />
-            <b>الرئيسية</b>
-          </Link>
-
-          <Link href="/restaurants">
-            <Icon name="explore" />
-            <b>استكشف</b>
-          </Link>
-
-          <Link href="/reels">
-            <Icon name="reels" />
-            <b>ريلز</b>
-          </Link>
-
-          <Link href="/cart">
-            <Icon name="cart" />
-            <b>السلة{cartCount ? ` (${cartCount})` : ""}</b>
-          </Link>
-
-          <Link href="/order-status">
-            <Icon name="orders" />
-            <b>طلباتي</b>
-          </Link>
-
-        </footer>
-
         {session ? (
           <button onClick={logout} className="logout">
             خروج
@@ -687,8 +659,8 @@ export default function HomePage() {
           overflow: hidden;
           padding: 18px 16px 96px;
           background:
-            radial-gradient(circle at 90% 0%, rgba(255, 90, 0, 0.12), transparent 26%),
-            #fff7ee;
+            radial-gradient(circle at 90% 0%, rgba(18, 63, 189, 0.1), transparent 26%),
+            #fffaf1;
           color: #0b1220;
           box-shadow:
             0 42px 100px rgba(11, 18, 32, 0.16),
@@ -700,7 +672,10 @@ export default function HomePage() {
           grid-template-columns: 54px 1fr auto;
           align-items: center;
           gap: 12px;
-          margin-bottom: 18px;
+          margin: -18px -16px 0;
+          padding: 24px 16px 14px;
+          background: linear-gradient(135deg, #123fbd, #082d8f);
+          color: #fff;
         }
 
         .menu-btn,
@@ -718,15 +693,15 @@ export default function HomePage() {
         }
 
         .menu-btn {
-          background: #0b1220;
-          color: #ff5a00;
-          box-shadow: 0 16px 34px rgba(11, 18, 32, 0.15);
+          background: #ff6500;
+          color: #fff;
+          box-shadow: 0 12px 28px rgba(255, 90, 0, 0.25);
         }
 
         .location {
           border: 0;
           background: transparent;
-          color: #0b1220;
+          color: #fff;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -757,16 +732,16 @@ export default function HomePage() {
           width: 44px;
           height: 44px;
           border-radius: 999px;
-          color: #0b1220;
-          background: #fffdf9;
-          box-shadow: 0 12px 26px rgba(11, 18, 32, 0.08);
+          color: #fff;
+          background: rgba(255, 255, 255, 0.14);
+          box-shadow: none;
         }
 
         .profile {
           width: 48px;
           height: 48px;
           border-radius: 999px;
-          background: #0b1220;
+          background: #ff6500;
           color: #fff;
           overflow: hidden;
         }
@@ -814,7 +789,9 @@ export default function HomePage() {
           display: grid;
           grid-template-columns: 1fr 54px;
           gap: 11px;
-          margin-bottom: 17px;
+          margin: 0 -16px 17px;
+          padding: 0 16px 18px;
+          background: linear-gradient(135deg, #123fbd, #082d8f);
         }
 
         .search-box {
@@ -903,11 +880,11 @@ export default function HomePage() {
           border-radius: 32px;
           background:
             radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.18), transparent 36%),
-            linear-gradient(135deg, #ff3d00 0%, #ff6a00 55%, #ff8a00 100%);
+            linear-gradient(135deg, #082d8f 0%, #123fbd 58%, #1e51d1 100%);
           display: grid;
           grid-template-columns: 1fr 46%;
           margin-bottom: 13px;
-          box-shadow: 0 24px 50px rgba(255, 90, 0, 0.22);
+          box-shadow: 0 24px 50px rgba(8, 45, 143, 0.24);
         }
 
         .hero::after {
@@ -982,7 +959,7 @@ export default function HomePage() {
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(90deg, transparent 0%, rgba(255, 90, 0, 0.12) 55%, rgba(255, 90, 0, 0.92) 100%);
+            linear-gradient(90deg, transparent 0%, rgba(18, 63, 189, 0.12) 55%, rgba(8, 45, 143, 0.92) 100%);
           pointer-events: none;
         }
 
