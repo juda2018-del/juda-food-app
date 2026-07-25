@@ -227,14 +227,6 @@ export default function CartPage() {
       {message ? <div className="message ok">{message}</div> : null}
       {error ? <div className="message bad">{error}</div> : null}
 
-      <nav className="nav">
-        <Link href="/">⌂<br />الرئيسية</Link>
-        <Link href="/explore">⌕<br />استكشف</Link>
-        <Link href="/cart" className="active">▱<br />السلة</Link>
-        <Link href="/order-status">▣<br />طلباتي</Link>
-        <Link href="/profile">○<br />حسابي</Link>
-      </nav>
-
       <style jsx>{`
         :global(*) { box-sizing: border-box; }
         :global(html), :global(body) { margin: 0; padding: 0; background: #efe8df; }
