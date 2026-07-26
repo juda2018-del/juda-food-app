@@ -99,7 +99,7 @@ export default function DataDeletionPage() {
               <div dir="ltr" style={{padding:"13px 14px",borderRadius:14,background:"#f7f7f7",fontSize:13,overflowWrap:"anywhere"}}>{user.email || "بدون بريد"}</div>
 
               <label style={{display:"block",fontWeight:900,fontSize:13,margin:"16px 0 7px"}}>سبب الحذف — اختياري</label>
-              <textarea disabled={closed} value={reason} onChange={(e)=>setReason(e.target.value)} maxLength={500} placeholder="اكتب السبب حتى نطوّر الخدمة" style={{width:"100%",minHeight:110,border:"1px solid #ddd",borderRadius:16,padding:13,fontFamily:"inherit",resize:"vertical",opacity:closed?.65:1}} />
+              <textarea disabled={closed} value={reason} onChange={(e)=>setReason(e.target.value)} maxLength={500} placeholder="اكتب السبب حتى نطوّر الخدمة" style={{width:"100%",minHeight:110,border:"1px solid #ddd",borderRadius:16,padding:13,fontFamily:"inherit",resize:"vertical",opacity:closed ? .65 : 1}} />
 
               {!closed ? <>
                 <label style={{display:"block",fontWeight:900,fontSize:13,margin:"16px 0 7px"}}>للتأكيد اكتب: حذف حسابي</label>
