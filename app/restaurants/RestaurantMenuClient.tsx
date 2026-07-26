@@ -17,6 +17,7 @@ type MenuDoc = {
   title?: string;
   restaurant?: string;
   restaurantName?: string;
+  restaurantId?: string;
   category?: string;
   price?: number;
   available?: boolean;
@@ -36,15 +37,15 @@ type RestaurantDoc = {
 };
 
 const fallbackMenu: MenuDoc[] = [
-  { documentId: "fayrouz-1", restaurant: "فيروز", name: "مخلمة", category: "فطور", price: 7000 },
-  { documentId: "fayrouz-2", restaurant: "فيروز", name: "كاهي وقيمر", category: "كاهي", price: 5000 },
-  { documentId: "fayrouz-3", restaurant: "فيروز", name: "باقلة بالدهن", category: "فطور", price: 6000 },
-  { documentId: "shalteta-1", restaurant: "شلتتة", name: "مشلتت سادة", category: "مشلتت", price: 8000 },
-  { documentId: "shalteta-2", restaurant: "شلتتة", name: "فطير جبن", category: "فطائر", price: 9000 },
-  { documentId: "khan-1", restaurant: "خان قدوري", name: "وجبة عراقية", category: "وجبات", price: 12000 },
-  { documentId: "khan-2", restaurant: "خان قدوري", name: "دجاج مشوي", category: "مشاوي", price: 9000 },
-  { documentId: "forn-1", restaurant: "الفرن", name: "منقوشة جبن", category: "مناقيش", price: 5000 },
-  { documentId: "forn-2", restaurant: "الفرن", name: "وافل شوكولاتة", category: "حلويات", price: 7000 },
+  { documentId: "fayrouz-1", restaurantId: "fayrouz", restaurant: "فيروز", name: "مخلمة", category: "فطور", price: 7000 },
+  { documentId: "fayrouz-2", restaurantId: "fayrouz", restaurant: "فيروز", name: "كاهي وقيمر", category: "كاهي", price: 5000 },
+  { documentId: "fayrouz-3", restaurantId: "fayrouz", restaurant: "فيروز", name: "باقلة بالدهن", category: "فطور", price: 6000 },
+  { documentId: "shalteta-1", restaurantId: "shalteta", restaurant: "شلتتة", name: "مشلتت سادة", category: "مشلتت", price: 8000 },
+  { documentId: "shalteta-2", restaurantId: "shalteta", restaurant: "شلتتة", name: "فطير جبن", category: "فطائر", price: 9000 },
+  { documentId: "khan-1", restaurantId: "khan", restaurant: "خان قدوري", name: "وجبة عراقية", category: "وجبات", price: 12000 },
+  { documentId: "khan-2", restaurantId: "khan", restaurant: "خان قدوري", name: "دجاج مشوي", category: "مشاوي", price: 9000 },
+  { documentId: "forn-1", restaurantId: "alforn", restaurant: "الفرن", name: "منقوشة جبن", category: "مناقيش", price: 5000 },
+  { documentId: "forn-2", restaurantId: "alforn", restaurant: "الفرن", name: "وافل شوكولاتة", category: "حلويات", price: 7000 },
 ];
 
 function itemName(item: MenuDoc) {
@@ -57,6 +58,16 @@ function itemRestaurant(item: MenuDoc) {
 
 function isAvailable(item: MenuDoc) {
   return item.available !== false && item.isAvailable !== false;
+}
+
+function sameRestaurant(
+  item: Pick<MenuDoc | FuseCartItem, "restaurant" | "restaurantId"> & { restaurantName?: string },
+  restaurant: string,
+  restaurantId: string
+) {
+  const itemId = String(item.restaurantId || "").trim().toLowerCase();
+  const itemNameValue = String(item.restaurant || item.restaurantName || "").trim();
+  return itemId === restaurantId.trim().toLowerCase() || itemNameValue === restaurant;
 }
 
 function formatIQD(value: number) {
@@ -134,12 +145,12 @@ export default function RestaurantMenuClient({
 
   const source = useMemo(() => {
     const remote = menu.filter(
-      (item) => itemRestaurant(item) === restaurant && isAvailable(item)
+      (item) => sameRestaurant(item, restaurant, restaurantId) && isAvailable(item)
     );
     return remote.length
       ? remote
-      : fallbackMenu.filter((item) => itemRestaurant(item) === restaurant);
-  }, [menu, restaurant]);
+      : fallbackMenu.filter((item) => sameRestaurant(item, restaurant, restaurantId));
+  }, [menu, restaurant, restaurantId]);
 
   const categories = useMemo(
     () => ["الكل", ...Array.from(new Set(source.map((item) => item.category || "عام")))],
@@ -156,8 +167,12 @@ export default function RestaurantMenuClient({
     });
   }, [category, search, source]);
 
-  const cartCount = cart.reduce((sum, item) => sum + item.qty, 0);
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const restaurantCart = useMemo(
+    () => cart.filter((item) => sameRestaurant(item, restaurant, restaurantId)),
+    [cart, restaurant, restaurantId]
+  );
+  const cartCount = restaurantCart.reduce((sum, item) => sum + item.qty, 0);
+  const cartTotal = restaurantCart.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   function addItem(item: MenuDoc) {
     if (!restaurantOpen) {
@@ -165,7 +180,11 @@ export default function RestaurantMenuClient({
       return;
     }
 
-    addFuseCartItem({
+    const previousCart = readFuseCart();
+    const replacingOtherRestaurant =
+      previousCart.length > 0 && !sameRestaurant(previousCart[0], restaurant, restaurantId);
+
+    const next = addFuseCartItem({
       id: item.documentId,
       name: itemName(item),
       restaurant,
@@ -176,8 +195,13 @@ export default function RestaurantMenuClient({
       image: item.image,
     });
 
-    setNotice(`تمت إضافة ${itemName(item)} للسلة`);
-    window.setTimeout(() => setNotice(""), 1600);
+    setCart(next);
+    setNotice(
+      replacingOtherRestaurant
+        ? `بدأنا سلة جديدة من ${restaurant} وأضفنا ${itemName(item)}`
+        : `تمت إضافة ${itemName(item)} للسلة`
+    );
+    window.setTimeout(() => setNotice(""), 1900);
   }
 
   return (
@@ -214,7 +238,7 @@ export default function RestaurantMenuClient({
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث داخل المنيو" />
         <div className="categories">
           {categories.map((item) => (
-            <button key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>
+            <button type="button" key={item} className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>
           ))}
         </div>
       </section>
@@ -228,7 +252,7 @@ export default function RestaurantMenuClient({
               <h3>{itemName(item)}</h3>
               <strong>{formatIQD(Number(item.price || 0))}</strong>
             </div>
-            <button disabled={!restaurantOpen} onClick={() => addItem(item)} aria-label={`إضافة ${itemName(item)}`}>+</button>
+            <button type="button" disabled={!restaurantOpen} onClick={() => addItem(item)} aria-label={`إضافة ${itemName(item)}`}>+</button>
           </article>
         ))}
       </section>
@@ -262,7 +286,7 @@ export default function RestaurantMenuClient({
         .filters{margin-top:16px}.filters input{width:100%;height:50px;border:1px solid #eee0d3;border-radius:17px;background:#fff;padding:0 15px;font-family:inherit;font-size:14px;outline:none}.categories{display:flex;gap:8px;overflow:auto;padding:10px 0 4px;scrollbar-width:none}.categories::-webkit-scrollbar{display:none}.categories button{white-space:nowrap;border:1px solid #eee0d3;background:#fff;color:#665f59;padding:9px 13px;border-radius:999px;font-family:inherit;font-weight:900}.categories button.active{background:#ff5a00;color:#fff;border-color:#ff5a00}
         .menu-grid{display:grid;gap:11px;margin-top:12px}.menu-card{display:grid;grid-template-columns:70px 1fr 46px;gap:12px;align-items:center;background:#fff;border:1px solid #f1e7dd;border-radius:22px;padding:11px;box-shadow:0 10px 28px rgba(0,0,0,.055)}.food-image{width:70px;height:70px;border-radius:19px;background:linear-gradient(135deg,#222,#443a32);color:#ff7a00;display:grid;place-items:center;font-size:29px;font-weight:900}.food-info{min-width:0}.food-info small{color:#8b8179;font-size:10px;font-weight:800}.food-info h3{margin:3px 0 7px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.food-info strong{color:#ff5a00;font-size:14px}.menu-card>button{width:44px;height:44px;border:0;border-radius:15px;background:#ff5a00;color:#fff;font-size:25px;font-weight:900}.menu-card>button:disabled{background:#d6d3d1}
         .empty{text-align:center;padding:30px;color:#78716c;font-weight:800}.checkout-bar{position:fixed;z-index:90;left:50%;transform:translateX(-50%);bottom:88px;width:calc(100% - 32px);max-width:398px;min-height:64px;border-radius:20px;background:#171717;color:#fff;text-decoration:none;padding:11px 15px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 16px 38px rgba(0,0,0,.3)}.checkout-bar div{display:grid;gap:2px}.checkout-bar div b{font-size:13px}.checkout-bar div span{font-size:11px;color:#ff8a3d}.checkout-bar>strong{font-size:13px}
-        .toast{position:fixed;z-index:120;left:50%;transform:translateX(-50%);bottom:170px;background:#fff;color:#111;padding:12px 17px;border-radius:999px;font-weight:900;box-shadow:0 12px 35px rgba(0,0,0,.2);white-space:nowrap}
+        .toast{position:fixed;z-index:120;left:50%;transform:translateX(-50%);bottom:170px;background:#fff;color:#111;padding:12px 17px;border-radius:999px;font-weight:900;box-shadow:0 12px 35px rgba(0,0,0,.2);white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
         .bottom-nav{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;height:72px;background:rgba(255,255,255,.98);border-radius:24px;box-shadow:0 12px 35px rgba(0,0,0,.18);display:grid;grid-template-columns:repeat(5,1fr);padding:6px;z-index:99}.bottom-nav a{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;text-decoration:none;color:#78716c;font-size:10px;font-weight:900;border-radius:17px}.bottom-nav a.active{color:#ff5a00;background:#fff1e8}.bottom-nav b{font-size:19px;line-height:1}
       `}</style>
     </main>
