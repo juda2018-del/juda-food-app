@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { parseFuseRole, roleHome } from "@/lib/fuse-auth";
 
 type OrderItem = { name?: string; title?: string; qty?: number; quantity?: number; price?: number };
 type OrderDoc = {
@@ -30,8 +31,9 @@ const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "
 
 function normalizeStatus(status?: string) {
   if (!status) return "جديد";
-  if (status === "جاهز") return "جاهز للتوصيل";
+  if (status === "جاهز" || status === "ready" || status === "ready_for_delivery") return "جاهز للتوصيل";
   if (status === "السائق استلم") return "قيد التوصيل";
+  if (status === "Delivered" || status === "delivered") return "تم التسليم";
   return status;
 }
 
@@ -91,9 +93,9 @@ export default function OrderStatusPage() {
 
       try {
         const token = await currentUser.getIdTokenResult();
-        const role = String(token.claims.role || "customer");
-        if (["admin", "restaurant", "driver"].includes(role)) {
-          router.replace(role === "admin" ? "/admin" : role === "restaurant" ? "/restaurant" : "/driver");
+        const role = parseFuseRole(token.claims.role || token.claims.fuseRole);
+        if (role && role !== "customer") {
+          router.replace(roleHome[role]);
           return;
         }
         setUser(currentUser);
@@ -207,7 +209,9 @@ export default function OrderStatusPage() {
               )) : <p>تفاصيل الأصناف غير متوفرة.</p>}
             </section>
 
-            {normalizeStatus(current.status) === "تم التسليم" ? <Link className="rate" href="/ratings">قيّم الطلب</Link> : null}
+            {normalizeStatus(current.status) === "تم التسليم" ? (
+              <Link className="rate" href={`/ratings?orderDocumentId=${encodeURIComponent(current.documentId)}`}>قيّم هذا الطلب</Link>
+            ) : null}
           </article>
         )}
 
