@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { db } from "../firebase";
-import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
+import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
 
 type NotificationDoc = {
   documentId: string;
@@ -14,6 +14,8 @@ type NotificationDoc = {
   type?: string;
   role?: string;
   restaurant?: string;
+  restaurantName?: string;
+  restaurantId?: string;
   orderId?: string;
   createdAt?: unknown;
   read?: boolean;
@@ -32,14 +34,8 @@ function readSession(): FuseSession | null {
   }
 }
 
-function canSee(item: NotificationDoc, session: FuseSession | null) {
-  if (!session) return false;
-  const role = session.role as FuseRole;
-  if (role === "admin") return true;
-  if (role !== "restaurant") return false;
-  if (item.role && item.role !== "restaurant") return false;
-  if (item.restaurant && session.restaurant) return item.restaurant === session.restaurant;
-  return true;
+function restaurantKey(session: FuseSession | null) {
+  return String(session?.restaurantId || session?.restaurant || session?.restaurantName || "").trim();
 }
 
 function formatDate(value: unknown) {
@@ -61,37 +57,73 @@ export default function NotificationCenterPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setSession(readSession());
+    const saved = readSession();
+    if (!saved) {
+      window.location.href = "/login?next=/notification-center";
+      return;
+    }
+    setSession(saved);
   }, []);
 
   const staffMode = session?.role === "admin" || session?.role === "restaurant";
+  const scopedRestaurantId = restaurantKey(session);
 
   useEffect(() => {
+    if (!session) return;
+
     if (!staffMode) {
+      setItems([]);
       setLoading(false);
       return;
     }
 
+    if (session.role === "restaurant" && !scopedRestaurantId) {
+      setItems([]);
+      setLoading(false);
+      setError("حساب المطعم غير مربوط بمطعم. راجع إدارة FUSE لربط الحساب.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    const notificationsQuery = session.role === "admin"
+      ? query(collection(db, "notifications"), orderBy("createdAt", "desc"))
+      : query(
+          collection(db, "notifications"),
+          where("restaurantId", "==", scopedRestaurantId),
+          orderBy("createdAt", "desc")
+        );
+
     const unsubscribe = onSnapshot(
-      query(collection(db, "notifications"), orderBy("createdAt", "desc")),
+      notificationsQuery,
       (snapshot) => {
-        setItems(snapshot.docs.map((doc) => ({ ...(doc.data() as Omit<NotificationDoc, "documentId">), documentId: doc.id })));
+        const data = snapshot.docs
+          .map((item) => ({
+            ...(item.data() as Omit<NotificationDoc, "documentId">),
+            documentId: item.id,
+          }))
+          .filter((item) => session.role === "admin" || !item.role || item.role === "restaurant")
+          .slice(0, 60);
+
+        setItems(data);
         setLoading(false);
         setError("");
       },
       (snapshotError) => {
         setItems([]);
         setLoading(false);
-        setError(snapshotError.message || "تعذر تحميل الإشعارات");
+        const message = snapshotError.message || "تعذر تحميل الإشعارات";
+        setError(message.includes("index") ? "الإشعارات تحتاج Firestore Index للاستعلام المقيد بالمطعم." : message);
       }
     );
 
     return unsubscribe;
-  }, [staffMode]);
+  }, [scopedRestaurantId, session, staffMode]);
 
-  const visibleItems = useMemo(() => items.filter((item) => canSee(item, session)).slice(0, 60), [items, session]);
+  const visibleItems = useMemo(() => items.slice(0, 60), [items]);
 
-  if (!staffMode) {
+  if (session && !staffMode) {
     return (
       <main dir="rtl" className="page customer-page">
         <header className="topbar">
@@ -123,10 +155,19 @@ export default function NotificationCenterPage() {
     );
   }
 
+  if (!session) {
+    return (
+      <main dir="rtl" className="page staff-page">
+        <section className="empty-note"><b>جاري فحص الحساب...</b></section>
+        <style jsx>{styles}</style>
+      </main>
+    );
+  }
+
   return (
     <main dir="rtl" className="page staff-page">
       <header className="topbar">
-        <Link href={roleHome[session!.role] || "/"} className="back">‹</Link>
+        <Link href={roleHome[session.role] || "/"} className="back">‹</Link>
         <div><h1>مركز الإشعارات</h1><p>طلبات وتنبيهات النظام</p></div>
         <span className="count">{visibleItems.filter((item) => !item.read).length}</span>
       </header>
@@ -170,6 +211,6 @@ const styles = `
   .customer-hero span{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.15);font-weight:900}.customer-hero h2{font-size:31px;margin:16px 0 8px}.customer-hero p{line-height:1.8;color:rgba(255,255,255,.82);font-weight:700}
   .primary{display:block;text-align:center;margin-top:18px;padding:15px;border-radius:18px;background:#ff5a00;color:#fff;text-decoration:none;font-weight:900}
   .cards{display:grid;gap:12px;margin-top:15px}.card{display:grid;gap:5px;padding:18px;border-radius:24px;background:#fff;color:#171717;text-decoration:none;box-shadow:0 14px 32px rgba(0,0,0,.07)}.card b{font-size:18px}.card small{color:#777;line-height:1.6;font-weight:700}
-  .empty-note{margin-top:15px;padding:20px;border-radius:24px;background:#fff3e8;text-align:center}.staff-page .empty-note{background:rgba(255,255,255,.06)}.empty-note b{font-size:18px}.empty-note p{margin:8px 0 0;color:#746b63;line-height:1.7}.staff-page .empty-note p{color:rgba(255,255,255,.62)}.error{background:#fee2e2;color:#991b1b}
+  .empty-note{margin-top:15px;padding:20px;border-radius:24px;background:#fff3e8;text-align:center}.staff-page .empty-note{background:rgba(255,255,255,.06)}.empty-note b{font-size:18px}.empty-note p{margin:8px 0 0;color:#746b63;line-height:1.7}.staff-page .empty-note p{color:rgba(255,255,255,.62)}.error{background:#fee2e2!important;color:#991b1b}.staff-page .error p{color:#991b1b}
   .list{display:grid;gap:12px}.notification{padding:18px;border-radius:24px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09)}.notification-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.notification-head small{color:rgba(255,255,255,.55)}.notification h2{margin:13px 0 7px;font-size:20px}.notification p{margin:0;color:rgba(255,255,255,.7);line-height:1.7}.notification a{display:inline-block;margin-top:12px;color:#ff9a55;font-weight:900;text-decoration:none}.badge{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12);font-size:11px;font-weight:900}.badge.order{background:rgba(255,90,0,.18);color:#ffb06f}.badge.warning{background:rgba(234,179,8,.18);color:#fde68a}
 `;
