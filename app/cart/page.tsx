@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { collection, doc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 import {
   clearFuseCart,
@@ -15,51 +15,48 @@ import {
 } from "@/lib/fuse-cart";
 
 function formatIQD(value: number) {
-  return `${Number(value || 0).toLocaleString()} د.ع`;
+  return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
+}
+
+function normalizePhone(value: string) {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[^0-9+]/g, "");
+}
+
+function validIraqiPhone(value: string) {
+  const phone = normalizePhone(value).replace(/^\+964/, "0");
+  return /^07\d{9}$/.test(phone);
 }
 
 export default function CartPage() {
   const router = useRouter();
   const [items, setItems] = useState<FuseCartItem[]>([]);
-  const [customerName, setCustomerName] = useState("زبون فيوز");
-  const [phone, setPhone] = useState("07700000000");
-  const [address, setAddress] = useState("بغداد");
+  const [customerName, setCustomerName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    function refresh() {
-      setItems(readFuseCart());
-    }
-
+    const refresh = () => setItems(readFuseCart());
     refresh();
     window.addEventListener(FUSE_CART_EVENT, refresh);
     window.addEventListener("storage", refresh);
-
     return () => {
       window.removeEventListener(FUSE_CART_EVENT, refresh);
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  const groupedRestaurants = useMemo(() => {
-    const map = new Map<string, FuseCartItem[]>();
-
-    for (const item of items) {
-      const key = item.restaurant || "FUSE";
-      map.set(key, [...(map.get(key) || []), item]);
-    }
-
-    return Array.from(map.entries());
-  }, [items]);
-
   const totals = fuseCartTotals(items);
+  const restaurant = items[0]?.restaurant || "FUSE";
 
   function changeQty(item: FuseCartItem, nextQty: number) {
-    const next = updateFuseCartQty(item.id, nextQty);
-    setItems(next);
+    setItems(updateFuseCartQty(item.id, nextQty));
   }
 
   function clearCart() {
@@ -70,46 +67,36 @@ export default function CartPage() {
   }
 
   async function submitOrder() {
+    if (saving) return;
     setMessage("");
     setError("");
 
-    if (!items.length) {
-      setError("السلة فارغة. أضف صنف واحد على الأقل حتى تكمل الطلب.");
-      return;
-    }
-
-    if (!customerName.trim()) {
-      setError("اكتب اسم الزبون.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      setError("اكتب رقم الهاتف.");
-      return;
-    }
-
-    if (!address.trim()) {
-      setError("اكتب عنوان التوصيل.");
-      return;
-    }
+    if (!items.length) return setError("السلة فارغة. أضف صنفاً واحداً على الأقل.");
+    if (!customerName.trim()) return setError("اكتب اسم الزبون.");
+    if (!validIraqiPhone(phone)) return setError("اكتب رقم هاتف عراقي صحيح مثل 07701234567.");
+    if (address.trim().length < 5) return setError("اكتب عنوان توصيل واضحاً.");
 
     setSaving(true);
-
     try {
-      const restaurant = items[0]?.restaurant || "FUSE";
-      const shortOrderId = "FUSE-" + Date.now().toString().slice(-6);
+      const cleanPhone = normalizePhone(phone).replace(/^\+964/, "0");
+      const shortOrderId = `FUSE-${Date.now().toString().slice(-6)}`;
+      const orderRef = doc(collection(db, "orders"));
+      const notificationRef = doc(collection(db, "notifications"));
+      const batch = writeBatch(db);
 
-      await addDoc(collection(db, "orders"), {
+      batch.set(orderRef, {
         orderId: shortOrderId,
         customerName: customerName.trim(),
         customer: customerName.trim(),
-        phone: phone.trim(),
-        customerPhone: phone.trim(),
+        phone: cleanPhone,
+        customerPhone: cleanPhone,
         address: address.trim(),
         note: note.trim(),
         restaurant,
         restaurantName: restaurant,
+        restaurantId: items[0]?.restaurantId || "",
         items: items.map((item) => ({
+          id: item.id,
           name: item.name,
           title: item.name,
           qty: item.qty,
@@ -126,27 +113,28 @@ export default function CartPage() {
         createdAt: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "notifications"), {
+      batch.set(notificationRef, {
         type: "order",
         title: "طلب جديد",
         message: `وصل طلب جديد من ${customerName.trim()} بقيمة ${formatIQD(totals.total)}.`,
         restaurant,
         restaurantName: restaurant,
-        phone: phone.trim(),
+        restaurantId: items[0]?.restaurantId || "",
+        phone: cleanPhone,
         orderId: shortOrderId,
         read: false,
         createdAt: serverTimestamp(),
       });
 
+      await batch.commit();
       clearFuseCart();
       setItems([]);
       setMessage(`تم إرسال الطلب بنجاح. رقم الطلب: ${shortOrderId}`);
-
       window.setTimeout(() => {
-        router.push(`/order-status?phone=${encodeURIComponent(phone.trim())}`);
-      }, 1200);
+        router.replace(`/order-status?orderId=${encodeURIComponent(shortOrderId)}`);
+      }, 900);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "تعذر إرسال الطلب. تأكد من الاتصال وحاول مرة ثانية.");
+      setError(submitError instanceof Error ? submitError.message : "تعذر إرسال الطلب. حاول مرة ثانية.");
     } finally {
       setSaving(false);
     }
@@ -155,182 +143,41 @@ export default function CartPage() {
   return (
     <main dir="rtl" className="app">
       <header className="top">
-        <Link className="back" href="/">‹</Link>
-        <div className="title">
-          <h1>السلة</h1>
-          <p>{items.length ? `${items.reduce((sum, item) => sum + item.qty, 0)} صنف جاهز للدفع` : "ابدأ بإضافة وجبات من المطاعم"}</p>
-        </div>
+        <button className="back" type="button" onClick={() => history.length > 1 ? history.back() : router.push("/restaurants")}>‹</button>
+        <div className="title"><h1>السلة</h1><p>{items.length ? `${items.reduce((sum, item) => sum + item.qty, 0)} قطعة من ${restaurant}` : "ابدأ بإضافة وجبات"}</p></div>
         <Link className="support" href="/support">دعم</Link>
       </header>
 
-      {items.length === 0 ? (
-        <section className="empty">
-          <div className="empty-icon">🛒</div>
-          <h2>السلة فارغة</h2>
-          <p>اختار مطعم وأضف صنف حتى يظهر هنا. هذه الصفحة متصلة فعلياً مع أزرار إضافة للسلة.</p>
-          <Link href="/restaurants/fayrouz">ابدأ الطلب من فيروز</Link>
-        </section>
+      {!items.length ? (
+        <section className="empty"><div>🛒</div><h2>السلة فارغة</h2><p>اختار مطعماً وأضف وجبتك.</p><Link href="/restaurants">تصفح المطاعم</Link></section>
       ) : (
         <>
-          <section className="items">
-            {groupedRestaurants.map(([restaurant, restaurantItems]) => (
-              <div className="group" key={restaurant}>
-                <div className="group-head">
-                  <h2>{restaurant}</h2>
-                  <small>{restaurantItems.length} صنف</small>
-                </div>
-
-                {restaurantItems.map((item) => (
-                  <article className="item" key={item.id}>
-                    <div className="thumb">{item.name.slice(0, 1)}</div>
-                    <div className="info">
-                      <h3>{item.name}</h3>
-                      <p>{item.category || "عام"} · {formatIQD(item.price)}</p>
-                      <div className="row">
-                        <div className="qty">
-                          <button type="button" onClick={() => changeQty(item, item.qty - 1)}>-</button>
-                          <b>{item.qty}</b>
-                          <button type="button" onClick={() => changeQty(item, item.qty + 1)}>+</button>
-                        </div>
-                        <strong>{formatIQD(item.price * item.qty)}</strong>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+          <section className="group">
+            <div className="groupHead"><h2>{restaurant}</h2><small>{items.length} صنف</small></div>
+            {items.map((item) => (
+              <article className="item" key={`${item.restaurantId || restaurant}-${item.id}`}>
+                <div className="thumb">{item.name.slice(0, 1)}</div>
+                <div className="info"><h3>{item.name}</h3><p>{item.category || "عام"} · {formatIQD(item.price)}</p><div className="row"><div className="qty"><button onClick={() => changeQty(item, item.qty - 1)}>−</button><b>{item.qty}</b><button onClick={() => changeQty(item, item.qty + 1)}>+</button></div><strong>{formatIQD(item.price * item.qty)}</strong></div></div>
+              </article>
             ))}
           </section>
 
-          <section className="summary">
-            <h2>ملخص الطلب</h2>
-            <div className="line"><span>المجموع الفرعي</span><b>{formatIQD(totals.subtotal)}</b></div>
-            <div className="line"><span>التوصيل</span><b>{formatIQD(totals.deliveryFee)}</b></div>
-            <div className="total"><span>الإجمالي</span><b>{formatIQD(totals.total)}</b></div>
-          </section>
+          <section className="summary"><h2>ملخص الطلب</h2><div><span>المجموع الفرعي</span><b>{formatIQD(totals.subtotal)}</b></div><div><span>التوصيل</span><b>{formatIQD(totals.deliveryFee)}</b></div><div className="total"><span>الإجمالي</span><b>{formatIQD(totals.total)}</b></div></section>
 
-          <section className="form">
-            <h2>بيانات التوصيل</h2>
-            <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="اسم الزبون" />
-            <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="رقم الهاتف" dir="ltr" />
-            <input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="العنوان" />
-            <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="ملاحظة اختيارية" />
-          </section>
+          <section className="form"><h2>بيانات التوصيل</h2><input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="الاسم الكامل" autoComplete="name"/><input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="07701234567" inputMode="tel" autoComplete="tel" dir="ltr"/><input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="المنطقة، الشارع، أقرب نقطة دالة" autoComplete="street-address"/><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="ملاحظة اختيارية للمطعم أو السائق"/></section>
 
-          <button type="button" className="checkout" onClick={submitOrder} disabled={saving}>
-            {saving ? "جاري إرسال الطلب..." : "تأكيد وإرسال الطلب"}
-          </button>
-
-          <button type="button" className="clear" onClick={clearCart}>تفريغ السلة</button>
+          <button className="checkout" type="button" onClick={submitOrder} disabled={saving}>{saving ? "جاري تثبيت الطلب..." : `تأكيد الطلب · ${formatIQD(totals.total)}`}</button>
+          <button className="clear" type="button" onClick={clearCart} disabled={saving}>تفريغ السلة</button>
         </>
       )}
 
-      {message ? <div className="message ok">{message}</div> : null}
-      {error ? <div className="message bad">{error}</div> : null}
+      {message && <div className="message ok">{message}</div>}
+      {error && <div className="message bad">{error}</div>}
+
+      <nav className="nav"><Link href="/">⌂<span>الرئيسية</span></Link><Link href="/restaurants">⌕<span>المطاعم</span></Link><Link href="/reels">▶<span>ريلز</span></Link><Link href="/order-status">▣<span>طلباتي</span></Link><Link href="/profile">●<span>حسابي</span></Link></nav>
 
       <style jsx>{`
-        :global(*) { box-sizing: border-box; }
-        :global(html), :global(body) { margin: 0; padding: 0; background: #efe8df; }
-
-        .app {
-          width: 100%;
-          max-width: 430px;
-          min-height: 100vh;
-          margin: 0 auto;
-          padding: 18px 18px 96px;
-          direction: rtl;
-          font-family: Cairo, system-ui, sans-serif;
-          background: linear-gradient(180deg, #fffaf4 0%, #ffffff 100%);
-          color: #151515;
-        }
-
-        .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
-        .back, .support {
-          min-width: 44px;
-          height: 44px;
-          border-radius: 16px;
-          background: white;
-          color: #151515;
-          text-decoration: none;
-          display: grid;
-          place-items: center;
-          padding: 0 12px;
-          font-size: 32px;
-          font-weight: 900;
-          box-shadow: 0 12px 28px rgba(0,0,0,.07);
-        }
-        .support { color: #ff4d00; font-size: 13px; }
-        .title { text-align: center; }
-        .title h1 { margin: 0; font-size: 28px; font-weight: 900; }
-        .title p { margin: 4px 0 0; color: #777; font-size: 13px; font-weight: 800; }
-
-        .empty, .summary, .form, .group {
-          background: white;
-          border-radius: 28px;
-          padding: 18px;
-          box-shadow: 0 14px 34px rgba(0,0,0,.08);
-          margin-bottom: 14px;
-        }
-        .empty { text-align: center; padding: 28px 18px; }
-        .empty-icon { width: 72px; height: 72px; border-radius: 26px; margin: 0 auto 12px; display: grid; place-items: center; background: #fff3e9; font-size: 34px; }
-        .empty h2 { margin: 0; font-size: 24px; font-weight: 900; }
-        .empty p { color: #777; line-height: 1.8; font-weight: 800; }
-        .empty a { display: block; border-radius: 22px; background: #ff4d00; color: white; text-decoration: none; padding: 15px; font-weight: 900; }
-
-        .items { display: grid; gap: 14px; }
-        .group-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .group-head h2 { margin: 0; font-size: 20px; font-weight: 900; }
-        .group-head small { color: #ff4d00; font-weight: 900; }
-        .item { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid #f1e9e0; }
-        .item:first-of-type { border-top: 0; }
-        .thumb { width: 74px; height: 74px; border-radius: 22px; background: linear-gradient(135deg,#151515,#303030); color: #ff8a00; display: grid; place-items: center; font-size: 32px; font-weight: 900; }
-        .info h3 { margin: 0; font-size: 17px; font-weight: 900; }
-        .info p { margin: 4px 0 10px; color: #777; font-size: 12px; font-weight: 800; }
-        .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .row strong { color: #ff4d00; font-weight: 900; }
-        .qty { display: inline-flex; align-items: center; gap: 10px; background: #fff3e9; border-radius: 16px; padding: 5px; }
-        .qty button { width: 30px; height: 30px; border: 0; border-radius: 12px; background: #ff4d00; color: white; font-size: 18px; font-weight: 900; }
-        .qty b { min-width: 20px; text-align: center; }
-
-        .summary h2, .form h2 { margin: 0 0 14px; font-size: 22px; font-weight: 900; }
-        .line, .total { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #666; font-weight: 800; }
-        .total { border-top: 1px solid #f1e9e0; padding-top: 14px; color: #151515; font-size: 20px; font-weight: 900; }
-        .total b { color: #ff4d00; }
-
-        .form { display: grid; gap: 10px; }
-        .form h2 { margin-bottom: 4px; }
-        .form input { width: 100%; border: 1px solid #f1e9e0; border-radius: 18px; padding: 14px; font-family: inherit; font-weight: 800; outline: none; }
-        .form input:focus { border-color: #ff8a00; box-shadow: 0 0 0 3px rgba(255,77,0,.10); }
-
-        .checkout, .clear { width: 100%; border: 0; border-radius: 22px; padding: 16px; font-family: inherit; font-weight: 900; margin-top: 10px; }
-        .checkout { background: #ff4d00; color: white; box-shadow: 0 14px 30px rgba(255,77,0,.24); }
-        .checkout:disabled { opacity: .65; }
-        .clear { background: #151515; color: white; }
-        .message { margin-top: 12px; border-radius: 20px; padding: 14px; font-weight: 900; line-height: 1.7; }
-        .ok { background: #dcfce7; color: #166534; }
-        .bad { background: #fee2e2; color: #991b1b; }
-
-        .nav {
-          position: fixed;
-          left: 50%;
-          bottom: 0;
-          transform: translateX(-50%);
-          width: 100%;
-          max-width: 430px;
-          height: 86px;
-          background: #ffffff;
-          box-shadow: 0 -12px 32px rgba(0,0,0,.08);
-          display: grid;
-          grid-template-columns: repeat(5,1fr);
-          align-items: center;
-          text-align: center;
-          color: #777;
-          font-size: 14px;
-          font-weight: 800;
-          z-index: 50;
-          border-top: 1px solid rgba(0,0,0,.04);
-        }
-        .nav a { min-height: 64px; text-decoration: none; color: inherit; line-height: 1.45; display: grid; place-content: center; font-size: 14px; font-weight: 900; }
-        .nav .active { color: #ff4d00; font-weight: 900; }
+        :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;background:#efe8df}.app{width:100%;max-width:430px;min-height:100dvh;margin:auto;padding:18px 16px 105px;background:linear-gradient(180deg,#fffaf4,#fff);color:#171717;font-family:Cairo,system-ui,sans-serif}.top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px;margin-bottom:18px}.back,.support{height:44px;border:0;border-radius:15px;background:#fff;color:#171717;display:grid;place-items:center;text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.08);font-family:inherit;font-weight:900}.back{font-size:30px}.support{font-size:12px;color:#f45100}.title{text-align:center}.title h1{margin:0;font-size:27px}.title p{margin:3px 0 0;color:#777;font-size:11px;font-weight:800}.empty,.group,.summary,.form{background:#fff;border-radius:25px;padding:17px;margin-bottom:13px;box-shadow:0 12px 30px rgba(0,0,0,.07)}.empty{text-align:center;padding:30px 18px}.empty>div{font-size:42px}.empty h2{margin:8px 0}.empty p{color:#777}.empty a{display:block;padding:14px;border-radius:17px;background:#f45100;color:#fff;text-decoration:none;font-weight:900}.groupHead{display:flex;justify-content:space-between;align-items:center}.groupHead h2{margin:0}.groupHead small{color:#f45100;font-weight:900}.item{display:grid;grid-template-columns:68px 1fr;gap:11px;padding:13px 0;border-top:1px solid #f3e8dc}.item:first-of-type{border-top:0}.thumb{width:68px;height:68px;border-radius:20px;background:#171717;color:#ff7800;display:grid;place-items:center;font-size:29px;font-weight:900}.info h3{margin:0;font-size:16px}.info p{margin:3px 0 9px;color:#777;font-size:11px;font-weight:700}.row,.summary>div{display:flex;justify-content:space-between;align-items:center;gap:8px}.row strong,.total b{color:#f45100}.qty{display:flex;align-items:center;gap:9px;padding:4px;border-radius:14px;background:#fff0e5}.qty button{width:30px;height:30px;border:0;border-radius:10px;background:#f45100;color:#fff;font-size:18px;font-weight:900}.qty b{min-width:18px;text-align:center}.summary h2,.form h2{margin:0 0 13px}.summary>div{margin:9px 0;color:#666;font-weight:800}.summary .total{padding-top:13px;border-top:1px solid #eee;color:#171717;font-size:19px}.form{display:grid;gap:10px}.form input{width:100%;border:1px solid #eee2d8;border-radius:16px;padding:14px;font:inherit;font-size:13px;outline:none}.form input:focus{border-color:#ff7800;box-shadow:0 0 0 3px rgba(255,120,0,.12)}.checkout,.clear{width:100%;border:0;border-radius:19px;padding:16px;font:inherit;font-weight:900;margin-top:9px}.checkout{background:#f45100;color:#fff}.checkout:disabled,.clear:disabled{opacity:.55}.clear{background:#171717;color:#fff}.message{margin-top:12px;border-radius:18px;padding:13px;font-weight:900}.ok{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}.nav{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;height:70px;background:rgba(255,255,255,.97);border-radius:23px;box-shadow:0 12px 35px rgba(0,0,0,.16);display:grid;grid-template-columns:repeat(5,1fr);padding:6px;z-index:99}.nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#666;text-decoration:none;font-size:18px;font-weight:900}.nav span{font-size:9px}
       `}</style>
     </main>
   );
