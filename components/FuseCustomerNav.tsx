@@ -3,15 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type IconName = "home" | "search" | "reels" | "orders" | "heart";
+type IconName = "home" | "search" | "reels" | "orders" | "user";
 
-const items: Array<{ href: string; label: string; icon?: IconName; profile?: boolean }> = [
+const items: Array<{ href: string; label: string; icon: IconName }> = [
   { href: "/", label: "الرئيسية", icon: "home" },
-  { href: "/restaurants", label: "البحث", icon: "search" },
-  { href: "/reels", label: "الريلز", icon: "reels" },
+  { href: "/restaurants", label: "المطاعم", icon: "search" },
+  { href: "/reels", label: "ريلز", icon: "reels" },
   { href: "/order-status", label: "طلباتي", icon: "orders" },
-  { href: "/favorites", label: "المفضلة", icon: "heart" },
-  { href: "/profile", label: "حسابي", profile: true },
+  { href: "/profile", label: "حسابي", icon: "user" },
 ];
 
 const hiddenPrefixes = [
@@ -51,12 +50,12 @@ function isItemActive(pathname: string, href: string) {
 
 function NavIcon({ name }: { name: IconName }) {
   const common = {
-    width: 25,
-    height: 25,
+    width: 24,
+    height: 24,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: 1.9,
+    strokeWidth: 2,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
     "aria-hidden": true,
@@ -92,15 +91,16 @@ function NavIcon({ name }: { name: IconName }) {
   if (name === "orders") {
     return (
       <svg {...common}>
-        <path d="M6 4h12l1 17-3-2-2 2-2-2-2 2-2-2-3 2Z" />
-        <path d="M9 9h6M9 13h6" />
+        <rect x="6" y="3" width="12" height="18" rx="2" />
+        <path d="M9 8h6M9 12h6M9 16h4" />
       </svg>
     );
   }
 
   return (
     <svg {...common}>
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z" />
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c.8-4 3.2-6 7-6s6.2 2 7 6" />
     </svg>
   );
 }
@@ -125,15 +125,9 @@ export default function FuseCustomerNav() {
             className={active ? "is-active" : undefined}
           >
             <span className="fuse-nav-icon">
-              {item.profile ? (
-                <span className="fuse-nav-avatar" aria-hidden="true">
-                  F
-                  <i />
-                </span>
-              ) : (
-                <NavIcon name={item.icon!} />
-              )}
+              <NavIcon name={item.icon} />
             </span>
+            <b>{item.label}</b>
           </Link>
         );
       })}
