@@ -27,21 +27,10 @@ service cloud.firestore {
                 : '';
     }
 
-    function isAdmin() {
-      return role() == 'admin';
-    }
-
-    function isRestaurant() {
-      return role() == 'restaurant';
-    }
-
-    function isDriver() {
-      return role() == 'driver';
-    }
-
-    function isCustomer() {
-      return role() == 'customer';
-    }
+    function isAdmin() { return role() == 'admin'; }
+    function isRestaurant() { return role() == 'restaurant'; }
+    function isDriver() { return role() == 'driver'; }
+    function isCustomer() { return role() == 'customer'; }
 
     function restaurantId() {
       return !signedIn()
@@ -54,15 +43,11 @@ service cloud.firestore {
     }
 
     function orderOwnedByCustomer(data) {
-      return signedIn()
-        && data.customerUid is string
-        && data.customerUid == request.auth.uid;
+      return signedIn() && data.customerUid is string && data.customerUid == request.auth.uid;
     }
 
     function restaurantOwns(data) {
-      return isRestaurant()
-        && restaurantId() != ''
-        && data.restaurantId == restaurantId();
+      return isRestaurant() && restaurantId() != '' && data.restaurantId == restaurantId();
     }
 
     function driverOwns(data) {
@@ -73,8 +58,7 @@ service cloud.firestore {
     }
 
     function restaurantExists(id) {
-      return id is string
-        && id.size() > 0
+      return id is string && id.size() > 0
         && exists(/databases/$(database)/documents/restaurants/$(id));
     }
 
@@ -134,6 +118,24 @@ service cloud.firestore {
       ]);
     }
 
+    function validApplicationCreate(kind) {
+      return isCustomer()
+        && request.resource.data.applicantUid == request.auth.uid
+        && request.resource.data.kind == kind
+        && request.resource.data.status == 'pending'
+        && request.resource.data.applicantName is string
+        && request.resource.data.applicantName.size() >= 2
+        && request.resource.data.applicantName.size() <= 80
+        && request.resource.data.phone is string
+        && request.resource.data.phone.matches('^07[0-9]{9}$')
+        && request.resource.data.city is string
+        && request.resource.data.city.size() >= 2
+        && request.resource.data.city.size() <= 80
+        && request.resource.data.details is string
+        && request.resource.data.details.size() >= 10
+        && request.resource.data.details.size() <= 1000;
+    }
+
     match /restaurants/{id} {
       allow read: if true;
       allow create, delete: if isAdmin();
@@ -151,19 +153,16 @@ service cloud.firestore {
     match /menu/{id} {
       allow read: if true;
       allow create: if isAdmin() || (
-        isRestaurant()
-        && restaurantId() != ''
+        isRestaurant() && restaurantId() != ''
         && request.resource.data.restaurantId == restaurantId()
       );
       allow update: if isAdmin() || (
-        isRestaurant()
-        && restaurantId() != ''
+        isRestaurant() && restaurantId() != ''
         && resource.data.restaurantId == restaurantId()
         && request.resource.data.restaurantId == resource.data.restaurantId
       );
       allow delete: if isAdmin() || (
-        isRestaurant()
-        && restaurantId() != ''
+        isRestaurant() && restaurantId() != ''
         && resource.data.restaurantId == restaurantId()
       );
     }
@@ -190,13 +189,11 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.orderId == request.resource.data.orderId
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId;
       allow read: if isAdmin() || (
-        isRestaurant()
-        && restaurantId() != ''
+        isRestaurant() && restaurantId() != ''
         && resource.data.restaurantId == restaurantId()
       );
       allow update: if isAdmin() || (
-        isRestaurant()
-        && restaurantId() != ''
+        isRestaurant() && restaurantId() != ''
         && resource.data.restaurantId == restaurantId()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
       );
@@ -256,6 +253,28 @@ service cloud.firestore {
           'name', 'phone', 'photoURL', 'address', 'updatedAt'
         ]);
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
+    match /driverApplications/{uid} {
+      allow create: if uid == request.auth.uid
+        && validApplicationCreate('driver')
+        && request.resource.data.vehicleType is string
+        && request.resource.data.vehicleType in ['دراجة نارية', 'سيارة', 'دراجة هوائية'];
+      allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /restaurantApplications/{uid} {
+      allow create: if uid == request.auth.uid
+        && validApplicationCreate('restaurant')
+        && request.resource.data.restaurantName is string
+        && request.resource.data.restaurantName.size() >= 2
+        && request.resource.data.restaurantName.size() <= 120
+        && request.resource.data.restaurantAddress is string
+        && request.resource.data.restaurantAddress.size() >= 8
+        && request.resource.data.restaurantAddress.size() <= 220;
+      allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
+      allow update, delete: if isAdmin();
     }
 
     match /drivers/{id} {
