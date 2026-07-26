@@ -6,8 +6,9 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { auth, db } from "../firebase";
+import { performFuseLogout } from "@/lib/fuse-logout";
 
-type ProfileData = {
+ type ProfileData = {
   name?: string;
   displayName?: string;
   phone?: string;
@@ -176,10 +177,18 @@ export default function SettingsPage() {
         {error ? <p className="message bad">{error}</p> : null}
       </section>
 
+      <section className="links">
+        <h2>الحساب والقانونية</h2>
+        <Link href="/privacy"><span>سياسة الخصوصية</span><b>‹</b></Link>
+        <Link href="/terms"><span>الشروط والأحكام</span><b>‹</b></Link>
+        <Link href="/data-deletion" className="danger-link"><span>طلب حذف الحساب والبيانات</span><b>‹</b></Link>
+        <button type="button" onClick={() => performFuseLogout("/")}>تسجيل الخروج</button>
+      </section>
+
       <section className="note"><b>حماية الحساب</b><p>لا يمكن من هذه الصفحة تغيير البريد أو الدور أو صلاحيات الإدارة والمطعم والسائق.</p></section>
 
       <style jsx>{`
-        :global(*){box-sizing:border-box}:global(body){margin:0;background:#efe8df}.page,.state{width:100%;max-width:430px;min-height:100dvh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);font-family:Cairo,Arial,sans-serif;color:#171717}.page{padding:18px 16px 50px}.state{display:grid;place-items:center;font-weight:900}.top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px;margin-bottom:18px;text-align:center}.top h1{margin:2px 0 0;font-size:24px}.top small{color:#ff5a00;font-weight:900}.back,.support{height:44px;border-radius:15px;background:#fff;display:grid;place-items:center;text-decoration:none;color:#171717;box-shadow:0 8px 24px rgba(0,0,0,.08);font-weight:900}.back{font-size:30px}.support{font-size:12px;color:#ff5a00}.card,.note{background:#fff;border-radius:28px;padding:18px;box-shadow:0 14px 34px rgba(0,0,0,.07)}.identity{display:flex;align-items:center;gap:12px;padding-bottom:16px;border-bottom:1px solid #f0e8df}.avatar{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#ff8a00,#ff3d00);color:#fff;font-size:24px;font-weight:950}.identity div:last-child{display:grid;gap:4px;min-width:0}.identity b{font-size:13px;overflow-wrap:anywhere}.identity span{font-size:11px;color:#888;font-weight:800}form{display:grid;gap:14px;margin-top:18px}label{display:grid;gap:7px;font-size:13px;font-weight:900}input,textarea{width:100%;border:1px solid #ece3da;border-radius:16px;padding:14px;background:#fffaf6;font:inherit;outline:none}textarea{min-height:100px;resize:vertical}input:focus,textarea:focus{border-color:#ff6a00;box-shadow:0 0 0 3px rgba(255,106,0,.12)}button{border:0;border-radius:17px;padding:15px;background:#ff5a00;color:#fff;font:inherit;font-weight:950;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.message{margin:14px 0 0;border-radius:15px;padding:12px;font-size:12px;font-weight:900}.ok{background:#edfff2;color:#176b35}.bad{background:#fff0f0;color:#a52323}.note{margin-top:14px;background:linear-gradient(135deg,#171717,#2d2d2d);color:#fff}.note p{margin:7px 0 0;color:#ccc;font-size:12px;line-height:1.7}
+        :global(*){box-sizing:border-box}:global(body){margin:0;background:#efe8df}.page,.state{width:100%;max-width:430px;min-height:100dvh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);font-family:Cairo,Arial,sans-serif;color:#171717}.page{padding:18px 16px 50px}.state{display:grid;place-items:center;font-weight:900}.top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:8px;margin-bottom:18px;text-align:center}.top h1{margin:2px 0 0;font-size:24px}.top small{color:#ff5a00;font-weight:900}.back,.support{height:44px;border-radius:15px;background:#fff;display:grid;place-items:center;text-decoration:none;color:#171717;box-shadow:0 8px 24px rgba(0,0,0,.08);font-weight:900}.back{font-size:30px}.support{font-size:12px;color:#ff5a00}.card,.note,.links{background:#fff;border-radius:28px;padding:18px;box-shadow:0 14px 34px rgba(0,0,0,.07)}.identity{display:flex;align-items:center;gap:12px;padding-bottom:16px;border-bottom:1px solid #f0e8df}.avatar{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#ff8a00,#ff3d00);color:#fff;font-size:24px;font-weight:950}.identity div:last-child{display:grid;gap:4px;min-width:0}.identity b{font-size:13px;overflow-wrap:anywhere}.identity span{font-size:11px;color:#888;font-weight:800}form{display:grid;gap:14px;margin-top:18px}label{display:grid;gap:7px;font-size:13px;font-weight:900}input,textarea{width:100%;border:1px solid #ece3da;border-radius:16px;padding:14px;background:#fffaf6;font:inherit;outline:none}textarea{min-height:100px;resize:vertical}input:focus,textarea:focus{border-color:#ff6a00;box-shadow:0 0 0 3px rgba(255,106,0,.12)}button{border:0;border-radius:17px;padding:15px;background:#ff5a00;color:#fff;font:inherit;font-weight:950;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}.message{margin:14px 0 0;border-radius:15px;padding:12px;font-size:12px;font-weight:900}.ok{background:#edfff2;color:#176b35}.bad{background:#fff0f0;color:#a52323}.links{margin-top:14px;padding:10px}.links h2{font-size:15px;margin:7px 8px 9px}.links a{min-height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 11px;border-bottom:1px solid #f0e8df;color:#171717;text-decoration:none;font-size:13px;font-weight:900}.links a b{font-size:24px;color:#aaa}.links .danger-link{color:#dc2626}.links button{width:100%;margin-top:8px;background:#fff3e9;color:#e65300}.note{margin-top:14px;background:linear-gradient(135deg,#171717,#2d2d2d);color:#fff}.note p{margin:7px 0 0;color:#ccc;font-size:12px;line-height:1.7}
       `}</style>
     </main>
   );
