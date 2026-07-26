@@ -60,7 +60,7 @@ function collectionName(kind: RequestKind) {
 function statusLabel(value?: string) {
   if (value === "approved") return "مقبول";
   if (value === "rejected") return "مرفوض";
-  if (value === "completed") return "مكتمل";
+  if (value === "completed") return "تمت المعالجة";
   return "قيد المراجعة";
 }
 
@@ -159,19 +159,20 @@ export default function AdminRequestsPage() {
               {item.details ? <div className="details">{item.details}</div> : null}
               <div className="actions">
                 {item.kind === "deletion" ? (
-                  <button type="button" disabled={Boolean(busy)} onClick={() => changeStatus(item, "completed")}>{busy === `${item.kind}:${item.id}:completed` ? "جاري..." : "تم تنفيذ الحذف"}</button>
+                  <button type="button" disabled={Boolean(busy)} onClick={() => changeStatus(item, "completed")}>{busy === `${item.kind}:${item.id}:completed` ? "جاري..." : "تأكيد معالجة الطلب"}</button>
                 ) : (
                   <button type="button" disabled={Boolean(busy)} onClick={() => changeStatus(item, "approved")}>{busy === `${item.kind}:${item.id}:approved` ? "جاري..." : "قبول"}</button>
                 )}
                 <button className="reject" type="button" disabled={Boolean(busy)} onClick={() => changeStatus(item, "rejected")}>{busy === `${item.kind}:${item.id}:rejected` ? "جاري..." : "رفض"}</button>
               </div>
+              {item.kind === "deletion" ? <small className="warning">تنفيذ حذف Firebase Authentication وبيانات المستخدم يتم يدوياً أو عبر وظيفة خادم آمنة، وليس من المتصفح.</small> : null}
             </article>
           ))}
         </section>
       </section>
 
       <style jsx>{`
-        *{box-sizing:border-box}.page{min-height:100vh;background:#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1180px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.top small{color:#ff7a00;font-weight:900}.top h1{margin:4px 0;font-size:34px}.top p{margin:0;color:#aaa}.top nav{display:flex;gap:8px;flex-wrap:wrap}.top a{color:#fff;text-decoration:none;background:#171717;border:1px solid #333;padding:10px 13px;border-radius:14px;font-weight:900}.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.filters button{border:1px solid #333;background:#111;color:#bbb;padding:11px 16px;border-radius:14px;font-weight:900;cursor:pointer}.filters button.active{background:#ff7a00;color:#111;border-color:#ff7a00}.alert{background:#401313;color:#ffb4b4;padding:14px;border-radius:16px;margin-bottom:14px}.empty{background:#111;border:1px solid #252525;border-radius:20px;padding:28px;text-align:center;color:#aaa}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.card{background:linear-gradient(145deg,#171717,#0b0b0b);border:1px solid #2b2b2b;border-radius:24px;padding:18px}.cardHead{display:flex;justify-content:space-between;gap:12px}.cardHead span{color:#ff7a00;font-weight:900}.cardHead em{font-style:normal;background:#282828;padding:6px 10px;border-radius:999px;font-size:12px}.card h2{margin:16px 0 7px}.card p{color:#aaa;line-height:1.7;min-height:44px}.details{background:#101010;border:1px solid #292929;border-radius:14px;padding:12px;color:#ccc;line-height:1.7;margin-bottom:13px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions button{border:0;border-radius:14px;padding:12px;font-weight:900;background:#ff7a00;color:#111;cursor:pointer}.actions button.reject{background:#341414;color:#ff9b9b;border:1px solid #5b2020}.actions button:disabled{opacity:.55;cursor:not-allowed}@media(max-width:650px){.top{align-items:flex-start;flex-direction:column}.top h1{font-size:28px}}
+        *{box-sizing:border-box}.page{min-height:100vh;background:#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1180px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.top small{color:#ff7a00;font-weight:900}.top h1{margin:4px 0;font-size:34px}.top p{margin:0;color:#aaa}.top nav{display:flex;gap:8px;flex-wrap:wrap}.top a{color:#fff;text-decoration:none;background:#171717;border:1px solid #333;padding:10px 13px;border-radius:14px;font-weight:900}.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.filters button{border:1px solid #333;background:#111;color:#bbb;padding:11px 16px;border-radius:14px;font-weight:900;cursor:pointer}.filters button.active{background:#ff7a00;color:#111;border-color:#ff7a00}.alert{background:#401313;color:#ffb4b4;padding:14px;border-radius:16px;margin-bottom:14px}.empty{background:#111;border:1px solid #252525;border-radius:20px;padding:28px;text-align:center;color:#aaa}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.card{background:linear-gradient(145deg,#171717,#0b0b0b);border:1px solid #2b2b2b;border-radius:24px;padding:18px}.cardHead{display:flex;justify-content:space-between;gap:12px}.cardHead span{color:#ff7a00;font-weight:900}.cardHead em{font-style:normal;background:#282828;padding:6px 10px;border-radius:999px;font-size:12px}.card h2{margin:16px 0 7px}.card p{color:#aaa;line-height:1.7;min-height:44px}.details{background:#101010;border:1px solid #292929;border-radius:14px;padding:12px;color:#ccc;line-height:1.7;margin-bottom:13px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions button{border:0;border-radius:14px;padding:12px;font-weight:900;background:#ff7a00;color:#111;cursor:pointer}.actions button.reject{background:#341414;color:#ff9b9b;border:1px solid #5b2020}.actions button:disabled{opacity:.55;cursor:not-allowed}.warning{display:block;margin-top:12px;color:#d6a46f;line-height:1.7}@media(max-width:650px){.top{align-items:flex-start;flex-direction:column}.top h1{font-size:28px}}
       `}</style>
     </main>
   );
