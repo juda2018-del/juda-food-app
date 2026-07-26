@@ -35,6 +35,11 @@ const hiddenPrefixes = [
   "/dispatch",
   "/smart-",
   "/live-map",
+  "/reels",
+  "/order-status",
+  "/cart",
+  "/profile",
+  "/restaurants/",
 ];
 
 function isItemActive(pathname: string, href: string) {
@@ -43,7 +48,7 @@ function isItemActive(pathname: string, href: string) {
     return pathname === "/restaurants" || pathname.startsWith("/restaurants/");
   }
   if (href === "/order-status") {
-    return pathname === "/order-status" || pathname === "/orders" || pathname === "/live-orders";
+    return pathname === "/order-status" || pathname === "/orders";
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
