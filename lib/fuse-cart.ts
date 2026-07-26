@@ -17,11 +17,20 @@ function safeNumber(value: unknown, fallback = 0) {
   return Number.isFinite(next) ? next : fallback;
 }
 
+function restaurantKey(item: Pick<FuseCartItem, "restaurant" | "restaurantId">) {
+  return String(item.restaurantId || item.restaurant || "FUSE").trim().toLowerCase();
+}
+
+function itemKey(item: Pick<FuseCartItem, "id" | "restaurant" | "restaurantId">) {
+  return `${restaurantKey(item)}::${String(item.id).trim()}`;
+}
+
 export function normalizeCartItem(item: Partial<FuseCartItem>): FuseCartItem | null {
   const id = String(item.id || "").trim();
   const name = String(item.name || "صنف").trim();
   const restaurant = String(item.restaurant || "FUSE").trim();
-  const price = safeNumber(item.price, 0);
+  const restaurantId = String(item.restaurantId || "").trim() || undefined;
+  const price = Math.max(0, safeNumber(item.price, 0));
   const qty = Math.max(1, Math.round(safeNumber(item.qty, 1)));
 
   if (!id) return null;
@@ -30,7 +39,7 @@ export function normalizeCartItem(item: Partial<FuseCartItem>): FuseCartItem | n
     id,
     name,
     restaurant,
-    restaurantId: item.restaurantId,
+    restaurantId,
     category: item.category || "عام",
     price,
     qty,
@@ -48,9 +57,13 @@ export function readFuseCart(): FuseCartItem[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed
+    const cleanItems = parsed
       .map((item) => normalizeCartItem(item))
       .filter((item): item is FuseCartItem => Boolean(item));
+
+    // كل طلب في FUSE يخص مطعماً واحداً فقط. ننظف أي سلة قديمة مختلطة.
+    const firstRestaurant = cleanItems[0] ? restaurantKey(cleanItems[0]) : "";
+    return cleanItems.filter((item) => restaurantKey(item) === firstRestaurant);
   } catch {
     return [];
   }
@@ -63,8 +76,15 @@ export function writeFuseCart(items: FuseCartItem[]) {
     .map((item) => normalizeCartItem(item))
     .filter((item): item is FuseCartItem => Boolean(item));
 
-  window.localStorage.setItem(FUSE_CART_KEY, JSON.stringify(cleanItems));
-  window.dispatchEvent(new CustomEvent(FUSE_CART_EVENT, { detail: cleanItems }));
+  const firstRestaurant = cleanItems[0] ? restaurantKey(cleanItems[0]) : "";
+  const singleRestaurantItems = cleanItems.filter(
+    (item) => restaurantKey(item) === firstRestaurant
+  );
+
+  window.localStorage.setItem(FUSE_CART_KEY, JSON.stringify(singleRestaurantItems));
+  window.dispatchEvent(
+    new CustomEvent(FUSE_CART_EVENT, { detail: singleRestaurantItems })
+  );
 }
 
 export function addFuseCartItem(item: FuseCartItem) {
@@ -73,8 +93,15 @@ export function addFuseCartItem(item: FuseCartItem) {
   const normalized = normalizeCartItem(item);
   if (!normalized) return readFuseCart();
 
-  const current = readFuseCart();
-  const index = current.findIndex((cartItem) => cartItem.id === normalized.id);
+  let current = readFuseCart();
+
+  // الانتقال إلى مطعم آخر يبدأ سلة جديدة حتى لا يصل الطلب إلى المطعم الخطأ.
+  if (current.length && restaurantKey(current[0]) !== restaurantKey(normalized)) {
+    current = [];
+  }
+
+  const normalizedKey = itemKey(normalized);
+  const index = current.findIndex((cartItem) => itemKey(cartItem) === normalizedKey);
 
   if (index >= 0) {
     const next = current.map((cartItem, itemIndex) =>
