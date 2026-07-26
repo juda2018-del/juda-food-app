@@ -5,10 +5,26 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasUserProfile() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function profileData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function role() {
-      return signedIn() && request.auth.token.role is string
-        ? request.auth.token.role
-        : '';
+      return !signedIn()
+        ? ''
+        : request.auth.token.role is string
+          ? request.auth.token.role
+          : request.auth.token.fuseRole is string
+            ? request.auth.token.fuseRole
+            : hasUserProfile() && profileData().role is string
+              ? profileData().role
+              : hasUserProfile() && profileData().fuseRole is string
+                ? profileData().fuseRole
+                : '';
     }
 
     function isAdmin() {
@@ -28,9 +44,13 @@ service cloud.firestore {
     }
 
     function restaurantId() {
-      return signedIn() && request.auth.token.restaurantId is string
-        ? request.auth.token.restaurantId
-        : '';
+      return !signedIn()
+        ? ''
+        : request.auth.token.restaurantId is string
+          ? request.auth.token.restaurantId
+          : hasUserProfile() && profileData().restaurantId is string
+            ? profileData().restaurantId
+            : '';
     }
 
     function orderOwnedByCustomer(data) {
@@ -67,7 +87,7 @@ service cloud.firestore {
     }
 
     function validOrderCreate() {
-      return signedIn()
+      return isCustomer()
         && request.resource.data.keys().hasAll([
           'orderId', 'customerUid', 'customerName', 'phone', 'address',
           'restaurantId', 'restaurantName', 'items', 'subtotal',
@@ -161,7 +181,7 @@ service cloud.firestore {
     }
 
     match /notifications/{id} {
-      allow create: if signedIn()
+      allow create: if isCustomer()
         && request.resource.data.type == 'order'
         && request.resource.data.restaurantId is string
         && request.resource.data.orderId is string
@@ -209,11 +229,12 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow create: if signedIn()
         && request.auth.uid == uid
-        && request.resource.data.role == 'customer';
+        && request.resource.data.role == 'customer'
+        && !request.resource.data.keys().hasAny(['restaurantId', 'fuseRole', 'permissions']);
       allow update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name', 'phone', 'photoURL', 'updatedAt'
+          'name', 'phone', 'photoURL', 'address', 'updatedAt'
         ]);
       allow delete: if isAdmin();
     }
@@ -227,11 +248,12 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
       allow create: if signedIn()
         && request.auth.uid == uid
-        && request.resource.data.role == 'customer';
+        && request.resource.data.role == 'customer'
+        && !request.resource.data.keys().hasAny(['restaurantId', 'fuseRole', 'permissions']);
       allow update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name', 'phone', 'photoURL', 'updatedAt'
+          'name', 'phone', 'photoURL', 'address', 'updatedAt'
         ]);
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
     }
