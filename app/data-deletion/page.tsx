@@ -23,7 +23,11 @@ export default function DataDeletionPage() {
     if (!currentUser) return;
     try {
       const requestSnap = await getDoc(doc(db, "accountDeletionRequests", currentUser.uid));
-      if (requestSnap.exists()) setStatus(String(requestSnap.data().status || "pending"));
+      if (requestSnap.exists()) {
+        const data = requestSnap.data();
+        setStatus(String(data.status || "pending"));
+        setReason(String(data.reason || ""));
+      }
     } catch {
       // A missing request is normal.
     }
@@ -32,6 +36,7 @@ export default function DataDeletionPage() {
   async function submitRequest() {
     setError("");
     if (!user) return router.push("/login?next=/data-deletion");
+    if (status && status !== "pending") return setError("هذا الطلب مغلق بعد قرار الإدارة. تواصل مع الدعم إذا تحتاج مساعدة إضافية.");
     if (confirmText.trim() !== "حذف حسابي") return setError('اكتب عبارة "حذف حسابي" للتأكيد.');
     if (reason.trim().length > 500) return setError("سبب الحذف طويل جداً.");
 
@@ -44,7 +49,7 @@ export default function DataDeletionPage() {
         status: "pending",
         requestedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: Boolean(status) });
       setStatus("pending");
       setConfirmText("");
     } catch {
@@ -53,6 +58,8 @@ export default function DataDeletionPage() {
       setSaving(false);
     }
   }
+
+  const closed = status === "completed" || status === "rejected";
 
   return (
     <main dir="rtl" style={{minHeight:"100dvh",background:"linear-gradient(180deg,#fff7f7,#fff)",fontFamily:'Arial,"Cairo",sans-serif',padding:"18px 16px 60px",color:"#171717"}}>
@@ -83,6 +90,7 @@ export default function DataDeletionPage() {
             {status ? (
               <section style={{marginTop:14,background:"#fff",borderRadius:22,padding:18,boxShadow:"0 10px 28px rgba(0,0,0,.06)"}}>
                 <b>حالة طلبك: </b><span style={{color:status === "completed" ? "#15803d" : status === "rejected" ? "#b91c1c" : "#d97706",fontWeight:900}}>{status === "completed" ? "مكتمل" : status === "rejected" ? "مرفوض" : "قيد المراجعة"}</span>
+                {closed ? <p style={{margin:"9px 0 0",color:"#777",fontSize:12,lineHeight:1.7}}>تم إغلاق الطلب بعد قرار الإدارة. للاستفسار أو الاعتراض استخدم صفحة الدعم.</p> : null}
               </section>
             ) : null}
 
@@ -91,13 +99,15 @@ export default function DataDeletionPage() {
               <div dir="ltr" style={{padding:"13px 14px",borderRadius:14,background:"#f7f7f7",fontSize:13,overflowWrap:"anywhere"}}>{user.email || "بدون بريد"}</div>
 
               <label style={{display:"block",fontWeight:900,fontSize:13,margin:"16px 0 7px"}}>سبب الحذف — اختياري</label>
-              <textarea value={reason} onChange={(e)=>setReason(e.target.value)} maxLength={500} placeholder="اكتب السبب حتى نطوّر الخدمة" style={{width:"100%",minHeight:110,border:"1px solid #ddd",borderRadius:16,padding:13,fontFamily:"inherit",resize:"vertical"}} />
+              <textarea disabled={closed} value={reason} onChange={(e)=>setReason(e.target.value)} maxLength={500} placeholder="اكتب السبب حتى نطوّر الخدمة" style={{width:"100%",minHeight:110,border:"1px solid #ddd",borderRadius:16,padding:13,fontFamily:"inherit",resize:"vertical",opacity:closed?.65:1}} />
 
-              <label style={{display:"block",fontWeight:900,fontSize:13,margin:"16px 0 7px"}}>للتأكيد اكتب: حذف حسابي</label>
-              <input value={confirmText} onChange={(e)=>setConfirmText(e.target.value)} placeholder="حذف حسابي" style={{width:"100%",height:50,border:"1px solid #ddd",borderRadius:15,padding:"0 13px",fontFamily:"inherit"}} />
+              {!closed ? <>
+                <label style={{display:"block",fontWeight:900,fontSize:13,margin:"16px 0 7px"}}>للتأكيد اكتب: حذف حسابي</label>
+                <input value={confirmText} onChange={(e)=>setConfirmText(e.target.value)} placeholder="حذف حسابي" style={{width:"100%",height:50,border:"1px solid #ddd",borderRadius:15,padding:"0 13px",fontFamily:"inherit"}} />
+              </> : null}
 
               {error ? <p style={{background:"#fff1f2",color:"#b91c1c",padding:12,borderRadius:14,fontSize:13,fontWeight:800}}>{error}</p> : null}
-              <button type="button" disabled={saving} onClick={submitRequest} style={{width:"100%",height:52,border:0,borderRadius:16,background:saving?"#aaa":"#dc2626",color:"#fff",fontFamily:"inherit",fontWeight:900,fontSize:14,cursor:saving?"default":"pointer"}}>{saving ? "جاري الإرسال..." : status === "pending" ? "تحديث طلب الحذف" : "إرسال طلب الحذف"}</button>
+              {closed ? <Link href="/support" style={{width:"100%",height:52,borderRadius:16,background:"#171717",color:"#fff",fontWeight:900,fontSize:14,textDecoration:"none",display:"grid",placeItems:"center"}}>التواصل مع الدعم</Link> : <button type="button" disabled={saving} onClick={submitRequest} style={{width:"100%",height:52,border:0,borderRadius:16,background:saving?"#aaa":"#dc2626",color:"#fff",fontFamily:"inherit",fontWeight:900,fontSize:14,cursor:saving?"default":"pointer"}}>{saving ? "جاري الإرسال..." : status === "pending" ? "تحديث سبب طلب الحذف" : "إرسال طلب الحذف"}</button>}
             </section>
           </>
         ) : null}
