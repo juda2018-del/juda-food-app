@@ -70,7 +70,7 @@ export default function SettingsPage() {
         const role = normalizeRole(String(token.claims.role || token.claims.fuseRole || profile.role || profile.fuseRole || ""));
 
         if (role && role !== "customer") {
-          const target = role === "admin" ? "/" : role === "restaurant" ? "/restaurant-admin" : "/driver-app";
+          const target = role === "admin" ? "/fuse-admin" : role === "restaurant" ? "/restaurant-admin" : "/driver-app";
           router.replace(target);
           return;
         }
