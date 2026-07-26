@@ -1,17 +1,10 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db } from "../firebase";
-import {
-  FUSE_LOCAL_SESSION,
-  parseFuseRole,
-  roleHome,
-  roleTitle,
-  type FuseRole,
-  type FuseSession,
-} from "@/lib/fuse-auth";
+import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
 
 type NotificationDoc = {
   documentId: string;
@@ -30,312 +23,59 @@ function readSession(): FuseSession | null {
   try {
     const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
     if (!raw) return null;
-
     const parsed = JSON.parse(raw) as FuseSession;
     const role = parseFuseRole(parsed.role);
-
     if (!parsed.email || !role) return null;
-
-    return {
-      ...parsed,
-      role,
-    };
+    return { ...parsed, role };
   } catch {
     return null;
   }
 }
 
-function formatDate(value: unknown) {
-  if (!value) return "بدون وقت";
-
-  try {
-    let date: Date;
-
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toDate" in value &&
-      typeof (value as { toDate?: unknown }).toDate === "function"
-    ) {
-      date = (value as { toDate: () => Date }).toDate();
-    } else if (value instanceof Date) {
-      date = value;
-    } else {
-      date = new Date(value as string | number);
-    }
-
-    if (Number.isNaN(date.getTime())) return "بدون وقت";
-
-    return date.toLocaleString("ar-IQ", {
-      hour: "2-digit",
-      minute: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return "بدون وقت";
-  }
-}
-
-function canSeeNotification(item: NotificationDoc, role: FuseRole | null, session: FuseSession | null) {
-  if (!role || !session) return false;
+function canSee(item: NotificationDoc, session: FuseSession | null) {
+  if (!session) return false;
+  const role = session.role as FuseRole;
   if (role === "admin") return true;
+  if (role !== "restaurant") return false;
+  if (item.role && item.role !== "restaurant") return false;
+  if (item.restaurant && session.restaurant) return item.restaurant === session.restaurant;
+  return true;
+}
 
-  if (item.role && item.role !== role) return false;
-
-  if (role === "restaurant" && item.restaurant && session.restaurant) {
-    return item.restaurant === session.restaurant;
+function formatDate(value: unknown) {
+  try {
+    const date = value && typeof value === "object" && "toDate" in value
+      ? (value as { toDate: () => Date }).toDate()
+      : new Date(value as string | number);
+    if (Number.isNaN(date.getTime())) return "الآن";
+    return date.toLocaleString("ar-IQ", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "الآن";
   }
-
-  return role === "restaurant";
 }
-
-function typeLabel(type?: string) {
-  if (!type) return "إشعار";
-  if (type === "order") return "طلب";
-  if (type === "driver") return "سائق";
-  if (type === "system") return "نظام";
-  if (type === "restaurant") return "مطعم";
-  if (type === "warning") return "تنبيه";
-  return type;
-}
-
-function badgeStyle(type?: string): CSSProperties {
-  if (type === "warning") return styles.badgeYellow;
-  if (type === "system") return styles.badgePurple;
-  if (type === "driver") return styles.badgeSky;
-  if (type === "order") return styles.badgeOrange;
-  if (type === "restaurant") return styles.badgeGreen;
-  return styles.badgeMuted;
-}
-
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
-    color: "white",
-    padding: "26px 16px",
-    fontFamily: "Arial, sans-serif",
-  },
-  shell: {
-    width: "100%",
-    maxWidth: 1160,
-    margin: "0 auto",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 16,
-  },
-  pill: {
-    border: "1px solid rgba(255,255,255,0.13)",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.05)",
-    padding: "11px 16px",
-    color: "rgba(255,255,255,0.82)",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  hero: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 34,
-    background:
-      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.10))",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-    padding: 22,
-    marginBottom: 16,
-  },
-  heroGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) repeat(3, minmax(160px, 0.35fr))",
-    gap: 12,
-    alignItems: "stretch",
-  },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.36)",
-    padding: 20,
-  },
-  compactCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 24,
-    background: "rgba(0,0,0,0.34)",
-    padding: 16,
-    minHeight: 118,
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#FF7A00",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  title: {
-    margin: "8px 0 0",
-    fontSize: "clamp(36px, 5vw, 60px)",
-    lineHeight: 1.08,
-    fontWeight: 950,
-  },
-  orange: {
-    color: "#FF7A00",
-  },
-  muted: {
-    color: "rgba(255,255,255,0.58)",
-    lineHeight: 1.85,
-    fontSize: 14,
-  },
-  statLabel: {
-    margin: 0,
-    color: "rgba(255,255,255,0.52)",
-    fontSize: 13,
-    fontWeight: 850,
-  },
-  statValue: {
-    margin: "10px 0 0",
-    fontSize: 30,
-    fontWeight: 950,
-  },
-  filterBox: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-    marginBottom: 16,
-  },
-  filterGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(240px, 1fr) minmax(200px, 0.45fr)",
-    gap: 12,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "15px 16px",
-    outline: "none",
-    fontSize: 15,
-  },
-  select: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "15px 16px",
-    outline: "none",
-    fontSize: 15,
-  },
-  list: {
-    display: "grid",
-    gap: 12,
-  },
-  item: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-  },
-  itemTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-    flexWrap: "wrap",
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid",
-    borderRadius: 999,
-    padding: "7px 11px",
-    fontSize: 12,
-    fontWeight: 950,
-  },
-  badgeOrange: {
-    borderColor: "rgba(255,122,0,0.42)",
-    background: "rgba(255,122,0,0.12)",
-    color: "#FFB56B",
-  },
-  badgeYellow: {
-    borderColor: "rgba(234,179,8,0.42)",
-    background: "rgba(234,179,8,0.12)",
-    color: "#FDE68A",
-  },
-  badgeSky: {
-    borderColor: "rgba(14,165,233,0.42)",
-    background: "rgba(14,165,233,0.12)",
-    color: "#7DD3FC",
-  },
-  badgePurple: {
-    borderColor: "rgba(168,85,247,0.42)",
-    background: "rgba(168,85,247,0.12)",
-    color: "#D8B4FE",
-  },
-  badgeGreen: {
-    borderColor: "rgba(34,197,94,0.42)",
-    background: "rgba(34,197,94,0.12)",
-    color: "#86EFAC",
-  },
-  badgeMuted: {
-    borderColor: "rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.06)",
-    color: "rgba(255,255,255,0.65)",
-  },
-  empty: {
-    border: "1px dashed rgba(255,255,255,0.16)",
-    borderRadius: 30,
-    background: "rgba(255,255,255,0.035)",
-    padding: 28,
-    textAlign: "center",
-  },
-};
 
 export default function NotificationCenterPage() {
   const [session, setSession] = useState<FuseSession | null>(null);
   const [items, setItems] = useState<NotificationDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("الكل");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const saved = readSession();
-
-    if (!saved) {
-      window.location.href = "/login?next=/notification-center";
-      return;
-    }
-
-    if (saved.role !== "admin" && saved.role !== "restaurant") {
-      window.location.href = roleHome[saved.role] || "/live-orders";
-      return;
-    }
-
-    setSession(saved);
+    setSession(readSession());
   }, []);
 
+  const staffMode = session?.role === "admin" || session?.role === "restaurant";
+
   useEffect(() => {
-    const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"));
+    if (!staffMode) {
+      setLoading(false);
+      return;
+    }
 
     const unsubscribe = onSnapshot(
-      q,
+      query(collection(db, "notifications"), orderBy("createdAt", "desc")),
       (snapshot) => {
-        const data = snapshot.docs.map((item) => ({
-          ...(item.data() as Omit<NotificationDoc, "documentId">),
-          documentId: item.id,
-        }));
-
-        setItems(data);
+        setItems(snapshot.docs.map((doc) => ({ ...(doc.data() as Omit<NotificationDoc, "documentId">), documentId: doc.id })));
         setLoading(false);
         setError("");
       },
@@ -346,184 +86,90 @@ export default function NotificationCenterPage() {
       }
     );
 
-    return () => unsubscribe();
-  }, []);
+    return unsubscribe;
+  }, [staffMode]);
 
-  const role = session?.role || null;
+  const visibleItems = useMemo(() => items.filter((item) => canSee(item, session)).slice(0, 60), [items, session]);
 
-  const visibleItems = useMemo(() => {
-    const cleanSearch = search.trim().toLowerCase();
-
-    return items
-      .filter((item) => canSeeNotification(item, role, session))
-      .filter((item) => {
-        const sameType = typeFilter === "الكل" || typeLabel(item.type) === typeFilter;
-
-        const haystack = [
-          item.title || "",
-          item.message || "",
-          item.body || "",
-          item.orderId || "",
-          item.restaurant || "",
-          typeLabel(item.type),
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        return sameType && (!cleanSearch || haystack.includes(cleanSearch));
-      })
-      .slice(0, 80);
-  }, [items, role, search, session, typeFilter]);
-
-  const unreadCount = visibleItems.filter((item) => !item.read).length;
-  const warningCount = visibleItems.filter((item) => item.type === "warning").length;
-  const orderCount = visibleItems.filter((item) => item.type === "order").length;
-
-  return (
-    <main dir="rtl" style={styles.page}>
-      <section style={styles.shell}>
-        <div style={styles.topBar}>
-          <Link href="/" style={styles.pill}>
-            الرئيسية
-          </Link>
-
-          <Link href={role ? roleHome[role] : "/login"} style={styles.pill}>
-            لوحتي
-          </Link>
-        </div>
-
-        <header style={styles.hero}>
-          <div style={styles.heroGrid}>
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>مركز الإشعارات</p>
-              <h1 style={styles.title}>
-                كل التنبيهات
-                <br />
-                <span style={styles.orange}>بمكان واحد</span>
-              </h1>
-              <p style={styles.muted}>
-                إشعارات الطلبات، النظام، المطعم، والسائقين تظهر هنا حسب صلاحيتك.
-              </p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>الدور</p>
-              <p style={{ ...styles.statValue, ...styles.orange }}>
-                {role ? roleTitle[role] : "—"}
-              </p>
-              <p style={styles.muted}>{session?.name || "غير مسجل"}</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>غير مقروء</p>
-              <p style={{ ...styles.statValue, color: "#FFB56B" }}>{unreadCount}</p>
-              <p style={styles.muted}>بحسب القائمة الحالية</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>طلبات / تنبيهات</p>
-              <p style={{ ...styles.statValue, color: "#86EFAC" }}>
-                {orderCount} / {warningCount}
-              </p>
-              <p style={styles.muted}>{loading ? "تحميل" : "مباشر"}</p>
-            </div>
-          </div>
+  if (!staffMode) {
+    return (
+      <main dir="rtl" className="page customer-page">
+        <header className="topbar">
+          <Link href="/" className="back">‹</Link>
+          <div><h1>التحديثات</h1><p>تابع طلباتك من مكان واحد</p></div>
+          <Link href="/profile" className="profile">حسابي</Link>
         </header>
 
-        <section style={styles.filterBox}>
-          <div style={styles.filterGrid}>
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>
-                بحث سريع
-              </span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                style={styles.input}
-                placeholder="عنوان، طلب، مطعم، رسالة..."
-              />
-            </label>
-
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>
-                النوع
-              </span>
-              <select
-                value={typeFilter}
-                onChange={(event) => setTypeFilter(event.target.value)}
-                style={styles.select}
-              >
-                {["الكل", "طلب", "نظام", "سائق", "مطعم", "تنبيه", "إشعار"].map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <section className="hero customer-hero">
+          <span>FUSE</span>
+          <h2>وين وصل طلبك؟</h2>
+          <p>ادخل رقم الطلب الكامل أو رقم الهاتف داخل صفحة طلباتي وشوف آخر حالة مباشرة.</p>
+          <Link href="/order-status" className="primary">فتح طلباتي</Link>
         </section>
 
-        <section style={styles.list}>
-          {loading ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>جاري تحميل الإشعارات...</h2>
-              <p style={styles.muted}>انتظر لحظات.</p>
-            </div>
-          ) : error ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0, color: "#FCA5A5" }}>تعذر تحميل الإشعارات</h2>
-              <p style={styles.muted}>{error}</p>
-            </div>
-          ) : visibleItems.length === 0 ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>ماكو إشعارات حالياً</h2>
-              <p style={styles.muted}>
-                إذا وصلت طلبات أو تنبيهات جديدة راح تظهر هنا مباشرة.
-              </p>
-            </div>
-          ) : (
-            visibleItems.map((item) => (
-              <article key={item.documentId} style={styles.item}>
-                <div style={styles.itemTop}>
-                  <div>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 950 }}>
-                        {item.title || "إشعار جديد"}
-                      </h2>
-
-                      <span style={{ ...styles.badge, ...badgeStyle(item.type) }}>
-                        {typeLabel(item.type)}
-                      </span>
-
-                      {!item.read ? (
-                        <span style={{ ...styles.badge, ...styles.badgeOrange }}>
-                          جديد
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <p style={styles.muted}>
-                      {item.message || item.body || "بدون تفاصيل"}
-                    </p>
-                  </div>
-
-                  <div style={{ textAlign: "left", minWidth: 160 }}>
-                    <p style={styles.statLabel}>الوقت</p>
-                    <p style={{ ...styles.muted, margin: "8px 0 0" }}>
-                      {formatDate(item.createdAt)}
-                    </p>
-                    {item.orderId ? (
-                      <p style={{ ...styles.muted, margin: "8px 0 0", direction: "ltr" }}>
-                        #{item.orderId}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              </article>
-            ))
-          )}
+        <section className="cards">
+          <Link href="/order-status" className="card"><b>تتبع الطلب</b><small>الحالة، المطعم، المبلغ والمراحل</small></Link>
+          <Link href="/restaurants" className="card"><b>اطلب من جديد</b><small>اختار مطعماً وأضف الوجبات للسلة</small></Link>
+          <Link href="/support" className="card"><b>مشكلة بالطلب؟</b><small>تواصل مع دعم FUSE</small></Link>
         </section>
+
+        <section className="empty-note">
+          <b>ما نعرض إشعارات وهمية</b>
+          <p>أي تحديث حقيقي للطلب يظهر داخل صفحة طلباتي حسب البيانات المحفوظة في النظام.</p>
+        </section>
+
+        <style jsx>{styles}</style>
+      </main>
+    );
+  }
+
+  return (
+    <main dir="rtl" className="page staff-page">
+      <header className="topbar">
+        <Link href={roleHome[session!.role] || "/"} className="back">‹</Link>
+        <div><h1>مركز الإشعارات</h1><p>طلبات وتنبيهات النظام</p></div>
+        <span className="count">{visibleItems.filter((item) => !item.read).length}</span>
+      </header>
+
+      {loading ? <section className="empty-note"><b>جاري التحميل...</b></section> : null}
+      {error ? <section className="empty-note error"><b>تعذر التحميل</b><p>{error}</p></section> : null}
+
+      {!loading && !error && visibleItems.length === 0 ? (
+        <section className="empty-note"><b>ماكو إشعارات حالياً</b><p>الطلبات والتنبيهات الجديدة تظهر هنا مباشرة.</p></section>
+      ) : null}
+
+      <section className="list">
+        {visibleItems.map((item) => (
+          <article className="notification" key={item.documentId}>
+            <div className="notification-head">
+              <span className={`badge ${item.type || "system"}`}>{item.type === "order" ? "طلب" : item.type === "warning" ? "تنبيه" : "إشعار"}</span>
+              <small>{formatDate(item.createdAt)}</small>
+            </div>
+            <h2>{item.title || "إشعار جديد"}</h2>
+            <p>{item.message || item.body || "بدون تفاصيل"}</p>
+            {item.orderId ? <Link href={`/order-status?orderId=${encodeURIComponent(item.orderId)}`}>فتح الطلب #{item.orderId}</Link> : null}
+          </article>
+        ))}
       </section>
+
+      <style jsx>{styles}</style>
     </main>
   );
 }
+
+const styles = `
+  :global(*){box-sizing:border-box}
+  :global(html),:global(body){margin:0;background:#fff8ef}
+  .page{width:100%;max-width:430px;min-height:100dvh;margin:0 auto;padding:18px 16px 112px;background:linear-gradient(180deg,#fff8ef,#fff);color:#171717;font-family:var(--fuse-body-font)}
+  .staff-page{max-width:760px;background:#0b1220;color:#fff}
+  .topbar{display:grid;grid-template-columns:52px 1fr 58px;align-items:center;gap:10px;margin-bottom:18px}
+  .topbar>div{text-align:center}.topbar h1{margin:0;font-size:25px}.topbar p{margin:3px 0 0;color:#7d746c;font-size:12px;font-weight:700}.staff-page .topbar p{color:rgba(255,255,255,.6)}
+  .back,.profile,.count{height:46px;border-radius:16px;display:grid;place-items:center;background:#fff;color:#171717;text-decoration:none;font-weight:900;box-shadow:0 10px 25px rgba(0,0,0,.08)}
+  .back{font-size:32px}.profile{font-size:12px;color:#ff5a00}.count{background:#ff5a00;color:#fff;font-size:18px}
+  .customer-hero{border-radius:30px;padding:25px;background:linear-gradient(135deg,#123fbd,#082d8f);color:#fff;box-shadow:0 22px 45px rgba(8,45,143,.22)}
+  .customer-hero span{display:inline-flex;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.15);font-weight:900}.customer-hero h2{font-size:31px;margin:16px 0 8px}.customer-hero p{line-height:1.8;color:rgba(255,255,255,.82);font-weight:700}
+  .primary{display:block;text-align:center;margin-top:18px;padding:15px;border-radius:18px;background:#ff5a00;color:#fff;text-decoration:none;font-weight:900}
+  .cards{display:grid;gap:12px;margin-top:15px}.card{display:grid;gap:5px;padding:18px;border-radius:24px;background:#fff;color:#171717;text-decoration:none;box-shadow:0 14px 32px rgba(0,0,0,.07)}.card b{font-size:18px}.card small{color:#777;line-height:1.6;font-weight:700}
+  .empty-note{margin-top:15px;padding:20px;border-radius:24px;background:#fff3e8;text-align:center}.staff-page .empty-note{background:rgba(255,255,255,.06)}.empty-note b{font-size:18px}.empty-note p{margin:8px 0 0;color:#746b63;line-height:1.7}.staff-page .empty-note p{color:rgba(255,255,255,.62)}.error{background:#fee2e2;color:#991b1b}
+  .list{display:grid;gap:12px}.notification{padding:18px;border-radius:24px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09)}.notification-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.notification-head small{color:rgba(255,255,255,.55)}.notification h2{margin:13px 0 7px;font-size:20px}.notification p{margin:0;color:rgba(255,255,255,.7);line-height:1.7}.notification a{display:inline-block;margin-top:12px;color:#ff9a55;font-weight:900;text-decoration:none}.badge{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12);font-size:11px;font-weight:900}.badge.order{background:rgba(255,90,0,.18);color:#ffb06f}.badge.warning{background:rgba(234,179,8,.18);color:#fde68a}
+`;
