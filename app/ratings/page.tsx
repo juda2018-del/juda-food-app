@@ -3,20 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  setDoc,
-  where,
-} from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { parseFuseRole, roleHome } from "@/lib/fuse-auth";
 
- type OrderDoc = {
+type OrderDoc = {
   documentId: string;
   orderId?: string;
   customerUid?: string;
@@ -53,17 +44,24 @@ function isDelivered(order: OrderDoc) {
   return status === "تم التسليم" || status === "delivered";
 }
 
+function toMillis(value: unknown) {
+  try {
+    if (value && typeof value === "object" && "toDate" in value) {
+      const fn = (value as { toDate?: unknown }).toDate;
+      if (typeof fn === "function") return (fn as () => Date)().getTime();
+    }
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  } catch {
+    return 0;
+  }
+}
+
 function stars(value: number, setter: (value: number) => void) {
   return (
     <div style={styles.stars}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={() => setter(star)}
-          aria-label={`${star} نجوم`}
-          style={{ ...styles.starButton, color: star <= value ? "#FF7A00" : "rgba(255,255,255,0.24)" }}
-        >
+        <button key={star} type="button" onClick={() => setter(star)} aria-label={`${star} نجوم`} style={{ ...styles.starButton, color: star <= value ? "#FF7A00" : "rgba(255,255,255,0.24)" }}>
           ★
         </button>
       ))}
@@ -86,47 +84,48 @@ export default function RatingsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("orderDocumentId") || "";
+    if (requested.trim()) setSelectedOrderId(requested.trim());
+
     return onAuthStateChanged(auth, async (currentUser) => {
       setAuthReady(true);
       if (!currentUser) {
-        window.location.replace("/login?next=/ratings");
+        window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         return;
       }
 
-      const token = await currentUser.getIdTokenResult();
-      const role = String(token.claims.role || "customer").toLowerCase();
-      if (role !== "customer") {
-        window.location.replace(role === "restaurant" ? "/restaurant-admin" : role === "driver" ? "/driver" : "/admin");
-        return;
+      try {
+        const token = await currentUser.getIdTokenResult();
+        const role = parseFuseRole(token.claims.role || token.claims.fuseRole);
+        if (role && role !== "customer") {
+          window.location.replace(roleHome[role]);
+          return;
+        }
+        setUser(currentUser);
+      } catch {
+        setError("تعذر التحقق من الحساب. سجل خروج وادخل مرة ثانية.");
       }
-
-      setUser(currentUser);
     });
   }, []);
 
   useEffect(() => {
     if (!user) return;
 
-    const ordersQuery = query(
-      collection(db, "orders"),
-      where("customerUid", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
-
+    const ordersQuery = query(collection(db, "orders"), where("customerUid", "==", user.uid));
     return onSnapshot(
       ordersQuery,
       (snapshot) => {
-        setOrders(snapshot.docs.map((item) => ({
-          ...(item.data() as Omit<OrderDoc, "documentId">),
-          documentId: item.id,
-        })));
+        const next = snapshot.docs
+          .map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }))
+          .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+        setOrders(next);
         setLoading(false);
         setError("");
       },
-      (snapshotError) => {
+      () => {
         setOrders([]);
         setLoading(false);
-        setError(snapshotError.message.includes("index") ? "هذا الاستعلام يحتاج Firestore Index." : "تعذر تحميل طلباتك.");
+        setError("تعذر تحميل طلباتك.");
       }
     );
   }, [user]);
@@ -147,9 +146,7 @@ export default function RatingsPage() {
         if (!cancelled) setError("تعذر التحقق من التقييمات السابقة.");
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [orders]);
 
   const eligibleOrders = useMemo(
