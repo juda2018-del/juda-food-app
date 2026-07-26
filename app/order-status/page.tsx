@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
 
@@ -26,52 +26,14 @@ type OrderDoc = {
   restaurantName?: string;
   total?: number;
   amount?: number;
-  subtotal?: number;
-  deliveryFee?: number;
   status?: string;
   driverName?: string;
-  driverPhone?: string;
   assignedDriverName?: string;
-  assignedDriverPhone?: string;
   createdAt?: unknown;
   items?: OrderItem[];
 };
 
-function toDate(value: unknown): Date | null {
-  try {
-    if (!value) return null;
-
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toDate" in value &&
-      typeof (value as { toDate?: unknown }).toDate === "function"
-    ) {
-      return (value as { toDate: () => Date }).toDate();
-    }
-
-    if (value instanceof Date) return value;
-
-    const date = new Date(value as string | number);
-    return Number.isNaN(date.getTime()) ? null : date;
-  } catch {
-    return null;
-  }
-}
-
-function formatDate(value: unknown) {
-  const date = toDate(value);
-
-  if (!date) return "بدون وقت";
-
-  return date.toLocaleString("ar-IQ", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
 
 function normalizeDigits(value: string) {
   return value
@@ -79,8 +41,8 @@ function normalizeDigits(value: string) {
     .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
 }
 
-function cleanSearch(value: string) {
-  return normalizeDigits(value).replace(/\s+/g, "").trim().toLowerCase();
+function clean(value: string) {
+  return normalizeDigits(value).replace(/[\s-]+/g, "").trim().toLowerCase();
 }
 
 function normalizeStatus(status?: string) {
@@ -90,282 +52,66 @@ function normalizeStatus(status?: string) {
   return status;
 }
 
-function getCustomer(order: OrderDoc) {
-  return order.customerName || order.customer || order.name || "زبون";
+function toDate(value: unknown): Date | null {
+  try {
+    if (!value) return null;
+    if (typeof value === "object" && value !== null && "toDate" in value) {
+      const fn = (value as { toDate?: unknown }).toDate;
+      if (typeof fn === "function") return (fn as () => Date)();
+    }
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+function formatDate(value: unknown) {
+  const date = toDate(value);
+  if (!date) return "الوقت غير متوفر";
+  return date.toLocaleString("ar-IQ", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function getPhone(order: OrderDoc) {
   return order.phone || order.customerPhone || "";
 }
 
-function getRestaurant(order: OrderDoc) {
-  return order.restaurant || order.restaurantName || "مطعم";
+function getCustomer(order: OrderDoc) {
+  return order.customerName || order.customer || order.name || "زبون";
 }
 
-function getDriverName(order: OrderDoc) {
-  const assigned = (order.assignedDriverName || "").trim();
-  const direct = (order.driverName || "").trim();
-  const phone = (order.assignedDriverPhone || order.driverPhone || "").trim();
+function getRestaurant(order: OrderDoc) {
+  return order.restaurantName || order.restaurant || "مطعم";
+}
 
+function getDriver(order: OrderDoc) {
+  const assigned = String(order.assignedDriverName || "").trim();
+  const direct = String(order.driverName || "").trim();
   if (assigned) return assigned;
   if (direct && direct !== "FUSE إدارة" && direct !== "إدارة FUSE") return direct;
-  if (phone === "07800000000") return "kkkkkk";
-
-  return "غير محدد";
-}
-
-function getTotal(order: OrderDoc) {
-  return Number(order.total || order.amount || 0);
+  return "لم يُحدد بعد";
 }
 
 function statusIndex(status?: string) {
-  const clean = normalizeStatus(status);
-  const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
-  const index = steps.indexOf(clean);
-  return index === -1 ? 0 : index;
+  const index = steps.indexOf(normalizeStatus(status));
+  return index < 0 ? 0 : index;
 }
-
-function statusColor(status?: string) {
-  const clean = normalizeStatus(status);
-
-  if (clean === "تم التسليم") return "#86EFAC";
-  if (clean === "قيد التوصيل") return "#D8B4FE";
-  if (clean === "جاهز للتوصيل") return "#7DD3FC";
-  if (clean === "قيد التحضير") return "#FDE68A";
-  if (clean === "مرفوض") return "#FCA5A5";
-
-  return "#FFB56B";
-}
-
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
-    color: "white",
-    padding: "26px 16px",
-    fontFamily: "Arial, sans-serif",
-  },
-  shell: {
-    width: "100%",
-    maxWidth: 1120,
-    margin: "0 auto",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 16,
-  },
-  nav: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  pill: {
-    border: "1px solid rgba(255,255,255,0.13)",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.05)",
-    padding: "11px 16px",
-    color: "rgba(255,255,255,0.82)",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  activePill: {
-    border: "1px solid rgba(255,122,0,0.35)",
-    borderRadius: 999,
-    background: "#FF7A00",
-    padding: "11px 16px",
-    color: "#000",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  hero: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 34,
-    background:
-      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.12))",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-    padding: 22,
-    marginBottom: 16,
-  },
-  heroGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(240px, 0.36fr)",
-    gap: 14,
-    alignItems: "stretch",
-  },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.36)",
-    padding: 20,
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#FF7A00",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  title: {
-    margin: "8px 0 0",
-    fontSize: "clamp(38px, 6vw, 68px)",
-    lineHeight: 1.06,
-    fontWeight: 950,
-  },
-  orange: {
-    color: "#FF7A00",
-  },
-  muted: {
-    color: "rgba(255,255,255,0.60)",
-    lineHeight: 1.85,
-    fontSize: 14,
-  },
-  statusLive: {
-    margin: "8px 0 0",
-    fontSize: 34,
-    fontWeight: 950,
-  },
-  searchBox: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-    marginBottom: 16,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "15px 16px",
-    outline: "none",
-    fontSize: 15,
-  },
-  layout: {
-    display: "grid",
-    gap: 14,
-  },
-  orderCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 30,
-    background:
-      "linear-gradient(135deg, rgba(255,122,0,0.09), rgba(255,255,255,0.035))",
-    padding: 20,
-  },
-  orderTop: {
-    display: "grid",
-    gridTemplateColumns: "minmax(220px, 0.4fr) minmax(0, 1fr)",
-    gap: 12,
-    alignItems: "stretch",
-  },
-  totalBox: {
-    border: "1px solid rgba(255,122,0,0.30)",
-    borderRadius: 24,
-    background: "rgba(255,122,0,0.10)",
-    padding: 18,
-  },
-  total: {
-    margin: "8px 0 0",
-    color: "#FF7A00",
-    fontSize: 34,
-    fontWeight: 950,
-  },
-  infoGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-    gap: 10,
-  },
-  miniBox: {
-    border: "1px solid rgba(255,255,255,0.09)",
-    borderRadius: 18,
-    background: "rgba(0,0,0,0.26)",
-    padding: 12,
-  },
-  label: {
-    margin: 0,
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 12,
-    fontWeight: 850,
-  },
-  value: {
-    margin: "8px 0 0",
-    color: "white",
-    fontSize: 16,
-    fontWeight: 950,
-  },
-  progress: {
-    display: "grid",
-    gridTemplateColumns: "repeat(5, 1fr)",
-    gap: 8,
-    marginTop: 18,
-  },
-  step: {
-    minHeight: 8,
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.13)",
-  },
-  stepActive: {
-    minHeight: 8,
-    borderRadius: 999,
-    background: "#FF7A00",
-  },
-  stepLabels: {
-    display: "grid",
-    gridTemplateColumns: "repeat(5, 1fr)",
-    gap: 8,
-    marginTop: 8,
-  },
-  stepText: {
-    textAlign: "center",
-    color: "rgba(255,255,255,0.58)",
-    fontSize: 11,
-    fontWeight: 850,
-  },
-  details: {
-    border: "1px solid rgba(255,255,255,0.09)",
-    borderRadius: 22,
-    background: "rgba(0,0,0,0.26)",
-    padding: 16,
-    marginTop: 16,
-  },
-  itemRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 10,
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
-    padding: "10px 0",
-    color: "rgba(255,255,255,0.76)",
-  },
-  empty: {
-    border: "1px dashed rgba(255,255,255,0.16)",
-    borderRadius: 24,
-    background: "rgba(255,255,255,0.035)",
-    padding: 26,
-    textAlign: "center",
-  },
-};
 
 export default function OrderStatusPage() {
   const [orders, setOrders] = useState<OrderDoc[]>([]);
   const [search, setSearch] = useState("");
-  const [loadedFromUrl, setLoadedFromUrl] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const fromPhone = params.get("phone") || "";
-    const fromOrder = params.get("orderId") || params.get("order") || "";
-    const value = fromPhone || fromOrder;
-
-    if (value) setSearch(value);
-
-    setLoadedFromUrl(true);
+    setSearch(params.get("orderId") || params.get("order") || params.get("phone") || "");
   }, []);
 
   useEffect(() => {
@@ -376,185 +122,121 @@ export default function OrderStatusPage() {
           ...(item.data() as Omit<OrderDoc, "documentId">),
           documentId: item.id,
         }));
-
-        data.sort((a, b) => {
-          const ad = toDate(a.createdAt)?.getTime() || 0;
-          const bd = toDate(b.createdAt)?.getTime() || 0;
-          return bd - ad;
-        });
-
+        data.sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
         setOrders(data);
+        setLoadError(false);
+        setLoading(false);
       },
-      () => setOrders([])
+      () => {
+        setLoadError(true);
+        setLoading(false);
+      }
     );
-
     return () => unsubscribe();
   }, []);
 
-  const matches = useMemo(() => {
-    const clean = cleanSearch(search);
+  const current = useMemo(() => {
+    const value = clean(search);
+    if (!value) return null;
 
-    if (!clean) return [];
+    const looksLikeOrderId = value.startsWith("fuse") || /[a-z]/i.test(value);
+    const looksLikePhone = /^\d{10,13}$/.test(value);
+    if (!looksLikeOrderId && !looksLikePhone) return null;
 
-    return orders.filter((order) => {
-      const phone = cleanSearch(getPhone(order));
-      const orderId = cleanSearch(order.orderId || "");
-      const customer = cleanSearch(getCustomer(order));
-
-      return phone.includes(clean) || clean.includes(phone) || orderId.includes(clean) || customer.includes(clean);
-    });
+    return orders.find((order) => {
+      const orderId = clean(order.orderId || order.documentId);
+      const phone = clean(getPhone(order));
+      return looksLikeOrderId ? orderId === value : phone === value;
+    }) || null;
   }, [orders, search]);
 
-  const current = matches[0] || null;
-  const currentIndex = statusIndex(current?.status);
-  const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
+  const currentStep = statusIndex(current?.status);
+  const total = Number(current?.total || current?.amount || 0);
 
   return (
-    <main dir="rtl" style={styles.page}>
-      <section style={styles.shell}>
-        <header style={styles.topBar}>
-          <Link href="/" style={styles.pill}>
-            الرئيسية
-          </Link>
-
-          <Link href="/orders" style={{ ...styles.pill, fontSize: 16, padding: "13px 20px" }}>
-            ← طلباتي
-          </Link>
+    <main dir="rtl" className="page">
+      <section className="phone">
+        <header className="top">
+          <Link href="/" className="back">‹</Link>
+          <div className="heading"><span>FUSE Iraq</span><h1>طلباتي</h1></div>
+          <Link href="/support" className="support">دعم</Link>
         </header>
 
-        <section style={styles.hero}>
-          <div style={styles.heroGrid}>
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>حالة الطلب</p>
-              <h1 style={styles.title}>
-                تابع طلبك
-                <br />
-                <span style={styles.orange}>لحظة بلحظة</span>
-              </h1>
-              <p style={styles.muted}>
-                اكتب رقم الهاتف أو رقم الطلب. إذا دخلت من رابط فيه رقم الهاتف راح يظهر طلبك تلقائياً.
-              </p>
-            </div>
-
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>الحالة</p>
-              <p style={{ ...styles.statusLive, color: current ? statusColor(current.status) : "#86EFAC" }}>
-                {current ? normalizeStatus(current.status) : "مباشر"}
-              </p>
-              <p style={styles.muted}>
-                {current ? `طلب ${getCustomer(current)} من ${getRestaurant(current)}` : "متصل بقاعدة الطلبات"}
-              </p>
-            </div>
-          </div>
+        <section className="hero">
+          <span>تتبع مباشر</span>
+          <h2>اعرف وين وصل طلبك</h2>
+          <p>اكتب رقم الطلب الكامل أو رقم الهاتف الكامل المستخدم عند الطلب.</p>
         </section>
 
-        <section style={styles.searchBox}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={styles.label}>رقم الهاتف أو رقم الطلب</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              style={styles.input}
-              placeholder="0770... أو FUSE-751080"
-              dir="ltr"
-            />
-          </label>
+        <section className="searchBox">
+          <label>رقم الطلب أو الهاتف</label>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="FUSE-123456 أو 0770..."
+            dir="ltr"
+            autoComplete="tel"
+          />
+          <small>لحماية خصوصيتك، البحث الجزئي أو البحث بالاسم غير مسموح.</small>
         </section>
 
-        <section style={styles.layout}>
-          {!loadedFromUrl ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>جاري تحميل الحالة...</h2>
+        {loading ? (
+          <section className="state"><b>جاري تحميل طلباتك...</b></section>
+        ) : loadError ? (
+          <section className="state bad"><b>تعذر الاتصال بالطلبات</b><p>تأكد من الإنترنت وحاول مرة ثانية.</p></section>
+        ) : !search.trim() ? (
+          <section className="state"><b>اكتب رقم طلبك</b><p>سيظهر آخر تحديث مباشرة.</p></section>
+        ) : !current ? (
+          <section className="state"><b>ما لقينا طلب مطابق</b><p>اكتب الرقم كاملاً بدون نقص.</p></section>
+        ) : (
+          <article className="orderCard">
+            <div className="orderHead">
+              <div><span>رقم الطلب</span><b>{current.orderId || current.documentId}</b></div>
+              <strong>{normalizeStatus(current.status)}</strong>
             </div>
-          ) : !search.trim() ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>اكتب رقم الهاتف</h2>
-              <p style={styles.muted}>راح تظهر حالة الطلب هنا مباشرة.</p>
+
+            <div className="infoGrid">
+              <div><span>المطعم</span><b>{getRestaurant(current)}</b></div>
+              <div><span>الزبون</span><b>{getCustomer(current)}</b></div>
+              <div><span>المبلغ</span><b>{total.toLocaleString("en-US")} د.ع</b></div>
+              <div><span>السائق</span><b>{getDriver(current)}</b></div>
+              <div><span>العنوان</span><b>{current.address || "غير محدد"}</b></div>
+              <div><span>وقت الطلب</span><b>{formatDate(current.createdAt)}</b></div>
             </div>
-          ) : !current ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>ما لقينا طلب مطابق</h2>
-              <p style={styles.muted}>تأكد من رقم الهاتف أو استخدم نفس رقم الطلب الموجود برسالة التأكيد.</p>
-            </div>
-          ) : (
-            <article style={styles.orderCard}>
-              <div style={styles.orderTop}>
-                <div style={styles.totalBox}>
-                  <p style={styles.label}>المجموع</p>
-                  <p style={styles.total}>{getTotal(current).toLocaleString()} د.ع</p>
-                  <p style={styles.muted}>رقم الطلب: {current.orderId || current.documentId}</p>
+
+            <div className="progress">
+              {steps.map((step, index) => (
+                <div className={index <= currentStep ? "active" : ""} key={step}>
+                  <i />
+                  <span>{step}</span>
                 </div>
+              ))}
+            </div>
 
-                <div style={styles.infoGrid}>
-                  <div style={styles.miniBox}>
-                    <p style={styles.label}>الزبون</p>
-                    <p style={styles.value}>{getCustomer(current)}</p>
-                  </div>
-
-                  <div style={styles.miniBox}>
-                    <p style={styles.label}>المطعم</p>
-                    <p style={styles.value}>{getRestaurant(current)}</p>
-                  </div>
-
-                  <div style={styles.miniBox}>
-                    <p style={styles.label}>الهاتف</p>
-                    <p style={{ ...styles.value, direction: "ltr" }}>{getPhone(current)}</p>
-                  </div>
-
-                  <div style={styles.miniBox}>
-                    <p style={styles.label}>العنوان</p>
-                    <p style={styles.value}>{current.address || "غير محدد"}</p>
-                  </div>
-
-                  <div style={styles.miniBox}>
-                    <p style={styles.label}>السائق</p>
-                    <p style={styles.value}>{getDriverName(current)}</p>
-                  </div>
-
-                  <div style={styles.miniBox}>
-                    <p style={styles.label}>الوقت</p>
-                    <p style={styles.value}>{formatDate(current.createdAt)}</p>
-                  </div>
+            <section className="items">
+              <h3>تفاصيل الطلب</h3>
+              {current.items?.length ? current.items.map((item, index) => (
+                <div className="item" key={`${item.name || item.title}-${index}`}>
+                  <span>{item.name || item.title || "صنف"}</span>
+                  <b>{item.qty || item.quantity || 1} × {Number(item.price || 0).toLocaleString("en-US")} د.ع</b>
                 </div>
-              </div>
+              )) : <p>تفاصيل الأصناف غير متوفرة.</p>}
+            </section>
+          </article>
+        )}
 
-              <div style={styles.progress}>
-                {steps.map((step, index) => (
-                  <div
-                    key={step}
-                    style={index <= currentIndex ? styles.stepActive : styles.step}
-                  />
-                ))}
-              </div>
-
-              <div style={styles.stepLabels}>
-                {steps.map((step) => (
-                  <div key={step} style={styles.stepText}>
-                    {step}
-                  </div>
-                ))}
-              </div>
-
-              <div style={styles.details}>
-                <p style={styles.eyebrow}>تفاصيل الطلب</p>
-
-                {current.items?.length ? (
-                  current.items.map((item, index) => (
-                    <div key={`${item.name || item.title}-${index}`} style={styles.itemRow}>
-                      <span>{item.name || item.title || "صنف"}</span>
-                      <strong>
-                        {item.qty || item.quantity || 1}x — {Number(item.price || 0).toLocaleString()} د.ع
-                      </strong>
-                    </div>
-                  ))
-                ) : (
-                  <p style={styles.muted}>ماكو تفاصيل أصناف محفوظة.</p>
-                )}
-              </div>
-            </article>
-          )}
-        </section>
+        <nav className="bottom">
+          <Link href="/">⌂<span>الرئيسية</span></Link>
+          <Link href="/restaurants">⌕<span>المطاعم</span></Link>
+          <Link href="/reels">▶<span>ريلز</span></Link>
+          <Link href="/order-status" className="selected">▣<span>طلباتي</span></Link>
+          <Link href="/profile">○<span>حسابي</span></Link>
+        </nav>
       </section>
+
+      <style jsx>{`
+        *{box-sizing:border-box}.page{min-height:100vh;background:#efe8df;color:#171717;font-family:Arial,sans-serif}.phone{width:min(100%,430px);min-height:100vh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);padding:18px 18px 112px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.back,.support{height:44px;min-width:44px;border-radius:15px;background:#fff;color:#171717;text-decoration:none;display:grid;place-items:center;box-shadow:0 10px 25px rgba(0,0,0,.07);font-weight:900}.back{font-size:30px}.support{font-size:12px;color:#f45100;padding:0 12px}.heading{text-align:center}.heading span{font-size:11px;color:#f45100;font-weight:900}.heading h1{margin:2px 0 0;font-size:25px}.hero{background:linear-gradient(135deg,#151515,#2c2c2c);color:#fff;border-radius:28px;padding:22px;margin-bottom:14px}.hero span{color:#ff8a00;font-size:12px;font-weight:900}.hero h2{margin:7px 0;font-size:27px}.hero p{margin:0;color:#ccc;line-height:1.7;font-size:13px}.searchBox,.orderCard,.state{background:#fff;border-radius:24px;padding:17px;box-shadow:0 13px 32px rgba(0,0,0,.07);margin-bottom:14px}.searchBox label{display:block;font-size:13px;font-weight:900;margin-bottom:8px}.searchBox input{width:100%;border:1px solid #ece4dc;border-radius:16px;padding:14px;font:inherit;outline:none}.searchBox small{display:block;color:#8a8179;font-size:11px;line-height:1.6;margin-top:8px}.state{text-align:center;padding:28px 18px}.state b{font-size:19px}.state p{color:#817870;margin:8px 0 0}.state.bad{background:#fff0f0;color:#a52323}.orderHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid #f0e8df}.orderHead div{display:grid;gap:4px}.orderHead span,.infoGrid span{font-size:11px;color:#8c837a;font-weight:800}.orderHead strong{background:#fff1e5;color:#e64b00;padding:9px 12px;border-radius:999px;font-size:12px}.infoGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.infoGrid div{background:#fff8f1;border-radius:16px;padding:12px;display:grid;gap:6px}.infoGrid b{font-size:13px;overflow-wrap:anywhere}.progress{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:18px 0}.progress div{display:grid;gap:7px;text-align:center}.progress i{height:6px;border-radius:99px;background:#e7ddd3}.progress .active i{background:#ff5a00}.progress span{font-size:9px;color:#91877e;font-weight:800}.progress .active span{color:#d94d00}.items{background:#fff8f1;border-radius:18px;padding:14px}.items h3{margin:0 0 8px;font-size:15px}.items p{color:#82786f;font-size:12px}.item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #eee3d8;font-size:12px}.item:first-of-type{border-top:0}.bottom{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,430px);display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:1px solid #eee2d7;padding:8px 6px max(8px,env(safe-area-inset-bottom));z-index:20}.bottom a{display:grid;place-items:center;gap:3px;color:#8c837b;text-decoration:none;font-size:19px}.bottom span{font-size:10px;font-weight:800}.bottom .selected{color:#f45100}.bottom .selected span{font-weight:950}@media(min-width:520px){.phone{box-shadow:0 20px 70px rgba(0,0,0,.12)}}
+      `}</style>
     </main>
   );
 }
