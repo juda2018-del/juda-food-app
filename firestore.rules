@@ -76,11 +76,28 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /notifications/{id} {
-      allow create: if isCustomer() && request.resource.data.type == 'order'
-        && request.resource.data.restaurantId is string && request.resource.data.orderId is string && request.resource.data.orderDocumentId is string
+      allow create: if isCustomer()
+        && request.resource.data.keys().hasAll(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
+        && request.resource.data.keys().hasOnly(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
+        && request.resource.data.type == 'order'
+        && request.resource.data.audience == 'restaurant'
+        && request.resource.data.title == 'طلب جديد'
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 10
+        && request.resource.data.message.size() <= 220
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.restaurantId is string
+        && request.resource.data.phone is string
+        && request.resource.data.phone.matches('^07[0-9]{9}$')
+        && request.resource.data.orderId is string
+        && request.resource.data.orderDocumentId is string
+        && request.resource.data.read == false
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.customerUid == request.auth.uid
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.orderId == request.resource.data.orderId
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId;
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurantName
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurant
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.phone == request.resource.data.phone;
       allow read: if isAdmin() || (isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId());
       allow update: if isAdmin() || (isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']));
       allow delete: if isAdmin();
