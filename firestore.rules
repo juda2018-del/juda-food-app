@@ -33,43 +33,10 @@ service cloud.firestore {
         : '';
     }
 
-    function validOrderCreate() {
-      return request.resource.data.keys().hasAll([
-          'orderId', 'customerName', 'phone', 'address', 'restaurantId',
-          'restaurantName', 'items', 'subtotal', 'deliveryFee', 'total',
-          'currency', 'status', 'createdAt', 'updatedAt'
-        ])
-        && request.resource.data.orderId is string
-        && request.resource.data.orderId.size() >= 8
-        && request.resource.data.orderId.size() <= 40
-        && request.resource.data.customerName is string
-        && request.resource.data.customerName.size() >= 2
-        && request.resource.data.customerName.size() <= 80
-        && request.resource.data.phone is string
-        && request.resource.data.phone.matches('^07[0-9]{9}$')
-        && request.resource.data.address is string
-        && request.resource.data.address.size() >= 8
-        && request.resource.data.address.size() <= 220
-        && request.resource.data.restaurantId is string
-        && request.resource.data.restaurantId.size() > 0
-        && request.resource.data.items is list
-        && request.resource.data.items.size() > 0
-        && request.resource.data.items.size() <= 50
-        && request.resource.data.subtotal is number
-        && request.resource.data.deliveryFee is number
-        && request.resource.data.total is number
-        && request.resource.data.subtotal >= 0
-        && request.resource.data.deliveryFee >= 0
-        && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
-        && request.resource.data.currency == 'IQD'
-        && request.resource.data.status == 'جديد';
-    }
-
-    function ownsOrder(data) {
-      return signedIn() && (
-        (data.customerUid is string && data.customerUid == request.auth.uid)
-        || (data.customerEmail is string && data.customerEmail == request.auth.token.email)
-      );
+    function orderOwnedByCustomer(data) {
+      return signedIn()
+        && data.customerUid is string
+        && data.customerUid == request.auth.uid;
     }
 
     function restaurantOwns(data) {
@@ -85,10 +52,80 @@ service cloud.firestore {
       );
     }
 
+    function restaurantExists(id) {
+      return id is string
+        && id.size() > 0
+        && exists(/databases/$(database)/documents/restaurants/$(id));
+    }
+
+    function restaurantAcceptsOrders(id) {
+      let restaurant = get(/databases/$(database)/documents/restaurants/$(id)).data;
+      return restaurant.active != false
+        && restaurant.open != false
+        && restaurant.isOpen != false
+        && restaurant.status != 'مغلق';
+    }
+
+    function validOrderCreate() {
+      return signedIn()
+        && request.resource.data.keys().hasAll([
+          'orderId', 'customerUid', 'customerName', 'phone', 'address',
+          'restaurantId', 'restaurantName', 'items', 'subtotal',
+          'deliveryFee', 'total', 'currency', 'status', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.orderId is string
+        && request.resource.data.orderId.size() >= 8
+        && request.resource.data.orderId.size() <= 40
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() >= 2
+        && request.resource.data.customerName.size() <= 80
+        && request.resource.data.phone is string
+        && request.resource.data.phone.matches('^07[0-9]{9}$')
+        && request.resource.data.address is string
+        && request.resource.data.address.size() >= 8
+        && request.resource.data.address.size() <= 220
+        && restaurantExists(request.resource.data.restaurantId)
+        && restaurantAcceptsOrders(request.resource.data.restaurantId)
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 50
+        && request.resource.data.subtotal is number
+        && request.resource.data.deliveryFee is number
+        && request.resource.data.total is number
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.deliveryFee >= 0
+        && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
+        && request.resource.data.currency == 'IQD'
+        && request.resource.data.status == 'جديد';
+    }
+
+    function restaurantOrderUpdateAllowed() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status', 'updatedAt', 'acceptedAt', 'rejectedAt', 'readyAt',
+        'preparingAt', 'restaurantNote'
+      ]);
+    }
+
+    function driverOrderUpdateAllowed() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status', 'updatedAt', 'pickedUpAt', 'deliveredAt',
+        'driverLatitude', 'driverLongitude', 'driverLocationUpdatedAt'
+      ]);
+    }
+
     match /restaurants/{id} {
       allow read: if true;
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (isRestaurant() && id == restaurantId());
+      allow update: if isAdmin() || (
+        isRestaurant()
+        && id == restaurantId()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'description', 'phone', 'address', 'logo', 'cover',
+          'open', 'isOpen', 'status', 'deliveryFee', 'minimumOrder',
+          'workingHours', 'updatedAt'
+        ])
+      );
     }
 
     match /menu/{id} {
@@ -98,7 +135,13 @@ service cloud.firestore {
         && restaurantId() != ''
         && request.resource.data.restaurantId == restaurantId()
       );
-      allow update, delete: if isAdmin() || (
+      allow update: if isAdmin() || (
+        isRestaurant()
+        && restaurantId() != ''
+        && resource.data.restaurantId == restaurantId()
+        && request.resource.data.restaurantId == resource.data.restaurantId
+      );
+      allow delete: if isAdmin() || (
         isRestaurant()
         && restaurantId() != ''
         && resource.data.restaurantId == restaurantId()
@@ -108,21 +151,24 @@ service cloud.firestore {
     match /orders/{id} {
       allow create: if validOrderCreate();
       allow read: if isAdmin()
-        || ownsOrder(resource.data)
+        || orderOwnedByCustomer(resource.data)
         || restaurantOwns(resource.data)
         || driverOwns(resource.data);
       allow update: if isAdmin()
-        || restaurantOwns(resource.data)
-        || driverOwns(resource.data);
+        || (restaurantOwns(resource.data) && restaurantOrderUpdateAllowed())
+        || (driverOwns(resource.data) && driverOrderUpdateAllowed());
       allow delete: if isAdmin();
     }
 
     match /notifications/{id} {
-      allow create: if request.resource.data.type == 'order'
+      allow create: if signedIn()
+        && request.resource.data.type == 'order'
         && request.resource.data.restaurantId is string
-        && request.resource.data.restaurantId.size() > 0
         && request.resource.data.orderId is string
-        && request.resource.data.orderDocumentId is string;
+        && request.resource.data.orderDocumentId is string
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.customerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.orderId == request.resource.data.orderId
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId;
       allow read: if isAdmin() || (
         isRestaurant()
         && restaurantId() != ''
@@ -147,6 +193,10 @@ service cloud.firestore {
         && request.resource.data.driverRating is int
         && request.resource.data.driverRating >= 0
         && request.resource.data.driverRating <= 5
+        && exists(/databases/$(database)/documents/orders/$(orderDocumentId))
+        && get(/databases/$(database)/documents/orders/$(orderDocumentId)).data.customerUid == request.auth.uid
+        && get(/databases/$(database)/documents/orders/$(orderDocumentId)).data.status in ['تم التسليم', 'delivered']
+        && request.resource.data.restaurantId == get(/databases/$(database)/documents/orders/$(orderDocumentId)).data.restaurantId
         && !exists(/databases/$(database)/documents/ratings/$(orderDocumentId));
       allow read: if isAdmin()
         || (isCustomer() && resource.data.customerUid == request.auth.uid)
@@ -157,7 +207,9 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'customer';
       allow update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -173,7 +225,14 @@ service cloud.firestore {
 
     match /profiles/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'customer';
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'phone', 'photoURL', 'updatedAt'
+        ]);
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
     }
 
