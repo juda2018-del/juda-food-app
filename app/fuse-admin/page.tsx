@@ -12,9 +12,6 @@ type OrderDoc = {
   customerName?: string;
   customer?: string;
   name?: string;
-  phone?: string;
-  customerPhone?: string;
-  address?: string;
   restaurant?: string;
   restaurantName?: string;
   total?: number;
@@ -28,6 +25,7 @@ type OrderDoc = {
 type DriverDoc = { documentId: string; online?: boolean; isOnline?: boolean; status?: string };
 type RestaurantDoc = { documentId: string; name?: string; title?: string; restaurantName?: string; open?: boolean; isOpen?: boolean; active?: boolean; status?: string };
 type MenuDoc = { documentId: string; available?: boolean; isAvailable?: boolean };
+type RequestDoc = { documentId: string; status?: string };
 
 const CLOSED_STATUSES = new Set(["تم التسليم", "مرفوض", "ملغي", "ملغى", "Cancelled", "Delivered"]);
 
@@ -94,12 +92,19 @@ function isDriverOnline(item: DriverDoc) {
   return item.online === true || item.isOnline === true || item.status === "متصل";
 }
 
+function pendingCount(items: RequestDoc[]) {
+  return items.filter((item) => !item.status || item.status === "pending").length;
+}
+
 export default function FuseAdminPage() {
   const [session, setSession] = useState<FuseSession | null>(null);
   const [orders, setOrders] = useState<OrderDoc[]>([]);
   const [drivers, setDrivers] = useState<DriverDoc[]>([]);
   const [restaurants, setRestaurants] = useState<RestaurantDoc[]>([]);
   const [menu, setMenu] = useState<MenuDoc[]>([]);
+  const [driverRequests, setDriverRequests] = useState<RequestDoc[]>([]);
+  const [restaurantRequests, setRestaurantRequests] = useState<RequestDoc[]>([]);
+  const [deletionRequests, setDeletionRequests] = useState<RequestDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -118,17 +123,23 @@ export default function FuseAdminPage() {
 
   useEffect(() => {
     if (!session || session.role !== "admin") return;
+    const mapDocs = <T extends { documentId: string }>(snapshot: { docs: Array<{ id: string; data: () => unknown }> }) =>
+      snapshot.docs.map((item) => ({ ...(item.data() as Omit<T, "documentId">), documentId: item.id }));
+
     const unsubs = [
       onSnapshot(query(collection(db, "orders")), (snapshot) => {
-        const data = snapshot.docs.map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }));
+        const data = mapDocs<OrderDoc>(snapshot);
         data.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
         setOrders(data);
         setLoading(false);
         setError("");
       }, (e) => { setError(e.message || "تعذر تحميل الطلبات"); setLoading(false); }),
-      onSnapshot(query(collection(db, "drivers")), (snapshot) => setDrivers(snapshot.docs.map((item) => ({ ...(item.data() as Omit<DriverDoc, "documentId">), documentId: item.id }))), () => setDrivers([])),
-      onSnapshot(query(collection(db, "restaurants")), (snapshot) => setRestaurants(snapshot.docs.map((item) => ({ ...(item.data() as Omit<RestaurantDoc, "documentId">), documentId: item.id }))), () => setRestaurants([])),
-      onSnapshot(query(collection(db, "menu")), (snapshot) => setMenu(snapshot.docs.map((item) => ({ ...(item.data() as Omit<MenuDoc, "documentId">), documentId: item.id }))), () => setMenu([])),
+      onSnapshot(query(collection(db, "drivers")), (snapshot) => setDrivers(mapDocs<DriverDoc>(snapshot)), () => setDrivers([])),
+      onSnapshot(query(collection(db, "restaurants")), (snapshot) => setRestaurants(mapDocs<RestaurantDoc>(snapshot)), () => setRestaurants([])),
+      onSnapshot(query(collection(db, "menu")), (snapshot) => setMenu(mapDocs<MenuDoc>(snapshot)), () => setMenu([])),
+      onSnapshot(query(collection(db, "driverApplications")), (snapshot) => setDriverRequests(mapDocs<RequestDoc>(snapshot)), () => setDriverRequests([])),
+      onSnapshot(query(collection(db, "restaurantApplications")), (snapshot) => setRestaurantRequests(mapDocs<RequestDoc>(snapshot)), () => setRestaurantRequests([])),
+      onSnapshot(query(collection(db, "accountDeletionRequests")), (snapshot) => setDeletionRequests(mapDocs<RequestDoc>(snapshot)), () => setDeletionRequests([])),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [session]);
@@ -143,7 +154,6 @@ export default function FuseAdminPage() {
       active: active.length,
       new: count("جديد"),
       preparing: count("قيد التحضير"),
-      ready: count("جاهز للتوصيل"),
       delivering: count("قيد التوصيل"),
       delivered: delivered.length,
       rejected: count("مرفوض"),
@@ -172,6 +182,7 @@ export default function FuseAdminPage() {
   const onlineDrivers = drivers.filter(isDriverOnline).length;
   const openRestaurants = restaurants.filter(isRestaurantOpen).length;
   const availableMenu = menu.filter((item) => item.available !== false && item.isAvailable !== false).length;
+  const pendingRequests = pendingCount(driverRequests) + pendingCount(restaurantRequests) + pendingCount(deletionRequests);
 
   return (
     <main dir="rtl" className="page">
@@ -179,7 +190,7 @@ export default function FuseAdminPage() {
         <header className="topbar">
           <div><small>FUSE Iraq</small><h1>لوحة الإدارة</h1><p>{session?.name || session?.email || "الإدارة"}</p></div>
           <nav>
-            <Link href="/">الرئيسية</Link><Link href="/live-orders">الطلبات</Link><Link href="/restaurant-admin">المطاعم</Link><Link href="/auto-dispatch">التوزيع</Link><Link href="/drivers-admin">السائقون</Link>
+            <Link href="/">الرئيسية</Link><Link href="/live-orders">الطلبات</Link><Link href="/admin-requests">طلبات الانضمام {pendingRequests ? `(${pendingRequests})` : ""}</Link><Link href="/restaurant-admin">المطاعم</Link><Link href="/auto-dispatch">التوزيع</Link><Link href="/drivers-admin">السائقون</Link>
           </nav>
         </header>
 
@@ -203,6 +214,7 @@ export default function FuseAdminPage() {
           <article><span>المطاعم المفتوحة</span><b>{openRestaurants}/{restaurants.length}</b></article>
           <article><span>السائقون المتصلون</span><b>{onlineDrivers}/{drivers.length}</b></article>
           <article><span>الأصناف المتاحة</span><b>{availableMenu}/{menu.length}</b></article>
+          <Link href="/admin-requests"><span>طلبات بانتظار المراجعة</span><b>{pendingRequests || "فتح ←"}</b></Link>
           <Link href="/reels-review"><span>مراجعة الريلز</span><b>فتح ←</b></Link>
           <Link href="/system-tools"><span>أدوات النظام</span><b>فتح ←</b></Link>
         </section>
@@ -232,7 +244,7 @@ export default function FuseAdminPage() {
       </section>
 
       <style jsx>{`
-        *{box-sizing:border-box}.page{min-height:100vh;background:radial-gradient(circle at top right,rgba(255,122,0,.15),transparent 30%),#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1240px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}.topbar small,.hero span{color:#ff7a00;font-weight:900}.topbar h1{margin:4px 0;font-size:34px}.topbar p{margin:0;color:#aaa}.topbar nav{display:flex;gap:8px;flex-wrap:wrap}.topbar a,.head a{color:#fff;text-decoration:none;background:#171717;border:1px solid #333;border-radius:14px;padding:10px 13px;font-weight:900}.alert{background:#401313;color:#ffaaaa;border-radius:16px;padding:13px;margin-bottom:14px}.hero{display:grid;grid-template-columns:1fr minmax(250px,.45fr);gap:14px;background:linear-gradient(135deg,#171717,#33261c);border:1px solid #38322e;border-radius:30px;padding:22px;margin-bottom:14px}.hero h2{font-size:40px;margin:8px 0}.hero p{color:#ccc;line-height:1.7}.hero article{background:rgba(255,255,255,.07);border-radius:24px;padding:20px;display:grid;align-content:center;gap:10px}.hero article b{font-size:34px;color:#ff9b43}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}.stats article,.system article,.system a{background:#121212;border:1px solid #292929;border-radius:22px;padding:16px;display:grid;gap:7px;color:#fff;text-decoration:none}.stats span,.system span{color:#aaa;font-size:12px;font-weight:800}.stats b,.system b{font-size:27px}.stats small{color:#888}.system{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.panel{background:#111;border:1px solid #2c2c2c;border-radius:28px;padding:17px}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.head h2{margin:0}.order{display:grid;grid-template-columns:1fr auto 130px;gap:12px;align-items:center;border-top:1px solid #292929;padding:13px 0}.order:first-of-type{border-top:0}.order div,.restaurant div{display:grid;gap:5px}.order span,.restaurant span{color:#999;font-size:12px}.order em{font-style:normal;text-align:center;background:#2a211a;color:#ffb067;padding:9px;border-radius:12px;font-size:12px;font-weight:900}.restaurant{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #292929;padding:14px 0}.restaurant:first-of-type{border-top:0}.restaurant>b{color:#ff9b43}.empty{text-align:center;color:#999;padding:28px}@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.system{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}@media(max-width:600px){.page{padding:12px 8px}.topbar{align-items:flex-start}.hero{grid-template-columns:1fr}.hero h2{font-size:31px}.stats{grid-template-columns:repeat(2,1fr)}.system{grid-template-columns:1fr}.order{grid-template-columns:1fr}.order em{text-align:right}.panel{border-radius:22px;padding:14px}}
+        *{box-sizing:border-box}.page{min-height:100vh;background:radial-gradient(circle at top right,rgba(255,122,0,.15),transparent 30%),#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1240px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}.topbar small,.hero span{color:#ff7a00;font-weight:900}.topbar h1{margin:4px 0;font-size:34px}.topbar p{margin:0;color:#aaa}.topbar nav{display:flex;gap:8px;flex-wrap:wrap}.topbar a,.head a{color:#fff;text-decoration:none;background:#171717;border:1px solid #333;border-radius:14px;padding:10px 13px;font-weight:900}.alert{background:#401313;color:#ffaaaa;border-radius:16px;padding:13px;margin-bottom:14px}.hero{display:grid;grid-template-columns:1fr minmax(250px,.45fr);gap:14px;background:linear-gradient(135deg,#171717,#33261c);border:1px solid #38322e;border-radius:30px;padding:22px;margin-bottom:14px}.hero h2{font-size:40px;margin:8px 0}.hero p{color:#ccc;line-height:1.7}.hero article{background:rgba(255,255,255,.07);border-radius:24px;padding:20px;display:grid;align-content:center;gap:10px}.hero article b{font-size:34px;color:#ff9b43}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}.stats article,.system article,.system a{background:#121212;border:1px solid #292929;border-radius:22px;padding:16px;display:grid;gap:7px;color:#fff;text-decoration:none}.stats span,.system span{color:#aaa;font-size:12px;font-weight:800}.stats b,.system b{font-size:27px}.stats small{color:#888}.system{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.panel{background:#111;border:1px solid #2c2c2c;border-radius:28px;padding:17px}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.head h2{margin:0}.order{display:grid;grid-template-columns:1fr auto 130px;gap:12px;align-items:center;border-top:1px solid #292929;padding:13px 0}.order:first-of-type{border-top:0}.order div,.restaurant div{display:grid;gap:5px}.order span,.restaurant span{color:#999;font-size:12px}.order em{font-style:normal;text-align:center;background:#2a211a;color:#ffb067;padding:9px;border-radius:12px;font-size:12px;font-weight:900}.restaurant{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #292929;padding:14px 0}.restaurant:first-of-type{border-top:0}.restaurant>b{color:#ff9b43}.empty{text-align:center;color:#999;padding:28px}@media(max-width:1050px){.system{grid-template-columns:repeat(3,1fr)}}@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.layout{grid-template-columns:1fr}}@media(max-width:600px){.page{padding:12px 8px}.topbar{align-items:flex-start;flex-direction:column}.hero{grid-template-columns:1fr}.hero h2{font-size:31px}.stats{grid-template-columns:repeat(2,1fr)}.system{grid-template-columns:1fr}.order{grid-template-columns:1fr}.order em{text-align:right}.panel{border-radius:22px;padding:14px}}
       `}</style>
     </main>
   );
