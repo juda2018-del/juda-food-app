@@ -1,16 +1,10 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
-import {
-  FUSE_LOCAL_SESSION,
-  parseFuseRole,
-  roleHome,
-  roleTitle,
-  type FuseSession,
-} from "@/lib/fuse-auth";
+import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
 
 type OrderDoc = {
   documentId: string;
@@ -27,388 +21,78 @@ type OrderDoc = {
   amount?: number;
   status?: string;
   driverName?: string;
-  driverPhone?: string;
+  assignedDriverName?: string;
   createdAt?: unknown;
 };
 
-type DriverDoc = {
-  documentId: string;
-  name?: string;
-  driverName?: string;
-  phone?: string;
-  driverPhone?: string;
-  status?: string;
-  online?: boolean;
-  isOnline?: boolean;
-  rating?: number;
-};
+type DriverDoc = { documentId: string; online?: boolean; isOnline?: boolean; status?: string };
+type RestaurantDoc = { documentId: string; name?: string; title?: string; restaurantName?: string; open?: boolean; isOpen?: boolean; active?: boolean; status?: string };
+type MenuDoc = { documentId: string; available?: boolean; isAvailable?: boolean };
 
-type RestaurantDoc = {
-  documentId: string;
-  name?: string;
-  title?: string;
-  restaurant?: string;
-  status?: string;
-  open?: boolean;
-  isOpen?: boolean;
-};
-
-type MenuDoc = {
-  documentId: string;
-  name?: string;
-  title?: string;
-  restaurant?: string;
-  restaurantName?: string;
-  available?: boolean;
-  isAvailable?: boolean;
-};
-
-type RatingDoc = {
-  documentId: string;
-  restaurantRating?: number;
-  driverRating?: number;
-  restaurant?: string;
-};
+const CLOSED_STATUSES = new Set(["تم التسليم", "مرفوض", "ملغي", "ملغى", "Cancelled", "Delivered"]);
 
 function readSession(): FuseSession | null {
   try {
     const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
     if (!raw) return null;
-
     const parsed = JSON.parse(raw) as FuseSession;
     const role = parseFuseRole(parsed.role);
-
     if (!parsed.email || !role) return null;
-
     return { ...parsed, role };
   } catch {
     return null;
   }
 }
 
-function toDate(value: unknown): Date | null {
-  try {
-    if (!value) return null;
-
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toDate" in value &&
-      typeof (value as { toDate?: unknown }).toDate === "function"
-    ) {
-      return (value as { toDate: () => Date }).toDate();
-    }
-
-    if (value instanceof Date) return value;
-
-    const date = new Date(value as string | number);
-    return Number.isNaN(date.getTime()) ? null : date;
-  } catch {
-    return null;
-  }
-}
-
-function formatDate(value: unknown) {
-  const date = toDate(value);
-  if (!date) return "بدون وقت";
-
-  return date.toLocaleString("ar-IQ", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
 function normalizeStatus(status?: string) {
   if (!status) return "جديد";
-  if (status === "جاهز") return "جاهز للتوصيل";
+  if (status === "جاهز" || status === "ready" || status === "ready_for_delivery") return "جاهز للتوصيل";
   if (status === "السائق استلم") return "قيد التوصيل";
+  if (status === "Delivered") return "تم التسليم";
+  if (status === "Cancelled") return "ملغي";
   return status;
 }
 
-function getRestaurant(order: OrderDoc | MenuDoc) {
-  return order.restaurant || order.restaurantName || "مطعم";
+function toMillis(value: unknown) {
+  try {
+    if (value && typeof value === "object" && "toDate" in value) {
+      const fn = (value as { toDate?: unknown }).toDate;
+      if (typeof fn === "function") return (fn as () => Date)().getTime();
+    }
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  } catch {
+    return 0;
+  }
 }
 
-function getRestaurantName(item: RestaurantDoc) {
-  return item.name || item.title || item.restaurant || "مطعم";
+function money(value: number) {
+  return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
+}
+
+function getTotal(order: OrderDoc) {
+  return Math.max(0, Number(order.total || order.amount || 0));
+}
+
+function getRestaurant(order: OrderDoc) {
+  return order.restaurantName || order.restaurant || "مطعم غير محدد";
 }
 
 function getCustomer(order: OrderDoc) {
   return order.customerName || order.customer || order.name || "زبون";
 }
 
-function getPhone(order: OrderDoc) {
-  return order.phone || order.customerPhone || "";
+function isActive(order: OrderDoc) {
+  return !CLOSED_STATUSES.has(normalizeStatus(order.status));
 }
 
-function getTotal(order: OrderDoc) {
-  return Number(order.total || order.amount || 0);
+function isRestaurantOpen(item: RestaurantDoc) {
+  return item.active !== false && item.open !== false && item.isOpen !== false && item.status !== "مغلق";
 }
 
-function isActiveOrder(order: OrderDoc) {
-  const status = normalizeStatus(order.status);
-  return status !== "تم التسليم" && status !== "مرفوض";
+function isDriverOnline(item: DriverDoc) {
+  return item.online === true || item.isOnline === true || item.status === "متصل";
 }
-
-function isOnlineDriver(driver: DriverDoc) {
-  return driver.online === true || driver.isOnline === true || driver.status === "متصل";
-}
-
-function isOpenRestaurant(item: RestaurantDoc) {
-  return item.open === true || item.isOpen === true || item.status === "مفتوح";
-}
-
-function isAvailableMenu(item: MenuDoc) {
-  return item.available !== false && item.isAvailable !== false;
-}
-
-function average(values: number[]) {
-  const clean = values.filter((value) => Number.isFinite(value) && value > 0);
-  if (!clean.length) return 0;
-  return clean.reduce((sum, value) => sum + value, 0) / clean.length;
-}
-
-function statusStyle(status?: string): CSSProperties {
-  const clean = normalizeStatus(status);
-
-  if (clean === "جديد") return styles.badgeOrange;
-  if (clean === "قيد التحضير") return styles.badgeYellow;
-  if (clean === "جاهز للتوصيل") return styles.badgeSky;
-  if (clean === "قيد التوصيل") return styles.badgePurple;
-  if (clean === "تم التسليم") return styles.badgeGreen;
-  if (clean === "مرفوض") return styles.badgeRed;
-
-  return styles.badgeMuted;
-}
-
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
-    color: "white",
-    padding: "26px 16px",
-    fontFamily: "Arial, sans-serif",
-  },
-  shell: {
-    width: "100%",
-    maxWidth: 1240,
-    margin: "0 auto",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 16,
-  },
-  nav: {
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  pill: {
-    border: "1px solid rgba(255,255,255,0.13)",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.05)",
-    padding: "11px 16px",
-    color: "rgba(255,255,255,0.82)",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 900,
-  },
-  activePill: {
-    border: "1px solid rgba(255,122,0,0.35)",
-    borderRadius: 999,
-    background: "#FF7A00",
-    padding: "11px 16px",
-    color: "#000",
-    textDecoration: "none",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  hero: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 34,
-    background:
-      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.10))",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-    padding: 22,
-    marginBottom: 16,
-  },
-  heroGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) repeat(4, minmax(150px, 0.32fr))",
-    gap: 12,
-    alignItems: "stretch",
-  },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.36)",
-    padding: 20,
-  },
-  compactCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 24,
-    background: "rgba(0,0,0,0.34)",
-    padding: 16,
-    minHeight: 118,
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#FF7A00",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  title: {
-    margin: "8px 0 0",
-    fontSize: "clamp(36px, 5vw, 62px)",
-    lineHeight: 1.08,
-    fontWeight: 950,
-  },
-  orange: {
-    color: "#FF7A00",
-  },
-  muted: {
-    color: "rgba(255,255,255,0.58)",
-    lineHeight: 1.85,
-    fontSize: 14,
-  },
-  statLabel: {
-    margin: 0,
-    color: "rgba(255,255,255,0.52)",
-    fontSize: 13,
-    fontWeight: 850,
-  },
-  statValue: {
-    margin: "10px 0 0",
-    fontSize: 30,
-    fontWeight: 950,
-  },
-  quickGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-    gap: 10,
-    marginBottom: 16,
-  },
-  quickCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 22,
-    background: "rgba(255,255,255,0.045)",
-    padding: 16,
-    color: "white",
-    textDecoration: "none",
-  },
-  layout: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(320px, 0.42fr)",
-    gap: 14,
-    marginBottom: 16,
-  },
-  panel: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 30,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-  },
-  sectionTitle: {
-    margin: 0,
-    fontSize: 25,
-    fontWeight: 950,
-  },
-  rowList: {
-    display: "grid",
-    gap: 10,
-    marginTop: 14,
-  },
-  row: {
-    display: "grid",
-    gridTemplateColumns: "minmax(180px, 1fr) 130px 130px",
-    gap: 10,
-    alignItems: "center",
-    border: "1px solid rgba(255,255,255,0.09)",
-    borderRadius: 18,
-    background: "rgba(0,0,0,0.26)",
-    padding: 12,
-  },
-  restaurantRow: {
-    display: "grid",
-    gridTemplateColumns: "minmax(160px, 1fr) 110px 110px",
-    gap: 10,
-    alignItems: "center",
-    border: "1px solid rgba(255,255,255,0.09)",
-    borderRadius: 18,
-    background: "rgba(0,0,0,0.26)",
-    padding: 12,
-  },
-  smallGrid: {
-    display: "grid",
-    gap: 10,
-    marginTop: 14,
-  },
-  miniBox: {
-    border: "1px solid rgba(255,255,255,0.09)",
-    borderRadius: 20,
-    background: "rgba(0,0,0,0.26)",
-    padding: 14,
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid",
-    borderRadius: 999,
-    padding: "7px 11px",
-    fontSize: 12,
-    fontWeight: 950,
-  },
-  badgeOrange: {
-    borderColor: "rgba(255,122,0,0.42)",
-    background: "rgba(255,122,0,0.12)",
-    color: "#FFB56B",
-  },
-  badgeYellow: {
-    borderColor: "rgba(234,179,8,0.42)",
-    background: "rgba(234,179,8,0.12)",
-    color: "#FDE68A",
-  },
-  badgeSky: {
-    borderColor: "rgba(14,165,233,0.42)",
-    background: "rgba(14,165,233,0.12)",
-    color: "#7DD3FC",
-  },
-  badgePurple: {
-    borderColor: "rgba(168,85,247,0.42)",
-    background: "rgba(168,85,247,0.12)",
-    color: "#D8B4FE",
-  },
-  badgeGreen: {
-    borderColor: "rgba(34,197,94,0.42)",
-    background: "rgba(34,197,94,0.12)",
-    color: "#86EFAC",
-  },
-  badgeRed: {
-    borderColor: "rgba(239,68,68,0.42)",
-    background: "rgba(239,68,68,0.12)",
-    color: "#FCA5A5",
-  },
-  badgeMuted: {
-    borderColor: "rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.06)",
-    color: "rgba(255,255,255,0.65)",
-  },
-  empty: {
-    border: "1px dashed rgba(255,255,255,0.16)",
-    borderRadius: 24,
-    background: "rgba(255,255,255,0.035)",
-    padding: 24,
-    textAlign: "center",
-  },
-};
 
 export default function FuseAdminPage() {
   const [session, setSession] = useState<FuseSession | null>(null);
@@ -416,394 +100,140 @@ export default function FuseAdminPage() {
   const [drivers, setDrivers] = useState<DriverDoc[]>([]);
   const [restaurants, setRestaurants] = useState<RestaurantDoc[]>([]);
   const [menu, setMenu] = useState<MenuDoc[]>([]);
-  const [ratings, setRatings] = useState<RatingDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const saved = readSession();
-
     if (!saved) {
       window.location.href = "/login?next=/fuse-admin";
       return;
     }
-
     if (saved.role !== "admin") {
-      window.location.href = roleHome[saved.role] || "/live-orders";
+      window.location.href = roleHome[saved.role] || "/login";
       return;
     }
-
     setSession(saved);
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      query(collection(db, "orders")),
-      (snapshot) => {
-        const data = snapshot.docs.map((item) => ({
-          ...(item.data() as Omit<OrderDoc, "documentId">),
-          documentId: item.id,
-        }));
-
-        data.sort((a, b) => {
-          const ad = toDate(a.createdAt)?.getTime() || 0;
-          const bd = toDate(b.createdAt)?.getTime() || 0;
-          return bd - ad;
-        });
-
+    if (!session || session.role !== "admin") return;
+    const unsubs = [
+      onSnapshot(query(collection(db, "orders")), (snapshot) => {
+        const data = snapshot.docs.map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }));
+        data.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
         setOrders(data);
         setLoading(false);
-      },
-      () => {
-        setOrders([]);
-        setLoading(false);
-      }
-    );
+        setError("");
+      }, (e) => { setError(e.message || "تعذر تحميل الطلبات"); setLoading(false); }),
+      onSnapshot(query(collection(db, "drivers")), (snapshot) => setDrivers(snapshot.docs.map((item) => ({ ...(item.data() as Omit<DriverDoc, "documentId">), documentId: item.id }))), () => setDrivers([])),
+      onSnapshot(query(collection(db, "restaurants")), (snapshot) => setRestaurants(snapshot.docs.map((item) => ({ ...(item.data() as Omit<RestaurantDoc, "documentId">), documentId: item.id }))), () => setRestaurants([])),
+      onSnapshot(query(collection(db, "menu")), (snapshot) => setMenu(snapshot.docs.map((item) => ({ ...(item.data() as Omit<MenuDoc, "documentId">), documentId: item.id }))), () => setMenu([])),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [session]);
 
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      query(collection(db, "drivers")),
-      (snapshot) => {
-        setDrivers(
-          snapshot.docs.map((item) => ({
-            ...(item.data() as Omit<DriverDoc, "documentId">),
-            documentId: item.id,
-          }))
-        );
-      },
-      () => setDrivers([])
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      query(collection(db, "restaurants")),
-      (snapshot) => {
-        setRestaurants(
-          snapshot.docs.map((item) => ({
-            ...(item.data() as Omit<RestaurantDoc, "documentId">),
-            documentId: item.id,
-          }))
-        );
-      },
-      () => setRestaurants([])
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      query(collection(db, "menu")),
-      (snapshot) => {
-        setMenu(
-          snapshot.docs.map((item) => ({
-            ...(item.data() as Omit<MenuDoc, "documentId">),
-            documentId: item.id,
-          }))
-        );
-      },
-      () => setMenu([])
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      query(collection(db, "ratings")),
-      (snapshot) => {
-        setRatings(
-          snapshot.docs.map((item) => ({
-            ...(item.data() as Omit<RatingDoc, "documentId">),
-            documentId: item.id,
-          }))
-        );
-      },
-      () => setRatings([])
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  const activeOrders = orders.filter(isActiveOrder);
-  const newOrders = orders.filter((order) => normalizeStatus(order.status) === "جديد");
-  const preparingOrders = orders.filter((order) => normalizeStatus(order.status) === "قيد التحضير");
-  const readyOrders = orders.filter((order) => normalizeStatus(order.status) === "جاهز للتوصيل");
-  const deliveringOrders = orders.filter((order) => normalizeStatus(order.status) === "قيد التوصيل");
-  const deliveredOrders = orders.filter((order) => normalizeStatus(order.status) === "تم التسليم");
-
-  const revenue = deliveredOrders.reduce((sum, order) => sum + getTotal(order), 0);
-  const onlineDrivers = drivers.filter(isOnlineDriver);
-  const openRestaurants = restaurants.filter(isOpenRestaurant);
-  const availableMenu = menu.filter(isAvailableMenu);
-
-  const avgRestaurantRating = average(ratings.map((rating) => Number(rating.restaurantRating || 0)));
-  const avgDriverRating = average(ratings.map((rating) => Number(rating.driverRating || 0)));
-
-  const restaurantStats = useMemo(() => {
-    const map = new Map<string, { orders: number; revenue: number; active: number }>();
-
-    for (const order of orders) {
-      const restaurant = getRestaurant(order);
-      const current = map.get(restaurant) || { orders: 0, revenue: 0, active: 0 };
-      const status = normalizeStatus(order.status);
-
-      map.set(restaurant, {
-        orders: current.orders + 1,
-        active: current.active + (isActiveOrder(order) ? 1 : 0),
-        revenue: current.revenue + (status === "تم التسليم" ? getTotal(order) : 0),
-      });
-    }
-
-    return Array.from(map.entries())
-      .map(([restaurant, value]) => ({ restaurant, ...value }))
-      .sort((a, b) => b.active - a.active || b.revenue - a.revenue)
-      .slice(0, 8);
+  const stats = useMemo(() => {
+    const count = (status: string) => orders.filter((order) => normalizeStatus(order.status) === status).length;
+    const delivered = orders.filter((order) => normalizeStatus(order.status) === "تم التسليم");
+    const active = orders.filter(isActive);
+    const assignedReady = orders.filter((order) => normalizeStatus(order.status) === "جاهز للتوصيل" && Boolean(order.driverName || order.assignedDriverName));
+    const unassignedReady = orders.filter((order) => normalizeStatus(order.status) === "جاهز للتوصيل" && !order.driverName && !order.assignedDriverName);
+    return {
+      active: active.length,
+      new: count("جديد"),
+      preparing: count("قيد التحضير"),
+      ready: count("جاهز للتوصيل"),
+      delivering: count("قيد التوصيل"),
+      delivered: delivered.length,
+      rejected: count("مرفوض"),
+      cancelled: count("ملغي") + count("ملغى"),
+      grossSales: delivered.reduce((sum, order) => sum + getTotal(order), 0),
+      assignedReady: assignedReady.length,
+      unassignedReady: unassignedReady.length,
+    };
   }, [orders]);
 
-  const latestOrders = orders.slice(0, 10);
+  const restaurantStats = useMemo(() => {
+    const map = new Map<string, { orders: number; active: number; sales: number }>();
+    for (const order of orders) {
+      const name = getRestaurant(order);
+      const current = map.get(name) || { orders: 0, active: 0, sales: 0 };
+      map.set(name, {
+        orders: current.orders + 1,
+        active: current.active + (isActive(order) ? 1 : 0),
+        sales: current.sales + (normalizeStatus(order.status) === "تم التسليم" ? getTotal(order) : 0),
+      });
+    }
+    return Array.from(map.entries()).map(([name, value]) => ({ name, ...value })).sort((a, b) => b.active - a.active || b.sales - a.sales).slice(0, 8);
+  }, [orders]);
 
-  const quickLinks = [
-    { title: "الطلبات المباشرة", desc: "متابعة كل الطلبات", href: "/live-orders", icon: "📡" },
-    { title: "لوحة المطعم", desc: "طلبات ومنيو المطاعم", href: "/restaurant-admin", icon: "🍽️" },
-    { title: "التوزيع التلقائي", desc: "ربط الطلبات بالسائقين", href: "/auto-dispatch", icon: "⚡" },
-    { title: "إدارة السائقين", desc: "تشغيل وإيقاف السائقين", href: "/drivers-admin", icon: "🛵" },
-    { title: "التقارير", desc: "المبيعات والأداء", href: "/reports", icon: "📊" },
-    { title: "مراجعة الريلز", desc: "قبول أو رفض ريلز المطاعم", href: "/reels-review", icon: "🎬" },
-    { title: "أدوات النظام", desc: "تنظيف وفحص Firestore", href: "/system-tools", icon: "🧰" },
-  ];
+  const latestOrders = orders.slice(0, 12);
+  const onlineDrivers = drivers.filter(isDriverOnline).length;
+  const openRestaurants = restaurants.filter(isRestaurantOpen).length;
+  const availableMenu = menu.filter((item) => item.available !== false && item.isAvailable !== false).length;
 
   return (
-    <main dir="rtl" style={styles.page}>
-      <section style={styles.shell}>
-        <header style={styles.topBar}>
-          <nav style={styles.nav}>
-            <Link href="/" style={styles.pill}>
-              الرئيسية
-            </Link>
-            <Link href="/fuse-admin" style={styles.activePill}>
-              لوحة الإدارة
-            </Link>
-            <Link href="/live-orders" style={styles.pill}>
-              الطلبات
-            </Link>
-            <Link href="/reports" style={styles.pill}>
-              التقارير
-            </Link>
-            <Link href="/system-tools" style={styles.pill}>
-              أدوات النظام
-            </Link>
+    <main dir="rtl" className="page">
+      <section className="shell">
+        <header className="topbar">
+          <div><small>FUSE Iraq</small><h1>لوحة الإدارة</h1><p>{session?.name || session?.email || "الإدارة"}</p></div>
+          <nav>
+            <Link href="/">الرئيسية</Link><Link href="/live-orders">الطلبات</Link><Link href="/restaurant-admin">المطاعم</Link><Link href="/auto-dispatch">التوزيع</Link><Link href="/drivers-admin">السائقون</Link>
           </nav>
-
-          <Link href="/" style={styles.pill}>
-            FUSE Iraq
-          </Link>
         </header>
 
-        <section style={styles.hero}>
-          <div style={styles.heroGrid}>
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>لوحة الإدارة العليا</p>
-              <h1 style={styles.title}>
-                مركز قيادة
-                <br />
-                <span style={styles.orange}>FUSE التشغيلي</span>
-              </h1>
-              <p style={styles.muted}>
-                متابعة الطلبات، المبيعات، المطاعم، السائقين، والتقييمات من مكان واحد.
-              </p>
-            </div>
+        {error ? <div className="alert">{error}</div> : null}
 
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>الدور</p>
-              <p style={{ ...styles.statValue, ...styles.orange }}>
-                {session ? roleTitle[session.role] : "—"}
-              </p>
-              <p style={styles.muted}>{session?.name || "غير مسجل"}</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>طلبات نشطة</p>
-              <p style={{ ...styles.statValue, color: "#86EFAC" }}>{activeOrders.length}</p>
-              <p style={styles.muted}>جديدة: {newOrders.length}</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>المبيعات</p>
-              <p style={{ ...styles.statValue, color: "#FFB56B" }}>
-                {revenue.toLocaleString()}
-              </p>
-              <p style={styles.muted}>دينار عراقي</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>السائقين</p>
-              <p style={{ ...styles.statValue, color: "#7DD3FC" }}>
-                {onlineDrivers.length}/{drivers.length}
-              </p>
-              <p style={styles.muted}>متصل / الكل</p>
-            </div>
-          </div>
+        <section className="hero">
+          <div><span>مركز التشغيل</span><h2>كل حركة التطبيق<br />بأرقام حقيقية</h2><p>المبيعات هنا هي إجمالي الطلبات المسلّمة فقط، وليست أرباح FUSE أو العمولة.</p></div>
+          <article><small>إجمالي المبيعات المسلّمة</small><b>{money(stats.grossSales)}</b></article>
         </section>
 
-        <section style={styles.quickGrid}>
-          {quickLinks.map((item) => (
-            <Link key={item.href} href={item.href} style={styles.quickCard}>
-              <p style={styles.eyebrow}>{item.icon}</p>
-              <h3 style={{ margin: "8px 0 0", fontSize: 19, fontWeight: 950 }}>
-                {item.title}
-              </h3>
-              <p style={{ ...styles.muted, margin: "6px 0 0" }}>{item.desc}</p>
-            </Link>
-          ))}
+        <section className="stats">
+          <article><span>نشطة</span><b>{stats.active}</b><small>جديدة {stats.new}</small></article>
+          <article><span>قيد التحضير</span><b>{stats.preparing}</b><small>داخل المطاعم</small></article>
+          <article><span>جاهزة بلا سائق</span><b>{stats.unassignedReady}</b><small>تحتاج توزيع</small></article>
+          <article><span>جاهزة ومخصصة</span><b>{stats.assignedReady}</b><small>بانتظار استلام السائق</small></article>
+          <article><span>قيد التوصيل</span><b>{stats.delivering}</b><small>مع السائقين</small></article>
+          <article><span>مسلّمة</span><b>{stats.delivered}</b><small>مرفوضة {stats.rejected} · ملغاة {stats.cancelled}</small></article>
         </section>
 
-        <section style={styles.hero}>
-          <div style={styles.heroGrid}>
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>قيد التحضير</p>
-              <p style={{ ...styles.statValue, color: "#FDE68A" }}>{preparingOrders.length}</p>
-              <p style={styles.muted}>داخل المطبخ</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>جاهزة للتوصيل</p>
-              <p style={{ ...styles.statValue, color: "#7DD3FC" }}>{readyOrders.length}</p>
-              <p style={styles.muted}>تحتاج توزيع</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>قيد التوصيل</p>
-              <p style={{ ...styles.statValue, color: "#D8B4FE" }}>{deliveringOrders.length}</p>
-              <p style={styles.muted}>مع السائقين</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>المطاعم</p>
-              <p style={{ ...styles.statValue, color: "#86EFAC" }}>
-                {openRestaurants.length}/{restaurants.length || restaurantStats.length}
-              </p>
-              <p style={styles.muted}>مفتوح / الكل</p>
-            </div>
-
-            <div style={styles.compactCard}>
-              <p style={styles.statLabel}>المنيو والتقييم</p>
-              <p style={{ ...styles.statValue, color: "#FFB56B" }}>{availableMenu.length}</p>
-              <p style={styles.muted}>
-                مطعم {avgRestaurantRating.toFixed(1)} / سائق {avgDriverRating.toFixed(1)}
-              </p>
-            </div>
-          </div>
+        <section className="system">
+          <article><span>المطاعم المفتوحة</span><b>{openRestaurants}/{restaurants.length}</b></article>
+          <article><span>السائقون المتصلون</span><b>{onlineDrivers}/{drivers.length}</b></article>
+          <article><span>الأصناف المتاحة</span><b>{availableMenu}/{menu.length}</b></article>
+          <Link href="/reels-review"><span>مراجعة الريلز</span><b>فتح ←</b></Link>
+          <Link href="/system-tools"><span>أدوات النظام</span><b>فتح ←</b></Link>
         </section>
 
-        {loading ? (
-          <div style={styles.empty}>
-            <h2 style={{ margin: 0 }}>جاري تحميل لوحة الإدارة...</h2>
-            <p style={styles.muted}>انتظر لحظات.</p>
-          </div>
-        ) : (
-          <section style={styles.layout}>
-            <section style={styles.panel}>
-              <h2 style={styles.sectionTitle}>آخر الطلبات</h2>
-
-              <div style={styles.rowList}>
-                {latestOrders.length === 0 ? (
-                  <div style={styles.empty}>
-                    <h3 style={{ margin: 0 }}>ماكو طلبات حالياً</h3>
-                    <p style={styles.muted}>إذا وصل طلب جديد راح يظهر هنا.</p>
-                  </div>
-                ) : (
-                  latestOrders.map((order) => (
-                    <article key={order.documentId} style={styles.row}>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 950 }}>
-                          {getCustomer(order)}
-                        </p>
-                        <p style={{ ...styles.muted, margin: "6px 0 0" }}>
-                          {getRestaurant(order)} — {formatDate(order.createdAt)}
-                        </p>
-                        <p style={{ ...styles.muted, margin: "6px 0 0", direction: "ltr" }}>
-                          {getPhone(order) || "—"}
-                        </p>
-                      </div>
-
-                      <span style={{ ...styles.badge, ...statusStyle(order.status) }}>
-                        {normalizeStatus(order.status)}
-                      </span>
-
-                      <p style={{ margin: 0, color: "#FFB56B", fontWeight: 950 }}>
-                        {getTotal(order).toLocaleString()} د.ع
-                      </p>
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <aside style={styles.panel}>
-              <h2 style={styles.sectionTitle}>أداء المطاعم</h2>
-
-              <div style={styles.rowList}>
-                {restaurantStats.length === 0 ? (
-                  <div style={styles.empty}>
-                    <h3 style={{ margin: 0 }}>ماكو بيانات مطاعم</h3>
-                  </div>
-                ) : (
-                  restaurantStats.map((item) => (
-                    <article key={item.restaurant} style={styles.restaurantRow}>
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 950 }}>
-                          {item.restaurant}
-                        </p>
-                        <p style={{ ...styles.muted, margin: "6px 0 0" }}>
-                          {item.orders} طلب
-                        </p>
-                      </div>
-
-                      <p style={{ margin: 0, color: "#86EFAC", fontWeight: 950 }}>
-                        {item.active}
-                      </p>
-
-                      <p style={{ margin: 0, color: "#FFB56B", fontWeight: 950 }}>
-                        {item.revenue.toLocaleString()}
-                      </p>
-                    </article>
-                  ))
-                )}
-              </div>
-
-              <div style={styles.smallGrid}>
-                <div style={styles.miniBox}>
-                  <p style={styles.statLabel}>مطاعم مسجلة</p>
-                  <p style={{ ...styles.statValue, ...styles.orange }}>
-                    {restaurants.length || restaurantStats.length}
-                  </p>
-                </div>
-
-                <div style={styles.miniBox}>
-                  <p style={styles.statLabel}>أصناف المنيو</p>
-                  <p style={{ ...styles.statValue, color: "#7DD3FC" }}>
-                    {menu.length}
-                  </p>
-                  <p style={styles.muted}>المتاحة: {availableMenu.length}</p>
-                </div>
-
-                <div style={styles.miniBox}>
-                  <p style={styles.statLabel}>التقييمات</p>
-                  <p style={{ ...styles.statValue, color: "#86EFAC" }}>
-                    {ratings.length}
-                  </p>
-                </div>
-              </div>
-            </aside>
+        <section className="layout">
+          <section className="panel">
+            <div className="head"><h2>أحدث الطلبات</h2><Link href="/live-orders">عرض الكل</Link></div>
+            {loading ? <div className="empty">جاري التحميل...</div> : latestOrders.length ? latestOrders.map((order) => (
+              <article className="order" key={order.documentId}>
+                <div><strong>{order.orderId || order.documentId}</strong><span>{getCustomer(order)} · {getRestaurant(order)}</span></div>
+                <b>{money(getTotal(order))}</b>
+                <em>{normalizeStatus(order.status)}</em>
+              </article>
+            )) : <div className="empty">ماكو طلبات حالياً.</div>}
           </section>
-        )}
+
+          <aside className="panel">
+            <div className="head"><h2>أداء المطاعم</h2><Link href="/restaurant-admin">الإدارة</Link></div>
+            {restaurantStats.length ? restaurantStats.map((item) => (
+              <article className="restaurant" key={item.name}>
+                <div><strong>{item.name}</strong><span>{item.orders} طلب · {item.active} نشط</span></div>
+                <b>{money(item.sales)}</b>
+              </article>
+            )) : <div className="empty">ماكو بيانات مطاعم بعد.</div>}
+          </aside>
+        </section>
       </section>
+
+      <style jsx>{`
+        *{box-sizing:border-box}.page{min-height:100vh;background:radial-gradient(circle at top right,rgba(255,122,0,.15),transparent 30%),#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1240px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}.topbar small,.hero span{color:#ff7a00;font-weight:900}.topbar h1{margin:4px 0;font-size:34px}.topbar p{margin:0;color:#aaa}.topbar nav{display:flex;gap:8px;flex-wrap:wrap}.topbar a,.head a{color:#fff;text-decoration:none;background:#171717;border:1px solid #333;border-radius:14px;padding:10px 13px;font-weight:900}.alert{background:#401313;color:#ffaaaa;border-radius:16px;padding:13px;margin-bottom:14px}.hero{display:grid;grid-template-columns:1fr minmax(250px,.45fr);gap:14px;background:linear-gradient(135deg,#171717,#33261c);border:1px solid #38322e;border-radius:30px;padding:22px;margin-bottom:14px}.hero h2{font-size:40px;margin:8px 0}.hero p{color:#ccc;line-height:1.7}.hero article{background:rgba(255,255,255,.07);border-radius:24px;padding:20px;display:grid;align-content:center;gap:10px}.hero article b{font-size:34px;color:#ff9b43}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}.stats article,.system article,.system a{background:#121212;border:1px solid #292929;border-radius:22px;padding:16px;display:grid;gap:7px;color:#fff;text-decoration:none}.stats span,.system span{color:#aaa;font-size:12px;font-weight:800}.stats b,.system b{font-size:27px}.stats small{color:#888}.system{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.layout{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.panel{background:#111;border:1px solid #2c2c2c;border-radius:28px;padding:17px}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.head h2{margin:0}.order{display:grid;grid-template-columns:1fr auto 130px;gap:12px;align-items:center;border-top:1px solid #292929;padding:13px 0}.order:first-of-type{border-top:0}.order div,.restaurant div{display:grid;gap:5px}.order span,.restaurant span{color:#999;font-size:12px}.order em{font-style:normal;text-align:center;background:#2a211a;color:#ffb067;padding:9px;border-radius:12px;font-size:12px;font-weight:900}.restaurant{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #292929;padding:14px 0}.restaurant:first-of-type{border-top:0}.restaurant>b{color:#ff9b43}.empty{text-align:center;color:#999;padding:28px}@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.system{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}}@media(max-width:600px){.page{padding:12px 8px}.topbar{align-items:flex-start}.hero{grid-template-columns:1fr}.hero h2{font-size:31px}.stats{grid-template-columns:repeat(2,1fr)}.system{grid-template-columns:1fr}.order{grid-template-columns:1fr}.order em{text-align:right}.panel{border-radius:22px;padding:14px}}
+      `}</style>
     </main>
   );
 }
