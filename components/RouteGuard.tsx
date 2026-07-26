@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -20,7 +20,6 @@ const ACCESS_RULES: AccessRule[] = [
       "/drivers-admin",
       "/auto-dispatch",
       "/reports",
-      "/notification-center",
       "/reels-review",
     ],
     roles: ["admin"],
@@ -30,6 +29,9 @@ const ACCESS_RULES: AccessRule[] = [
       "/restaurant-admin",
       "/restaurant-live",
       "/restaurants-admin",
+      "/restaurant-orders",
+      "/restaurant-dashboard",
+      "/live-orders",
     ],
     roles: ["admin", "restaurant"],
   },
@@ -38,12 +40,8 @@ const ACCESS_RULES: AccessRule[] = [
     roles: ["admin", "restaurant", "customer"],
   },
   {
-    prefixes: ["/driver-app"],
+    prefixes: ["/driver-app", "/driver"],
     roles: ["admin", "driver"],
-  },
-  {
-    prefixes: ["/live-orders"],
-    roles: ["admin", "restaurant", "driver", "customer"],
   },
 ];
 
@@ -60,31 +58,28 @@ function roleFromEmail(email?: string | null): FuseRole {
 
 function normalizeRole(value?: string | null): FuseRole {
   const clean = String(value || "").toLowerCase().trim();
-
   if (clean === "admin") return "admin";
   if (clean === "restaurant") return "restaurant";
   if (clean === "driver") return "driver";
   if (clean === "customer") return "customer";
-
   return "guest";
 }
 
 function saveSession(user: User) {
   const email = user.email || "";
   const role = roleFromEmail(email);
-
   const payload = {
     uid: user.uid,
     email,
     role,
     name:
       role === "admin"
-        ? "FUSE إدارة"
+        ? "إدارة FUSE"
         : role === "restaurant"
-        ? "مطعم فيروز"
+        ? "حساب المطعم"
         : role === "driver"
-        ? "kkkkkk"
-        : "FUSE زبون",
+        ? "سائق FUSE"
+        : "زبون FUSE",
     label:
       role === "admin"
         ? "إدارة"
@@ -101,53 +96,30 @@ function saveSession(user: User) {
   window.localStorage.setItem("fuseRole", role);
   window.localStorage.setItem("email", email);
   window.localStorage.setItem("role", role);
-
   return role;
 }
 
 function readStoredRole(): FuseRole {
   if (typeof window === "undefined") return "guest";
 
-  const params = new URLSearchParams(window.location.search);
-  const roleFromUrl = normalizeRole(params.get("fuseRole"));
-  const emailFromUrl = params.get("fuseEmail") || "";
-
-  if (roleFromUrl !== "guest") {
-    window.localStorage.setItem("fuseRole", roleFromUrl);
-    window.localStorage.setItem("role", roleFromUrl);
-
-    if (emailFromUrl) {
-      window.localStorage.setItem("fuseEmail", emailFromUrl);
-      window.localStorage.setItem("email", emailFromUrl);
-    }
-
-    window.history.replaceState(null, "", window.location.pathname);
-    return roleFromUrl;
-  }
-
   const rawUser = window.localStorage.getItem("fuseUser");
-
   if (rawUser) {
     try {
-      const parsed = JSON.parse(rawUser) as { role?: string; email?: string };
-      const role = normalizeRole(parsed.role);
-
-      if (role !== "guest") return role;
-
+      const parsed = JSON.parse(rawUser) as { role?: string; email?: string; uid?: string };
       const emailRole = roleFromEmail(parsed.email);
-      if (emailRole !== "guest") return emailRole;
+      if (emailRole !== "guest" && parsed.uid) return emailRole;
+
+      // Customer sessions may be phone/local sessions, but privileged roles are never
+      // trusted from localStorage alone.
+      const storedRole = normalizeRole(parsed.role);
+      if (storedRole === "customer") return "customer";
     } catch {}
   }
 
   const storedRole = normalizeRole(
     window.localStorage.getItem("fuseRole") || window.localStorage.getItem("role")
   );
-
-  if (storedRole !== "guest") return storedRole;
-
-  return roleFromEmail(
-    window.localStorage.getItem("fuseEmail") || window.localStorage.getItem("email")
-  );
+  return storedRole === "customer" ? "customer" : "guest";
 }
 
 function getRule(pathname: string): AccessRule | null {
@@ -177,33 +149,25 @@ export default function RouteGuard() {
     }
 
     const storedRole = readStoredRole();
-
-    if (rule.roles.includes(storedRole)) {
+    if (storedRole === "customer" && rule.roles.includes("customer")) {
       setChecking(false);
       return;
     }
 
     const unsubscribe = onAuthStateChanged(fuseAuth, (user) => {
       if (!user) {
-        const fallbackRole = readStoredRole();
-
-        if (rule.roles.includes(fallbackRole)) {
-          setChecking(false);
-          return;
-        }
-
         goLogin(pathname);
         return;
       }
 
       const firebaseRole = saveSession(user);
-
       if (rule.roles.includes(firebaseRole)) {
         setChecking(false);
         return;
       }
 
-      goLogin(pathname);
+      const safeHome = firebaseRole === "customer" ? "/" : "/login";
+      window.location.assign(safeHome);
     });
 
     return () => unsubscribe();
