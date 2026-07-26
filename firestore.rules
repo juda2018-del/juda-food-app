@@ -1,0 +1,189 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() && request.auth.token.role is string
+        ? request.auth.token.role
+        : '';
+    }
+
+    function isAdmin() {
+      return role() == 'admin';
+    }
+
+    function isRestaurant() {
+      return role() == 'restaurant';
+    }
+
+    function isDriver() {
+      return role() == 'driver';
+    }
+
+    function isCustomer() {
+      return role() == 'customer';
+    }
+
+    function restaurantId() {
+      return signedIn() && request.auth.token.restaurantId is string
+        ? request.auth.token.restaurantId
+        : '';
+    }
+
+    function validOrderCreate() {
+      return request.resource.data.keys().hasAll([
+          'orderId', 'customerName', 'phone', 'address', 'restaurantId',
+          'restaurantName', 'items', 'subtotal', 'deliveryFee', 'total',
+          'currency', 'status', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.orderId is string
+        && request.resource.data.orderId.size() >= 8
+        && request.resource.data.orderId.size() <= 40
+        && request.resource.data.customerName is string
+        && request.resource.data.customerName.size() >= 2
+        && request.resource.data.customerName.size() <= 80
+        && request.resource.data.phone is string
+        && request.resource.data.phone.matches('^07[0-9]{9}$')
+        && request.resource.data.address is string
+        && request.resource.data.address.size() >= 8
+        && request.resource.data.address.size() <= 220
+        && request.resource.data.restaurantId is string
+        && request.resource.data.restaurantId.size() > 0
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 50
+        && request.resource.data.subtotal is number
+        && request.resource.data.deliveryFee is number
+        && request.resource.data.total is number
+        && request.resource.data.subtotal >= 0
+        && request.resource.data.deliveryFee >= 0
+        && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
+        && request.resource.data.currency == 'IQD'
+        && request.resource.data.status == 'جديد';
+    }
+
+    function ownsOrder(data) {
+      return signedIn() && (
+        (data.customerUid is string && data.customerUid == request.auth.uid)
+        || (data.customerEmail is string && data.customerEmail == request.auth.token.email)
+      );
+    }
+
+    function restaurantOwns(data) {
+      return isRestaurant()
+        && restaurantId() != ''
+        && data.restaurantId == restaurantId();
+    }
+
+    function driverOwns(data) {
+      return isDriver() && (
+        (data.driverUid is string && data.driverUid == request.auth.uid)
+        || (data.driverId is string && data.driverId == request.auth.uid)
+      );
+    }
+
+    match /restaurants/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isRestaurant() && id == restaurantId());
+    }
+
+    match /menu/{id} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        isRestaurant()
+        && restaurantId() != ''
+        && request.resource.data.restaurantId == restaurantId()
+      );
+      allow update, delete: if isAdmin() || (
+        isRestaurant()
+        && restaurantId() != ''
+        && resource.data.restaurantId == restaurantId()
+      );
+    }
+
+    match /orders/{id} {
+      allow create: if validOrderCreate();
+      allow read: if isAdmin()
+        || ownsOrder(resource.data)
+        || restaurantOwns(resource.data)
+        || driverOwns(resource.data);
+      allow update: if isAdmin()
+        || restaurantOwns(resource.data)
+        || driverOwns(resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{id} {
+      allow create: if request.resource.data.type == 'order'
+        && request.resource.data.restaurantId is string
+        && request.resource.data.restaurantId.size() > 0
+        && request.resource.data.orderId is string
+        && request.resource.data.orderDocumentId is string;
+      allow read: if isAdmin() || (
+        isRestaurant()
+        && restaurantId() != ''
+        && resource.data.restaurantId == restaurantId()
+      );
+      allow update: if isAdmin() || (
+        isRestaurant()
+        && restaurantId() != ''
+        && resource.data.restaurantId == restaurantId()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /ratings/{orderDocumentId} {
+      allow create: if isCustomer()
+        && request.resource.data.orderDocumentId == orderDocumentId
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.restaurantRating is int
+        && request.resource.data.restaurantRating >= 1
+        && request.resource.data.restaurantRating <= 5
+        && request.resource.data.driverRating is int
+        && request.resource.data.driverRating >= 0
+        && request.resource.data.driverRating <= 5
+        && !exists(/databases/$(database)/documents/ratings/$(orderDocumentId));
+      allow read: if isAdmin()
+        || (isCustomer() && resource.data.customerUid == request.auth.uid)
+        || (isRestaurant() && resource.data.restaurantId == restaurantId())
+        || (isDriver() && resource.data.driverUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'phone', 'photoURL', 'updatedAt'
+        ]);
+      allow delete: if isAdmin();
+    }
+
+    match /accounts/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /profiles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid);
+    }
+
+    match /drivers/{id} {
+      allow read: if isAdmin() || (isDriver() && request.auth.uid == id);
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
