@@ -1,5 +1,5 @@
-﻿import RestaurantOrderClient from "../RestaurantOrderClient";
+import RestaurantMenuClient from "../RestaurantMenuClient";
 
 export default function Page() {
-  return <RestaurantOrderClient restaurant="خان قدوري" />;
+  return <RestaurantMenuClient restaurant="خان قدوري" restaurantId="khan" />;
 }
