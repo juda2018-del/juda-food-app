@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -9,13 +9,13 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
   FUSE_LOCAL_SESSION,
   parseFuseRole,
   roleHome,
-  type FuseRole,
   type FuseSession,
 } from "@/lib/fuse-auth";
 
@@ -44,11 +44,9 @@ type OrderDoc = {
   driverId?: string;
   driverEmail?: string;
   driverName?: string;
-  driverPhone?: string;
   assignedDriverId?: string;
   assignedDriverEmail?: string;
   assignedDriverName?: string;
-  assignedDriverPhone?: string;
   createdAt?: unknown;
   deliveredAt?: unknown;
   items?: OrderItem[];
@@ -61,104 +59,19 @@ type DriverIdentity = {
   phone: string;
 };
 
-const FALLBACK_DRIVER: DriverIdentity = {
-  id: "fuse-driver-demo",
-  email: "driver@fuse.iq",
-  name: "سائق FUSE",
-  phone: "07800000000",
-};
-
-const openStatuses = ["جاهز للتوصيل", "قيد التوصيل"];
-const doneStatuses = ["تم التسليم", "مرفوض", "ملغي", "Cancelled", "Delivered"];
-
-function clean(value: string | null | undefined) {
-  return (value || "").trim().toLowerCase();
-}
+const activeStatuses = ["جاهز للتوصيل", "قيد التوصيل"];
 
 function readSession(): FuseSession | null {
   try {
-    const raw =
-      localStorage.getItem(FUSE_LOCAL_SESSION) ||
-      localStorage.getItem("FUSE_LOCAL_SESSION") ||
-      localStorage.getItem("fuseUser");
-
+    const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
     if (!raw) return null;
-
     const parsed = JSON.parse(raw) as FuseSession;
-    const role = parseFuseRole(parsed.role || parsed.fuseRole);
-
+    const role = parseFuseRole(parsed.role);
     if (!parsed.email || !role) return null;
-
     return { ...parsed, role };
   } catch {
     return null;
   }
-}
-
-function driverFromSession(session: FuseSession | null): DriverIdentity {
-  if (!session || session.role !== "driver") return FALLBACK_DRIVER;
-
-  return {
-    id: session.uid || session.email || FALLBACK_DRIVER.id,
-    email: session.email || FALLBACK_DRIVER.email,
-    name: session.name || session.displayName || FALLBACK_DRIVER.name,
-    phone: session.phone || FALLBACK_DRIVER.phone,
-  };
-}
-
-function toDate(value: unknown): Date | null {
-  try {
-    if (!value) return null;
-
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toDate" in value &&
-      typeof (value as { toDate?: unknown }).toDate === "function"
-    ) {
-      return (value as { toDate: () => Date }).toDate();
-    }
-
-    if (value instanceof Date) return value;
-
-    const date = new Date(value as string | number);
-    return Number.isNaN(date.getTime()) ? null : date;
-  } catch {
-    return null;
-  }
-}
-
-function formatDate(value: unknown) {
-  const date = toDate(value);
-  if (!date) return "بدون وقت";
-
-  return date.toLocaleString("ar-IQ", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatIQD(value: number) {
-  return `${Number(value || 0).toLocaleString()} د.ع`;
-}
-
-function getCustomer(order: OrderDoc) {
-  return order.customerName || order.customer || order.name || "زبون";
-}
-
-function getPhone(order: OrderDoc) {
-  return order.phone || order.customerPhone || "";
-}
-
-function getRestaurant(order: OrderDoc) {
-  return order.restaurant || order.restaurantName || "مطعم";
-}
-
-function getTotal(order: OrderDoc) {
-  return Number(order.total || order.amount || 0);
 }
 
 function normalizeStatus(status?: string) {
@@ -170,158 +83,84 @@ function normalizeStatus(status?: string) {
   return status;
 }
 
-function isDoneStatus(status?: string) {
-  const cleanStatus = normalizeStatus(status);
-  return doneStatuses.includes(cleanStatus);
+function toDate(value: unknown): Date | null {
+  try {
+    if (!value) return null;
+    if (typeof value === "object" && value !== null && "toDate" in value) {
+      const fn = (value as { toDate?: unknown }).toDate;
+      if (typeof fn === "function") return (fn as () => Date)();
+    }
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
 }
 
-function hasAssignedDriver(order: OrderDoc) {
-  return Boolean(
-    order.assignedDriverId ||
-      order.driverId ||
-      order.assignedDriverEmail ||
-      order.driverEmail ||
-      order.assignedDriverName ||
-      order.driverName ||
-      order.assignedDriverPhone ||
-      order.driverPhone
-  );
+function formatDate(value: unknown) {
+  const date = toDate(value);
+  if (!date) return "بدون وقت";
+  return date.toLocaleString("ar-IQ", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
-function assignedToDriver(order: OrderDoc, driver: DriverIdentity) {
-  const ids = [
+function formatIQD(value: number) {
+  return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
+}
+
+function getCustomer(order: OrderDoc) {
+  return order.customerName || order.customer || order.name || "زبون";
+}
+
+function getPhone(order: OrderDoc) {
+  return order.phone || order.customerPhone || "";
+}
+
+function getRestaurant(order: OrderDoc) {
+  return order.restaurantName || order.restaurant || "مطعم";
+}
+
+function getTotal(order: OrderDoc) {
+  return Number(order.total || order.amount || 0);
+}
+
+function belongsToDriver(order: OrderDoc, driver: DriverIdentity) {
+  const values = [
     order.assignedDriverId,
     order.driverId,
     order.assignedDriverEmail,
     order.driverEmail,
-    order.assignedDriverName,
-    order.driverName,
-    order.assignedDriverPhone,
-    order.driverPhone,
-  ].map((value) => clean(value));
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
 
-  const mine = [driver.id, driver.email, driver.name, driver.phone].map((value) => clean(value));
+  const mine = [driver.id, driver.email]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
 
-  return ids.some((value) => value && mine.includes(value));
-}
-
-function canPickup(order: OrderDoc) {
-  const status = normalizeStatus(order.status);
-
-  return (
-    (status === "جاهز للتوصيل" || status === "جاهز") &&
-    !hasAssignedDriver(order) &&
-    !isDoneStatus(status)
-  );
-}
-
-function isActiveDriverOrder(order: OrderDoc, driver: DriverIdentity) {
-  const status = normalizeStatus(order.status);
-
-  return assignedToDriver(order, driver) && openStatuses.includes(status) && !isDoneStatus(status);
-}
-
-function statusClass(status?: string) {
-  const cleanStatus = normalizeStatus(status);
-
-  if (cleanStatus === "جاهز للتوصيل") return "sky";
-  if (cleanStatus === "قيد التوصيل") return "purple";
-  if (cleanStatus === "تم التسليم") return "green";
-  if (cleanStatus === "مرفوض" || cleanStatus === "ملغي") return "red";
-
-  return "orange";
+  return values.some((value) => mine.includes(value));
 }
 
 function phoneHref(phone: string) {
-  const cleanPhone = phone.replace(/\s+/g, "");
-  return cleanPhone ? `tel:${cleanPhone}` : "#";
+  const value = phone.replace(/\s+/g, "");
+  return value ? `tel:${value}` : "#";
 }
 
 function whatsappHref(phone: string) {
-  const cleanPhone = phone.replace(/\D/g, "");
-  if (!cleanPhone) return "#";
-  return `https://wa.me/964${cleanPhone.replace(/^0/, "")}`;
-}
-
-function Icon({ name }: { name: string }) {
-  const p = {
-    width: 20,
-    height: 20,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-
-  if (name === "bike") {
-    return (
-      <svg {...p}>
-        <circle cx="6" cy="17" r="3" />
-        <circle cx="18" cy="17" r="3" />
-        <path d="M9 17h3l3-7h2" />
-        <path d="M10 9h3l2 4" />
-        <path d="M5 14l3-5" />
-      </svg>
-    );
-  }
-
-  if (name === "orders") {
-    return (
-      <svg {...p}>
-        <rect x="5" y="4" width="14" height="16" rx="2" />
-        <path d="M9 9h6" />
-        <path d="M9 13h6" />
-      </svg>
-    );
-  }
-
-  if (name === "money") {
-    return (
-      <svg {...p}>
-        <rect x="4" y="6" width="16" height="12" rx="2" />
-        <circle cx="12" cy="12" r="2" />
-      </svg>
-    );
-  }
-
-  if (name === "clock") {
-    return (
-      <svg {...p}>
-        <circle cx="12" cy="12" r="8" />
-        <path d="M12 8v4l3 2" />
-      </svg>
-    );
-  }
-
-  if (name === "pin") {
-    return (
-      <svg {...p}>
-        <path d="M12 21s7-5.4 7-12a7 7 0 10-14 0c0 6.6 7 12 7 12z" />
-        <circle cx="12" cy="9" r="2.4" />
-      </svg>
-    );
-  }
-
-  if (name === "phone") {
-    return (
-      <svg {...p}>
-        <path d="M22 16.92v3a2 2 0 01-2.18 2A19.8 19.8 0 013 5.18 2 2 0 015 3h3a2 2 0 012 1.72c.12.9.32 1.77.6 2.6a2 2 0 01-.45 2.11L9 10.6a16 16 0 004.4 4.4l1.17-1.15a2 2 0 012.11-.45c.83.28 1.7.48 2.6.6A2 2 0 0122 16.92z" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg {...p}>
-      <circle cx="12" cy="12" r="8" />
-    </svg>
-  );
+  const value = phone.replace(/\D/g, "");
+  if (!value) return "#";
+  const international = value.startsWith("964") ? value : `964${value.replace(/^0/, "")}`;
+  return `https://wa.me/${international}`;
 }
 
 export default function DriverAppPage() {
   const [session, setSession] = useState<FuseSession | null>(null);
   const [orders, setOrders] = useState<OrderDoc[]>([]);
+  const [loading, setLoading] = useState(true);
   const [online, setOnline] = useState(true);
   const [savingOrderId, setSavingOrderId] = useState("");
   const [message, setMessage] = useState("");
@@ -329,85 +168,102 @@ export default function DriverAppPage() {
 
   useEffect(() => {
     const saved = readSession();
+    if (!saved) {
+      window.location.replace("/login?next=/driver-app");
+      return;
+    }
+    if (saved.role !== "driver") {
+      window.location.replace(roleHome[saved.role] || "/");
+      return;
+    }
     setSession(saved);
-
-    if (saved && saved.role !== "driver" && saved.role !== "admin") {
-      window.location.href = roleHome[saved.role] || "/login";
-    }
+    setOnline(localStorage.getItem("fuse_driver_online") !== "0");
   }, []);
 
-  useEffect(() => {
-    try {
-      const savedOnline = localStorage.getItem("fuse_driver_online");
-      if (savedOnline === "0") setOnline(false);
-      if (savedOnline === "1") setOnline(true);
-    } catch {
-      setOnline(true);
-    }
-  }, []);
+  const driver = useMemo<DriverIdentity | null>(() => {
+    if (!session || session.role !== "driver") return null;
+    return {
+      id: session.uid || session.email,
+      email: session.email,
+      name: session.name || session.displayName || "سائق FUSE",
+      phone: session.phone || "",
+    };
+  }, [session]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("fuse_driver_online", online ? "1" : "0");
-    } catch {
-      // ignore
-    }
-  }, [online]);
+    if (!driver) return;
 
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      query(collection(db, "orders")),
-      (snapshot) => {
-        const data = snapshot.docs.map((item) => ({
-          ...(item.data() as Omit<OrderDoc, "documentId">),
-          documentId: item.id,
-        }));
+    const merged = new Map<string, OrderDoc>();
+    const refresh = () => {
+      const data = Array.from(merged.values()).filter((item) => belongsToDriver(item, driver));
+      data.sort((a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0));
+      setOrders(data);
+      setLoading(false);
+    };
 
-        data.sort((a, b) => {
-          const ad = toDate(a.createdAt)?.getTime() || 0;
-          const bd = toDate(b.createdAt)?.getTime() || 0;
-          return bd - ad;
-        });
-
-        setOrders(data);
-      },
-      (snapshotError) => {
-        setError(snapshotError.message || "تعذر تحميل طلبات السائق");
-      }
+    const listeners = [
+      query(collection(db, "orders"), where("assignedDriverEmail", "==", driver.email)),
+      query(collection(db, "orders"), where("driverEmail", "==", driver.email)),
+      query(collection(db, "orders"), where("assignedDriverId", "==", driver.id)),
+      query(collection(db, "orders"), where("driverId", "==", driver.id)),
+    ].map((request) =>
+      onSnapshot(
+        request,
+        (snapshot) => {
+          snapshot.docs.forEach((item) => {
+            merged.set(item.id, {
+              ...(item.data() as Omit<OrderDoc, "documentId">),
+              documentId: item.id,
+            });
+          });
+          refresh();
+          setError("");
+        },
+        () => {
+          setLoading(false);
+          setError("تعذر تحميل طلبات السائق المخصصة.");
+        }
+      )
     );
 
-    return () => unsubscribe();
-  }, []);
+    return () => listeners.forEach((unsubscribe) => unsubscribe());
+  }, [driver]);
 
-  const driver = useMemo(() => driverFromSession(session), [session]);
-
-  const myActiveOrders = useMemo(
-    () => orders.filter((order) => isActiveDriverOrder(order, driver)),
-    [driver, orders]
-  );
-
-  const pickupOrders = useMemo(
-    () => orders.filter(canPickup).slice(0, 20),
+  const activeOrders = useMemo(
+    () => orders.filter((order) => activeStatuses.includes(normalizeStatus(order.status))),
     [orders]
   );
 
   const deliveredOrders = useMemo(
-    () =>
-      orders.filter(
-        (order) =>
-          assignedToDriver(order, driver) && normalizeStatus(order.status) === "تم التسليم"
-      ),
-    [driver, orders]
+    () => orders.filter((order) => normalizeStatus(order.status) === "تم التسليم"),
+    [orders]
   );
 
-  const totalMoney = myActiveOrders.reduce((sum, order) => sum + getTotal(order), 0);
-  const deliveredMoney = deliveredOrders.reduce((sum, order) => sum + getTotal(order), 0);
-  const delivering = myActiveOrders.filter((order) => normalizeStatus(order.status) === "قيد التوصيل").length;
+  function toggleOnline() {
+    const next = !online;
+    setOnline(next);
+    localStorage.setItem("fuse_driver_online", next ? "1" : "0");
+  }
 
-  async function updateOrder(order: OrderDoc, status: string) {
+  async function updateOrder(order: OrderDoc, status: "قيد التوصيل" | "تم التسليم") {
+    if (!driver || !belongsToDriver(order, driver)) {
+      setError("هذا الطلب غير مخصص لحسابك.");
+      return;
+    }
+
+    const currentStatus = normalizeStatus(order.status);
+    if (status === "قيد التوصيل" && currentStatus !== "جاهز للتوصيل") {
+      setError("لا يمكن استلام الطلب قبل أن يصبح جاهزاً للتوصيل.");
+      return;
+    }
+    if (status === "تم التسليم" && currentStatus !== "قيد التوصيل") {
+      setError("ابدأ التوصيل أولاً قبل تأكيد التسليم.");
+      return;
+    }
+
     setSavingOrderId(order.documentId);
-    setMessage("");
     setError("");
+    setMessage("");
 
     try {
       await updateDoc(doc(db, "orders", order.documentId), {
@@ -415,861 +271,84 @@ export default function DriverAppPage() {
         driverId: driver.id,
         driverEmail: driver.email,
         driverName: driver.name,
-        driverPhone: driver.phone,
         assignedDriverId: driver.id,
         assignedDriverEmail: driver.email,
         assignedDriverName: driver.name,
-        assignedDriverPhone: driver.phone,
         driverUpdatedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         ...(status === "تم التسليم" ? { deliveredAt: serverTimestamp() } : {}),
       });
-
-      setMessage(`تم تحديث طلب ${getCustomer(order)} إلى ${status}.`);
+      setMessage(status === "تم التسليم" ? "تم تأكيد تسليم الطلب." : "تم بدء التوصيل.");
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "تعذر تحديث الطلب");
+      setError(submitError instanceof Error ? submitError.message : "تعذر تحديث الطلب.");
     } finally {
       setSavingOrderId("");
     }
   }
 
-  async function acceptOrder(order: OrderDoc) {
-    await updateOrder(order, "قيد التوصيل");
+  if (!session || !driver) {
+    return <main dir="rtl" className="loading">جاري التحقق من حساب السائق...</main>;
   }
 
-  function renderOrderCard(order: OrderDoc, mode: "mine" | "pickup") {
-    const status = normalizeStatus(order.status);
-    const phone = getPhone(order);
-
-    return (
-      <article key={order.documentId} className="order-card">
-        <div className="order-top">
-          <div>
-            <span className={`badge ${statusClass(status)}`}>{status}</span>
-            <h3>{getCustomer(order)}</h3>
-            <p>{getRestaurant(order)} — {formatDate(order.createdAt)}</p>
-          </div>
-
-          <div className="total-box">
-            <span>المبلغ</span>
-            <b>{formatIQD(getTotal(order))}</b>
-          </div>
-        </div>
-
-        <div className="info-grid">
-          <div>
-            <span>رقم الطلب</span>
-            <b>{order.orderId || order.documentId}</b>
-          </div>
-
-          <div>
-            <span>هاتف الزبون</span>
-            <b dir="ltr">{phone || "—"}</b>
-          </div>
-
-          <div>
-            <span>العنوان</span>
-            <b>{order.address || "غير محدد"}</b>
-          </div>
-        </div>
-
-        <div className="details-box">
-          <span>تفاصيل الطلب</span>
-
-          {order.items?.length ? (
-            <div className="items">
-              {order.items.map((item, index) => (
-                <div key={`${item.name || item.title}-${index}`} className="item-row">
-                  <span>{item.name || item.title || "صنف"}</span>
-                  <b>
-                    {item.qty || item.quantity || 1}x — {formatIQD(Number(item.price || 0))}
-                  </b>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p>ماكو تفاصيل أصناف محفوظة.</p>
-          )}
-        </div>
-
-        <div className="actions">
-          {phone ? (
-            <>
-              <a href={phoneHref(phone)} className="secondary-action">
-                <Icon name="phone" />
-                اتصال
-              </a>
-
-              <a href={whatsappHref(phone)} target="_blank" className="secondary-action">
-                واتساب
-              </a>
-            </>
-          ) : null}
-
-          {mode === "pickup" ? (
-            <button
-              type="button"
-              disabled={!online || savingOrderId === order.documentId}
-              onClick={() => acceptOrder(order)}
-              className="primary-action"
-            >
-              {savingOrderId === order.documentId ? "جاري..." : online ? "استلام الطلب" : "أنت غير متصل"}
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={savingOrderId === order.documentId || status === "قيد التوصيل"}
-                onClick={() => updateOrder(order, "قيد التوصيل")}
-                className="secondary-button"
-              >
-                استلمت الطلب
-              </button>
-
-              <button
-                type="button"
-                disabled={savingOrderId === order.documentId}
-                onClick={() => updateOrder(order, "تم التسليم")}
-                className="primary-action"
-              >
-                {savingOrderId === order.documentId ? "جاري..." : "تم التسليم"}
-              </button>
-            </>
-          )}
-        </div>
-      </article>
-    );
-  }
+  const activeMoney = activeOrders.reduce((sum, order) => sum + getTotal(order), 0);
 
   return (
     <main dir="rtl" className="page">
       <section className="shell">
         <header className="topbar">
-          <div className="brand">
-            <div className="brand-icon">
-              <Icon name="bike" />
-            </div>
-            <div>
-              <b>FUSE Driver</b>
-              <span>{driver.name}</span>
-            </div>
-          </div>
-
-          <nav className="nav">
-            <Link href="/" className="pill">الرئيسية</Link>
-            <Link href="/driver-app" className="pill active">السائق</Link>
-            <Link href="/live-orders" className="pill">الطلبات المباشرة</Link>
-            <Link href="/live-tracking" className="pill">التتبع</Link>
-            <Link href="/login" className="pill danger">خروج</Link>
+          <div><small>FUSE Driver</small><h1>{driver.name}</h1></div>
+          <nav>
+            <Link href="/">الرئيسية</Link>
+            <button type="button" className={online ? "online" : "offline"} onClick={toggleOnline}>
+              {online ? "متصل" : "غير متصل"}
+            </button>
+            <Link href="/login" className="danger">خروج</Link>
           </nav>
         </header>
 
         <section className="hero">
-          <div className="hero-copy">
-            <span>تطبيق السائق</span>
-            <h1>
-              طلباتك
-              <br />
-              <em>والتوصيل المباشر</em>
-            </h1>
-            <p>
-              استلم الطلب الجاهز، حدث الحالة، تواصل ويا الزبون، وتابع مبالغك من لوحة واحدة.
-            </p>
-          </div>
-
-          <div className="stats-grid">
-            <article>
-              <Icon name="bike" />
-              <span>حالتي</span>
-              <b className={online ? "green-text" : "red-text"}>{online ? "متصل" : "غير متصل"}</b>
-              <small>{driver.phone}</small>
-            </article>
-
-            <article>
-              <Icon name="orders" />
-              <span>طلباتي الحالية</span>
-              <b>{myActiveOrders.length}</b>
-              <small>قيد التوصيل: {delivering}</small>
-            </article>
-
-            <article>
-              <Icon name="clock" />
-              <span>جاهزة للاستلام</span>
-              <b>{pickupOrders.length}</b>
-              <small>طلبات غير مخصصة</small>
-            </article>
-
-            <article>
-              <Icon name="money" />
-              <span>مبالغ نشطة</span>
-              <b>{formatIQD(totalMoney)}</b>
-              <small>مسلمة سابقاً: {formatIQD(deliveredMoney)}</small>
-            </article>
+          <div><span>طلبات مخصصة لحسابك فقط</span><h2>توصيل آمن وواضح</h2><p>لا تظهر هنا إلا الطلبات التي خصصتها الإدارة لك.</p></div>
+          <div className="stats">
+            <article><span>الحالية</span><b>{activeOrders.length}</b></article>
+            <article><span>المسلّمة</span><b>{deliveredOrders.length}</b></article>
+            <article><span>مبالغ نشطة</span><b>{formatIQD(activeMoney)}</b></article>
           </div>
         </section>
 
         {message ? <div className="alert ok">{message}</div> : null}
         {error ? <div className="alert bad">{error}</div> : null}
 
-        <section className="layout">
-          <section className="panel">
-            <div className="panel-head">
-              <div>
-                <span>My Orders</span>
-                <h2>طلباتي الحالية</h2>
-              </div>
-              <b>{myActiveOrders.length}</b>
-            </div>
+        <section className="panel">
+          <div className="panel-head"><div><small>My Orders</small><h2>طلباتي الحالية</h2></div><b>{activeOrders.length}</b></div>
 
-            {myActiveOrders.length === 0 ? (
-              <div className="empty">
-                <h3>ماكو طلبات مرتبطة بيك حالياً</h3>
-                <p>استلم طلب من قائمة الطلبات الجاهزة حتى يظهر هنا.</p>
-              </div>
-            ) : (
-              <div className="orders-list">
-                {myActiveOrders.map((order) => renderOrderCard(order, "mine"))}
-              </div>
-            )}
-
-            <div className="panel-head second">
-              <div>
-                <span>Ready Pickup</span>
-                <h2>طلبات جاهزة للاستلام</h2>
-              </div>
-              <b>{pickupOrders.length}</b>
-            </div>
-
-            {pickupOrders.length === 0 ? (
-              <div className="empty">
-                <h3>ماكو طلبات جاهزة</h3>
-                <p>أول ما المطعم يضغط جاهز للتوصيل راح تظهر هنا.</p>
-              </div>
-            ) : (
-              <div className="orders-list">
-                {pickupOrders.map((order) => renderOrderCard(order, "pickup"))}
-              </div>
-            )}
-          </section>
-
-          <aside className="panel side-panel">
-            <div className="panel-head">
-              <div>
-                <span>Driver Status</span>
-                <h2>حالة السائق</h2>
-              </div>
-            </div>
-
-            <div className="driver-card">
-              <div className="avatar">
-                <Icon name="bike" />
-              </div>
-
-              <h3>{driver.name}</h3>
-              <p dir="ltr">{driver.phone}</p>
-              <p dir="ltr">{driver.email}</p>
-
-              <span className={`status-pill ${online ? "online" : "offline"}`}>
-                {online ? "متصل ويستلم طلبات" : "غير متصل"}
-              </span>
-
-              <button type="button" onClick={() => setOnline(true)} className="primary-action wide">
-                تشغيل واستلام طلبات
-              </button>
-
-              <button type="button" onClick={() => setOnline(false)} className="secondary-button wide">
-                إيقاف مؤقت
-              </button>
-            </div>
-
-            <div className="tips">
-              <h3>خطوات التشغيل</h3>
-
-              <div className="tip active">
-                <span />
-                <b>استلام الطلب</b>
-                <p>خذ الطلب الجاهز من المطعم.</p>
-              </div>
-
-              <div className="tip active">
-                <span />
-                <b>قيد التوصيل</b>
-                <p>الحالة تتحدث تلقائياً عند الاستلام.</p>
-              </div>
-
-              <div className="tip">
-                <span />
-                <b>تم التسليم</b>
-                <p>اضغط تم التسليم بعد الوصول للزبون.</p>
-              </div>
-            </div>
-          </aside>
+          {loading ? <div className="empty">جاري تحميل طلباتك...</div> : activeOrders.length ? activeOrders.map((order) => {
+            const status = normalizeStatus(order.status);
+            const phone = getPhone(order);
+            return (
+              <article className="order" key={order.documentId}>
+                <div className="order-head">
+                  <div><span>{status}</span><h3>{getCustomer(order)}</h3><p>{getRestaurant(order)} — {formatDate(order.createdAt)}</p></div>
+                  <strong>{formatIQD(getTotal(order))}</strong>
+                </div>
+                <div className="info">
+                  <div><span>رقم الطلب</span><b>{order.orderId || order.documentId}</b></div>
+                  <div><span>الهاتف</span><b dir="ltr">{phone || "—"}</b></div>
+                  <div><span>العنوان</span><b>{order.address || "غير محدد"}</b></div>
+                </div>
+                {order.items?.length ? <div className="items">{order.items.map((item, index) => <div key={`${item.name || item.title}-${index}`}><span>{item.name || item.title || "صنف"}</span><b>{item.qty || item.quantity || 1} × {formatIQD(Number(item.price || 0))}</b></div>)}</div> : null}
+                <div className="actions">
+                  {phone ? <><a href={phoneHref(phone)}>اتصال</a><a href={whatsappHref(phone)} target="_blank" rel="noreferrer">واتساب</a></> : null}
+                  {status === "جاهز للتوصيل" ? <button type="button" disabled={!online || savingOrderId === order.documentId} onClick={() => updateOrder(order, "قيد التوصيل")}>{savingOrderId === order.documentId ? "جاري..." : online ? "استلمت الطلب" : "أنت غير متصل"}</button> : null}
+                  {status === "قيد التوصيل" ? <button type="button" disabled={savingOrderId === order.documentId} onClick={() => updateOrder(order, "تم التسليم")}>{savingOrderId === order.documentId ? "جاري..." : "تم التسليم"}</button> : null}
+                </div>
+              </article>
+            );
+          }) : <div className="empty"><h3>ماكو طلبات مخصصة إلك حالياً</h3><p>لما الإدارة تخصص طلب لحسابك راح يظهر هنا مباشرة.</p></div>}
         </section>
       </section>
 
       <style jsx>{`
-        :global(*) {
-          box-sizing: border-box;
-        }
-
-        :global(html),
-        :global(body) {
-          margin: 0;
-          padding: 0;
-          background: #050505;
-        }
-
-        .page {
-          min-height: 100vh;
-          padding: 26px 16px;
-          color: #fff;
-          font-family: Cairo, system-ui, sans-serif;
-          background:
-            radial-gradient(circle at top right, rgba(255,122,0,0.18), transparent 34%),
-            radial-gradient(circle at bottom left, rgba(255,61,0,0.11), transparent 34%),
-            #050505;
-        }
-
-        .shell {
-          width: min(1220px, 100%);
-          margin: 0 auto;
-        }
-
-        .topbar,
-        .hero,
-        .panel,
-        .alert {
-          border: 1px solid rgba(255,255,255,0.11);
-          background: rgba(255,255,255,0.055);
-          box-shadow: 0 24px 70px rgba(0,0,0,0.28);
-          backdrop-filter: blur(18px);
-        }
-
-        .topbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 16px;
-          flex-wrap: wrap;
-          border-radius: 28px;
-          padding: 14px;
-          margin-bottom: 16px;
-        }
-
-        .brand {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .brand-icon {
-          width: 52px;
-          height: 52px;
-          border-radius: 18px;
-          display: grid;
-          place-items: center;
-          background: linear-gradient(135deg, #ff8a00, #ff3d00);
-          color: #101010;
-        }
-
-        .brand b {
-          display: block;
-          font-size: 20px;
-          font-weight: 950;
-        }
-
-        .brand span {
-          display: block;
-          margin-top: 4px;
-          color: rgba(255,255,255,0.55);
-          font-size: 12px;
-          font-weight: 800;
-        }
-
-        .nav {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 9px;
-        }
-
-        .pill {
-          border-radius: 999px;
-          padding: 11px 15px;
-          color: rgba(255,255,255,0.74);
-          text-decoration: none;
-          background: rgba(255,255,255,0.065);
-          font-size: 13px;
-          font-weight: 950;
-        }
-
-        .pill.active {
-          background: #ff7a00;
-          color: #101010;
-        }
-
-        .pill.danger {
-          color: #fca5a5;
-          background: rgba(239,68,68,0.10);
-        }
-
-        .hero {
-          display: grid;
-          grid-template-columns: minmax(0, 0.82fr) minmax(520px, 1.18fr);
-          gap: 16px;
-          border-radius: 34px;
-          padding: 22px;
-          margin-bottom: 16px;
-          background:
-            radial-gradient(circle at 85% 20%, rgba(255,255,255,0.13), transparent 24%),
-            linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.11));
-        }
-
-        .hero-copy {
-          border-radius: 28px;
-          padding: 24px;
-          background: rgba(0,0,0,0.28);
-        }
-
-        .hero-copy > span,
-        .panel-head span,
-        .details-box > span {
-          color: #ff7a00;
-          font-size: 12px;
-          font-weight: 950;
-        }
-
-        .hero-copy h1 {
-          margin: 12px 0 12px;
-          font-size: clamp(42px, 5vw, 70px);
-          line-height: 0.98;
-          font-weight: 950;
-          letter-spacing: -1px;
-        }
-
-        .hero-copy em {
-          color: #ff7a00;
-          font-style: normal;
-        }
-
-        .hero-copy p,
-        .order-card p,
-        .empty p,
-        .details-box p,
-        .driver-card p,
-        .tip p {
-          margin: 8px 0 0;
-          color: rgba(255,255,255,0.58);
-          line-height: 1.7;
-          font-weight: 700;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-        }
-
-        .stats-grid article {
-          min-height: 165px;
-          border-radius: 26px;
-          padding: 18px;
-          background: rgba(0,0,0,0.32);
-          border: 1px solid rgba(255,255,255,0.09);
-        }
-
-        .stats-grid svg {
-          color: #ff7a00;
-          margin-bottom: 14px;
-        }
-
-        .stats-grid span {
-          display: block;
-          color: rgba(255,255,255,0.55);
-          font-size: 12px;
-          font-weight: 950;
-        }
-
-        .stats-grid b {
-          display: block;
-          margin: 10px 0 7px;
-          color: #fff;
-          font-size: 26px;
-          line-height: 1.08;
-          font-weight: 950;
-        }
-
-        .stats-grid small {
-          color: rgba(255,255,255,0.46);
-          font-weight: 700;
-        }
-
-        .green-text {
-          color: #86efac !important;
-        }
-
-        .red-text {
-          color: #fca5a5 !important;
-        }
-
-        .alert {
-          border-radius: 18px;
-          padding: 14px 16px;
-          margin-bottom: 14px;
-          font-weight: 950;
-        }
-
-        .alert.ok {
-          color: #86efac;
-          border-color: rgba(34,197,94,0.28);
-          background: rgba(34,197,94,0.10);
-        }
-
-        .alert.bad {
-          color: #fca5a5;
-          border-color: rgba(239,68,68,0.28);
-          background: rgba(239,68,68,0.10);
-        }
-
-        .layout {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(330px, 0.42fr);
-          gap: 14px;
-          align-items: start;
-        }
-
-        .panel {
-          border-radius: 30px;
-          padding: 18px;
-        }
-
-        .panel-head {
-          display: flex;
-          justify-content: space-between;
-          align-items: end;
-          gap: 12px;
-          margin-bottom: 14px;
-        }
-
-        .panel-head.second {
-          margin-top: 26px;
-        }
-
-        .panel-head h2 {
-          margin: 5px 0 0;
-          font-size: 30px;
-          line-height: 1.1;
-          font-weight: 950;
-        }
-
-        .panel-head > b {
-          min-width: 52px;
-          height: 52px;
-          border-radius: 18px;
-          display: grid;
-          place-items: center;
-          background: #ff7a00;
-          color: #101010;
-          font-size: 22px;
-          font-weight: 950;
-        }
-
-        .orders-list {
-          display: grid;
-          gap: 12px;
-        }
-
-        .order-card,
-        .empty,
-        .driver-card,
-        .tips {
-          border: 1px solid rgba(255,255,255,0.10);
-          background: rgba(0,0,0,0.28);
-          border-radius: 26px;
-          padding: 16px;
-        }
-
-        .order-card {
-          background: linear-gradient(135deg, rgba(255,122,0,0.09), rgba(255,255,255,0.035));
-        }
-
-        .order-top {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 210px;
-          gap: 12px;
-          align-items: start;
-        }
-
-        .order-top h3,
-        .empty h3,
-        .driver-card h3,
-        .tips h3 {
-          margin: 10px 0 0;
-          font-size: 24px;
-          line-height: 1.1;
-          font-weight: 950;
-        }
-
-        .total-box {
-          border-radius: 22px;
-          padding: 14px;
-          background: rgba(255,122,0,0.09);
-          border: 1px solid rgba(255,122,0,0.24);
-        }
-
-        .total-box span,
-        .info-grid span {
-          color: rgba(255,255,255,0.52);
-          font-size: 12px;
-          font-weight: 950;
-        }
-
-        .total-box b {
-          display: block;
-          margin-top: 8px;
-          color: #ffb56b;
-          font-size: 24px;
-          font-weight: 950;
-        }
-
-        .info-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 10px;
-          margin-top: 12px;
-        }
-
-        .info-grid > div,
-        .details-box {
-          border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(255,255,255,0.035);
-          border-radius: 18px;
-          padding: 12px;
-        }
-
-        .info-grid b {
-          display: block;
-          margin-top: 7px;
-          color: rgba(255,255,255,0.78);
-          font-size: 13px;
-          line-height: 1.6;
-        }
-
-        .details-box {
-          margin-top: 12px;
-        }
-
-        .items {
-          margin-top: 8px;
-        }
-
-        .item-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
-          padding: 10px 0;
-          color: rgba(255,255,255,0.76);
-        }
-
-        .item-row:last-child {
-          border-bottom: 0;
-        }
-
-        .actions {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-          gap: 10px;
-          margin-top: 12px;
-        }
-
-        button,
-        .secondary-action {
-          border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 16px;
-          min-height: 46px;
-          padding: 0 12px;
-          background: rgba(255,255,255,0.065);
-          color: #fff;
-          font-family: inherit;
-          font-weight: 950;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-          text-decoration: none;
-        }
-
-        .primary-action {
-          border: 0;
-          border-radius: 16px;
-          min-height: 46px;
-          background: #ff7a00;
-          color: #101010;
-          font-family: inherit;
-          font-weight: 950;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          text-decoration: none;
-        }
-
-        .primary-action.wide,
-        .secondary-button.wide {
-          width: 100%;
-          margin-top: 12px;
-        }
-
-        .secondary-button {
-          border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 16px;
-          min-height: 46px;
-          background: rgba(255,255,255,0.065);
-          color: #fff;
-          font-family: inherit;
-          font-weight: 950;
-          cursor: pointer;
-        }
-
-        button:disabled {
-          opacity: 0.55;
-          cursor: not-allowed;
-        }
-
-        .badge,
-        .status-pill {
-          display: inline-flex;
-          align-items: center;
-          border: 1px solid;
-          border-radius: 999px;
-          padding: 7px 11px;
-          font-size: 12px;
-          font-weight: 950;
-          white-space: nowrap;
-        }
-
-        .badge.orange {
-          border-color: rgba(255,122,0,0.42);
-          background: rgba(255,122,0,0.12);
-          color: #ffb56b;
-        }
-
-        .badge.sky {
-          border-color: rgba(14,165,233,0.42);
-          background: rgba(14,165,233,0.12);
-          color: #7dd3fc;
-        }
-
-        .badge.purple {
-          border-color: rgba(168,85,247,0.42);
-          background: rgba(168,85,247,0.12);
-          color: #d8b4fe;
-        }
-
-        .badge.green,
-        .status-pill.online {
-          border-color: rgba(34,197,94,0.42);
-          background: rgba(34,197,94,0.12);
-          color: #86efac;
-        }
-
-        .badge.red,
-        .status-pill.offline {
-          border-color: rgba(239,68,68,0.42);
-          background: rgba(239,68,68,0.12);
-          color: #fca5a5;
-        }
-
-        .avatar {
-          width: 70px;
-          height: 70px;
-          border-radius: 24px;
-          display: grid;
-          place-items: center;
-          background: linear-gradient(135deg, #ff8a00, #ff3d00);
-          color: #101010;
-          margin-bottom: 14px;
-        }
-
-        .driver-card {
-          margin-bottom: 14px;
-        }
-
-        .status-pill {
-          margin-top: 14px;
-        }
-
-        .tips h3 {
-          margin-top: 0;
-        }
-
-        .tip {
-          position: relative;
-          border-radius: 18px;
-          padding: 12px;
-          background: rgba(255,255,255,0.04);
-          margin-top: 10px;
-        }
-
-        .tip > span {
-          width: 11px;
-          height: 11px;
-          display: block;
-          border-radius: 999px;
-          background: rgba(255,255,255,0.22);
-          margin-bottom: 9px;
-        }
-
-        .tip.active > span {
-          background: #ff7a00;
-          box-shadow: 0 0 0 7px rgba(255,122,0,0.12);
-        }
-
-        .tip b {
-          display: block;
-          font-weight: 950;
-        }
-
-        @media (max-width: 1060px) {
-          .hero,
-          .layout {
-            grid-template-columns: 1fr;
-          }
-
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 720px) {
-          .page {
-            padding: 14px;
-          }
-
-          .topbar,
-          .hero,
-          .panel {
-            border-radius: 24px;
-          }
-
-          .stats-grid,
-          .info-grid,
-          .order-top {
-            grid-template-columns: 1fr;
-          }
-
-          .nav {
-            width: 100%;
-            overflow-x: auto;
-            flex-wrap: nowrap;
-            padding-bottom: 2px;
-          }
-
-          .pill {
-            flex: 0 0 auto;
-          }
-        }
+        *{box-sizing:border-box}.loading,.page{min-height:100vh;background:#050505;color:#fff;font-family:Arial,sans-serif}.loading{display:grid;place-items:center}.page{padding:20px 12px}.shell{max-width:980px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}.topbar small,.panel-head small,.hero span{color:#ff7a00;font-weight:900}.topbar h1{margin:5px 0 0}.topbar nav{display:flex;gap:8px;flex-wrap:wrap}.topbar a,.topbar button{border:1px solid #333;background:#151515;color:#fff;text-decoration:none;border-radius:13px;padding:10px 13px;font-weight:900}.topbar .online{background:#12351d;color:#9cffb8}.topbar .offline,.topbar .danger{background:#401313;color:#ffaaaa}.hero,.panel{background:#151210;border:1px solid #34302e;border-radius:28px;padding:18px;margin-bottom:15px}.hero{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}.hero h2{font-size:34px;margin:8px 0}.hero p{color:#aaa}.stats{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:9px}.stats article{background:#080808;border-radius:18px;padding:15px}.stats span{display:block;color:#999;font-size:12px}.stats b{display:block;margin-top:8px;font-size:22px}.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.panel-head h2{margin:5px 0}.panel-head>b{background:#ff7a00;color:#050505;border-radius:12px;padding:9px 12px}.order{background:#090909;border:1px solid #303030;border-radius:22px;padding:15px;margin-bottom:10px}.order-head{display:flex;justify-content:space-between;gap:12px}.order-head span{color:#ff9d4d;font-size:12px;font-weight:900}.order-head h3{margin:5px 0;font-size:23px}.order-head p{margin:0;color:#999}.order-head strong{color:#ff8a2b}.info{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:13px 0}.info div{background:#151515;border-radius:14px;padding:11px}.info span{display:block;color:#888;font-size:11px}.info b{display:block;margin-top:5px;overflow-wrap:anywhere}.items{background:#111;border-radius:16px;padding:10px}.items div{display:flex;justify-content:space-between;gap:10px;padding:8px;border-top:1px solid #252525}.items div:first-child{border-top:0}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions a,.actions button{border:0;border-radius:13px;padding:11px 14px;background:#222;color:#fff;text-decoration:none;font-weight:900}.actions button{background:#ff7a00;color:#050505}.actions button:disabled{opacity:.55}.empty{text-align:center;border:1px dashed #333;border-radius:20px;padding:25px;color:#aaa}.empty h3{color:#fff}.alert{border-radius:14px;padding:12px;margin-bottom:12px;font-weight:900}.ok{background:#12351d;color:#9cffb8}.bad{background:#401313;color:#ffaaaa}@media(max-width:720px){.topbar,.hero{display:block}.topbar nav{margin-top:12px}.stats{grid-template-columns:1fr;margin-top:14px}.info{grid-template-columns:1fr}.order-head{display:block}.order-head strong{display:block;margin-top:10px}.actions>*{flex:1;text-align:center}}
       `}</style>
     </main>
   );
