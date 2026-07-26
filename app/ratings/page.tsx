@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   collection,
   doc,
@@ -13,49 +14,34 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { db } from "../firebase";
-import { FUSE_LOCAL_SESSION, parseFuseRole, type FuseSession } from "@/lib/fuse-auth";
+import { auth, db } from "../firebase";
 
-type OrderDoc = {
+ type OrderDoc = {
   documentId: string;
   orderId?: string;
-  customerId?: string;
   customerUid?: string;
   customerEmail?: string;
   customerName?: string;
   customer?: string;
-  name?: string;
   phone?: string;
   customerPhone?: string;
   restaurantId?: string;
   restaurant?: string;
   restaurantName?: string;
   driverId?: string;
+  driverUid?: string;
   driverName?: string;
   driverPhone?: string;
   status?: string;
   createdAt?: unknown;
 };
 
-function readSession(): FuseSession | null {
-  try {
-    const raw = localStorage.getItem(FUSE_LOCAL_SESSION) || localStorage.getItem("FUSE_LOCAL_SESSION");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as FuseSession;
-    const role = parseFuseRole(parsed.role || parsed.fuseRole);
-    if (!parsed.email || !role) return null;
-    return { ...parsed, role };
-  } catch {
-    return null;
-  }
-}
-
 function clean(value?: string) {
   return String(value || "").trim().toLowerCase();
 }
 
 function getCustomer(order: OrderDoc) {
-  return order.customerName || order.customer || order.name || "زبون";
+  return order.customerName || order.customer || "زبون";
 }
 
 function getRestaurant(order: OrderDoc) {
@@ -65,21 +51,6 @@ function getRestaurant(order: OrderDoc) {
 function isDelivered(order: OrderDoc) {
   const status = clean(order.status);
   return status === "تم التسليم" || status === "delivered";
-}
-
-function belongsToSession(order: OrderDoc, session: FuseSession) {
-  const uid = clean(session.uid || session.customerId);
-  const email = clean(session.email);
-  const phone = String(session.phone || "").replace(/\D/g, "");
-
-  const orderUid = clean(order.customerUid || order.customerId);
-  const orderEmail = clean(order.customerEmail);
-  const orderPhone = String(order.customerPhone || order.phone || "").replace(/\D/g, "");
-
-  if (uid && orderUid) return uid === orderUid;
-  if (email && orderEmail) return email === orderEmail;
-  if (phone && orderPhone) return phone === orderPhone;
-  return false;
 }
 
 function stars(value: number, setter: (value: number) => void) {
@@ -101,7 +72,8 @@ function stars(value: number, setter: (value: number) => void) {
 }
 
 export default function RatingsPage() {
-  const [session, setSession] = useState<FuseSession | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [orders, setOrders] = useState<OrderDoc[]>([]);
   const [ratedOrderIds, setRatedOrderIds] = useState<Set<string>>(new Set());
   const [restaurantRating, setRestaurantRating] = useState(5);
@@ -114,49 +86,40 @@ export default function RatingsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const saved = readSession();
-    if (!saved) {
-      window.location.href = "/login?next=/ratings";
-      return;
-    }
-    if (saved.role !== "customer" && saved.role !== "admin") {
-      window.location.href = "/";
-      return;
-    }
-    setSession(saved);
+    return onAuthStateChanged(auth, async (currentUser) => {
+      setAuthReady(true);
+      if (!currentUser) {
+        window.location.replace("/login?next=/ratings");
+        return;
+      }
+
+      const token = await currentUser.getIdTokenResult();
+      const role = String(token.claims.role || "customer").toLowerCase();
+      if (role !== "customer") {
+        window.location.replace(role === "restaurant" ? "/restaurant-admin" : role === "driver" ? "/driver" : "/admin");
+        return;
+      }
+
+      setUser(currentUser);
+    });
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!user) return;
 
-    const constraints = [orderBy("createdAt", "desc")];
-    const sessionUid = clean(session.uid || session.customerId);
-    const sessionEmail = clean(session.email);
-    const sessionPhone = String(session.phone || "").replace(/\D/g, "");
-
-    let ordersQuery;
-    if (session.role === "admin") {
-      ordersQuery = query(collection(db, "orders"), ...constraints);
-    } else if (sessionUid) {
-      ordersQuery = query(collection(db, "orders"), where("customerUid", "==", sessionUid), ...constraints);
-    } else if (sessionEmail) {
-      ordersQuery = query(collection(db, "orders"), where("customerEmail", "==", sessionEmail), ...constraints);
-    } else if (sessionPhone) {
-      ordersQuery = query(collection(db, "orders"), where("customerPhone", "==", sessionPhone), ...constraints);
-    } else {
-      setOrders([]);
-      setLoading(false);
-      setError("الحساب غير مربوط بمعرّف زبون أو رقم هاتف.");
-      return;
-    }
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("customerUid", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
 
     return onSnapshot(
       ordersQuery,
       (snapshot) => {
-        const data = snapshot.docs
-          .map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }))
-          .filter((order) => session.role === "admin" || belongsToSession(order, session));
-        setOrders(data);
+        setOrders(snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<OrderDoc, "documentId">),
+          documentId: item.id,
+        })));
         setLoading(false);
         setError("");
       },
@@ -166,26 +129,28 @@ export default function RatingsPage() {
         setError(snapshotError.message.includes("index") ? "هذا الاستعلام يحتاج Firestore Index." : "تعذر تحميل طلباتك.");
       }
     );
-  }, [session]);
+  }, [user]);
 
   useEffect(() => {
-    if (!session) return;
-    const ids = orders.map((order) => order.documentId);
-    if (!ids.length) {
+    const deliveredIds = orders.filter(isDelivered).map((order) => order.documentId);
+    if (!deliveredIds.length) {
       setRatedOrderIds(new Set());
       return;
     }
 
     let cancelled = false;
-    Promise.all(ids.map(async (id) => ({ id, exists: (await getDoc(doc(db, "ratings", id))).exists() }))).then((results) => {
-      if (cancelled) return;
-      setRatedOrderIds(new Set(results.filter((item) => item.exists).map((item) => item.id)));
-    });
+    Promise.all(deliveredIds.map(async (id) => ({ id, exists: (await getDoc(doc(db, "ratings", id))).exists() })))
+      .then((results) => {
+        if (!cancelled) setRatedOrderIds(new Set(results.filter((item) => item.exists).map((item) => item.id)));
+      })
+      .catch(() => {
+        if (!cancelled) setError("تعذر التحقق من التقييمات السابقة.");
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [orders, session]);
+  }, [orders]);
 
   const eligibleOrders = useMemo(
     () => orders.filter(isDelivered).filter((order) => !ratedOrderIds.has(order.documentId)),
@@ -202,19 +167,10 @@ export default function RatingsPage() {
   }, [eligibleOrders, selectedOrderId]);
 
   async function submitRating() {
-    if (!session || !selectedOrder) return;
-    if (session.role !== "admin" && !belongsToSession(selectedOrder, session)) {
-      setError("هذا الطلب لا يخص حسابك.");
-      return;
-    }
-    if (!isDelivered(selectedOrder)) {
-      setError("التقييم متاح بعد تسليم الطلب فقط.");
-      return;
-    }
-    if (ratedOrderIds.has(selectedOrder.documentId)) {
-      setError("هذا الطلب مقيّم مسبقاً.");
-      return;
-    }
+    if (!user || !selectedOrder || saving) return;
+    if (selectedOrder.customerUid !== user.uid) return setError("هذا الطلب لا يخص حسابك.");
+    if (!isDelivered(selectedOrder)) return setError("التقييم متاح بعد تسليم الطلب فقط.");
+    if (ratedOrderIds.has(selectedOrder.documentId)) return setError("هذا الطلب مقيّم مسبقاً.");
 
     setSaving(true);
     setMessage("");
@@ -222,29 +178,28 @@ export default function RatingsPage() {
 
     try {
       const ratingRef = doc(db, "ratings", selectedOrder.documentId);
-      const existing = await getDoc(ratingRef);
-      if (existing.exists()) throw new Error("هذا الطلب مقيّم مسبقاً.");
+      if ((await getDoc(ratingRef)).exists()) throw new Error("هذا الطلب مقيّم مسبقاً.");
 
+      const hasDriver = Boolean(selectedOrder.driverUid || selectedOrder.driverId || selectedOrder.driverName);
       await setDoc(ratingRef, {
         orderId: selectedOrder.orderId || selectedOrder.documentId,
         orderDocumentId: selectedOrder.documentId,
-        customerId: selectedOrder.customerId || session.customerId || session.uid || "",
-        customerUid: selectedOrder.customerUid || session.uid || "",
-        customerEmail: selectedOrder.customerEmail || session.email,
+        customerUid: user.uid,
+        customerEmail: selectedOrder.customerEmail || user.email || "",
         customerName: getCustomer(selectedOrder),
-        phone: selectedOrder.customerPhone || selectedOrder.phone || session.phone || "",
+        phone: selectedOrder.customerPhone || selectedOrder.phone || "",
         restaurantId: selectedOrder.restaurantId || "",
         restaurant: getRestaurant(selectedOrder),
         driverId: selectedOrder.driverId || "",
+        driverUid: selectedOrder.driverUid || "",
         driverName: selectedOrder.driverName || "",
         driverPhone: selectedOrder.driverPhone || "",
         restaurantRating,
-        driverRating: selectedOrder.driverName ? driverRating : null,
+        driverRating: hasDriver ? driverRating : 0,
         note: note.trim().slice(0, 1000),
         status: selectedOrder.status || "",
         createdAt: serverTimestamp(),
-        createdByUid: session.uid || "",
-        createdByEmail: session.email,
+        createdByUid: user.uid,
       });
 
       setRatedOrderIds((current) => new Set(current).add(selectedOrder.documentId));
@@ -258,6 +213,8 @@ export default function RatingsPage() {
       setSaving(false);
     }
   }
+
+  if (!authReady) return <main dir="rtl" style={styles.page}><section style={styles.empty}>جاري التحقق من الحساب...</section></main>;
 
   return (
     <main dir="rtl" style={styles.page}>
@@ -304,15 +261,11 @@ export default function RatingsPage() {
                   <p style={styles.muted}>رقم الطلب: {selectedOrder.orderId || selectedOrder.documentId.slice(0, 8)}</p>
                   <p style={styles.muted}>السائق: {selectedOrder.driverName || "غير محدد"}</p>
                 </div>
-
                 <div>
                   <p style={styles.labelText}>تقييم المطعم</p>
                   {stars(restaurantRating, setRestaurantRating)}
-                  {selectedOrder.driverName ? (
-                    <>
-                      <p style={{ ...styles.labelText, marginTop: 18 }}>تقييم السائق</p>
-                      {stars(driverRating, setDriverRating)}
-                    </>
+                  {selectedOrder.driverUid || selectedOrder.driverId || selectedOrder.driverName ? (
+                    <><p style={{ ...styles.labelText, marginTop: 18 }}>تقييم السائق</p>{stars(driverRating, setDriverRating)}</>
                   ) : null}
                 </div>
               </div>
@@ -334,26 +287,26 @@ export default function RatingsPage() {
 }
 
 const styles: Record<string, CSSProperties> = {
-  page: { minHeight: "100vh", background: "radial-gradient(circle at top right, rgba(255,122,0,.16), transparent 34%), #050505", color: "white", padding: "24px 14px 100px", fontFamily: "Cairo, Arial, sans-serif" },
-  shell: { width: "100%", maxWidth: 880, margin: "0 auto" },
+  page: { minHeight: "100vh", background: "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505", color: "white", padding: "26px 16px", fontFamily: "Arial, sans-serif" },
+  shell: { width: "100%", maxWidth: 900, margin: "0 auto" },
   topBar: { display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 },
-  pill: { border: "1px solid rgba(255,255,255,.13)", borderRadius: 999, background: "rgba(255,255,255,.05)", padding: "12px 18px", color: "white", textDecoration: "none", fontWeight: 900 },
-  hero: { border: "1px solid rgba(255,255,255,.10)", borderRadius: 30, background: "linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,122,0,.10))", padding: 24, marginBottom: 16 },
-  eyebrow: { margin: 0, color: "#FF7A00", fontWeight: 950 },
-  title: { margin: "10px 0", fontSize: "clamp(34px, 7vw, 58px)", lineHeight: 1.1, fontWeight: 950 },
+  pill: { border: "1px solid rgba(255,255,255,0.13)", borderRadius: 999, background: "rgba(255,255,255,0.05)", padding: "13px 20px", color: "white", textDecoration: "none", fontWeight: 900 },
+  hero: { border: "1px solid rgba(255,255,255,0.10)", borderRadius: 30, background: "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.10))", padding: 22, marginBottom: 16 },
+  eyebrow: { margin: 0, color: "#FF7A00", fontSize: 13, fontWeight: 900 },
+  title: { margin: "8px 0", fontSize: "clamp(34px, 6vw, 58px)", lineHeight: 1.08, fontWeight: 950 },
   orange: { color: "#FF7A00" },
-  muted: { color: "rgba(255,255,255,.62)", lineHeight: 1.8 },
-  card: { border: "1px solid rgba(255,255,255,.10)", borderRadius: 28, background: "rgba(255,255,255,.05)", padding: 20 },
+  muted: { color: "rgba(255,255,255,0.62)", lineHeight: 1.8 },
+  card: { border: "1px solid rgba(255,255,255,0.10)", borderRadius: 28, background: "rgba(255,255,255,0.045)", padding: 20 },
   label: { display: "grid", gap: 8, fontWeight: 900 },
-  labelText: { margin: 0, color: "rgba(255,255,255,.72)", fontWeight: 900 },
-  input: { width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,.14)", borderRadius: 16, background: "#090909", color: "white", padding: "14px 15px", fontSize: 15 },
-  textarea: { width: "100%", minHeight: 110, boxSizing: "border-box", border: "1px solid rgba(255,255,255,.14)", borderRadius: 16, background: "#090909", color: "white", padding: "14px 15px", fontSize: 15, resize: "vertical" },
-  ratingGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 18, marginTop: 20 },
-  stars: { display: "flex", direction: "ltr", gap: 4 },
-  starButton: { border: 0, background: "transparent", cursor: "pointer", fontSize: 36, lineHeight: 1, padding: 0 },
-  submit: { width: "100%", border: 0, borderRadius: 17, background: "#FF7A00", color: "#111", padding: 16, marginTop: 18, fontWeight: 950, fontSize: 16, cursor: "pointer" },
-  disabled: { width: "100%", border: 0, borderRadius: 17, background: "rgba(255,255,255,.10)", color: "rgba(255,255,255,.45)", padding: 16, marginTop: 18, fontWeight: 950, fontSize: 16 },
-  empty: { border: "1px dashed rgba(255,255,255,.16)", borderRadius: 24, background: "rgba(255,255,255,.035)", padding: 24, textAlign: "center", marginTop: 14 },
-  success: { border: "1px solid rgba(34,197,94,.3)", borderRadius: 18, background: "rgba(34,197,94,.10)", color: "#86EFAC", padding: 14, marginBottom: 14, fontWeight: 900 },
-  error: { border: "1px solid rgba(239,68,68,.3)", borderRadius: 18, background: "rgba(239,68,68,.10)", color: "#FCA5A5", padding: 14, marginBottom: 14, fontWeight: 900 },
+  labelText: { margin: 0, color: "rgba(255,255,255,0.7)", fontWeight: 900 },
+  input: { width: "100%", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, background: "#090909", color: "white", padding: 14, fontSize: 15 },
+  textarea: { width: "100%", minHeight: 110, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, background: "#090909", color: "white", padding: 14, resize: "vertical" },
+  ratingGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 18, marginTop: 20 },
+  stars: { display: "flex", gap: 5, direction: "ltr" },
+  starButton: { border: 0, background: "transparent", cursor: "pointer", fontSize: 34, padding: 0 },
+  submit: { width: "100%", border: 0, borderRadius: 17, background: "#FF7A00", color: "#000", padding: 15, marginTop: 16, fontWeight: 950, cursor: "pointer" },
+  disabled: { width: "100%", border: 0, borderRadius: 17, background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.4)", padding: 15, marginTop: 16, fontWeight: 950 },
+  empty: { maxWidth: 900, margin: "20px auto", border: "1px dashed rgba(255,255,255,0.16)", borderRadius: 26, padding: 28, textAlign: "center", background: "rgba(255,255,255,0.035)" },
+  success: { border: "1px solid rgba(34,197,94,0.3)", borderRadius: 16, background: "rgba(34,197,94,0.1)", color: "#86EFAC", padding: 14, marginBottom: 14 },
+  error: { border: "1px solid rgba(239,68,68,0.3)", borderRadius: 16, background: "rgba(239,68,68,0.1)", color: "#FCA5A5", padding: 14, marginBottom: 14 },
 };
