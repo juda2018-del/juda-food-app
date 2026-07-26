@@ -1,67 +1,85 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
-  addDoc,
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { FUSE_LOCAL_SESSION, parseFuseRole, type FuseSession } from "@/lib/fuse-auth";
 
 type OrderDoc = {
   documentId: string;
   orderId?: string;
+  customerId?: string;
+  customerUid?: string;
+  customerEmail?: string;
   customerName?: string;
   customer?: string;
   name?: string;
   phone?: string;
   customerPhone?: string;
+  restaurantId?: string;
   restaurant?: string;
   restaurantName?: string;
+  driverId?: string;
   driverName?: string;
   driverPhone?: string;
   status?: string;
   createdAt?: unknown;
 };
 
-function cleanPhone(value?: string) {
-  return (value || "").replace(/\D/g, "");
+function readSession(): FuseSession | null {
+  try {
+    const raw = localStorage.getItem(FUSE_LOCAL_SESSION) || localStorage.getItem("FUSE_LOCAL_SESSION");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as FuseSession;
+    const role = parseFuseRole(parsed.role || parsed.fuseRole);
+    if (!parsed.email || !role) return null;
+    return { ...parsed, role };
+  } catch {
+    return null;
+  }
+}
+
+function clean(value?: string) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function getCustomer(order: OrderDoc) {
   return order.customerName || order.customer || order.name || "زبون";
 }
 
-function getPhone(order: OrderDoc) {
-  return order.phone || order.customerPhone || "";
-}
-
 function getRestaurant(order: OrderDoc) {
-  return order.restaurant || order.restaurantName || "مطعم";
+  return order.restaurantName || order.restaurant || "مطعم";
 }
 
 function isDelivered(order: OrderDoc) {
-  return order.status === "تم التسليم" || order.status === "delivered";
+  const status = clean(order.status);
+  return status === "تم التسليم" || status === "delivered";
 }
 
-function matchesSearch(order: OrderDoc, search: string) {
-  const value = search.trim().toLowerCase();
-  const phoneValue = cleanPhone(search);
+function belongsToSession(order: OrderDoc, session: FuseSession) {
+  const uid = clean(session.uid || session.customerId);
+  const email = clean(session.email);
+  const phone = String(session.phone || "").replace(/\D/g, "");
 
-  if (!value && !phoneValue) return false;
+  const orderUid = clean(order.customerUid || order.customerId);
+  const orderEmail = clean(order.customerEmail);
+  const orderPhone = String(order.customerPhone || order.phone || "").replace(/\D/g, "");
 
-  const orderPhone = cleanPhone(getPhone(order));
-  const orderId = (order.orderId || order.documentId || "").toLowerCase();
-
-  if (phoneValue.length >= 5 && orderPhone) {
-    return orderPhone.includes(phoneValue) || phoneValue.includes(orderPhone);
-  }
-
-  return orderId.includes(value);
+  if (uid && orderUid) return uid === orderUid;
+  if (email && orderEmail) return email === orderEmail;
+  if (phone && orderPhone) return phone === orderPhone;
+  return false;
 }
 
 function stars(value: number, setter: (value: number) => void) {
@@ -70,12 +88,10 @@ function stars(value: number, setter: (value: number) => void) {
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
-          onClick={() => setter(star)}
-          style={{
-            ...styles.starButton,
-            color: star <= value ? "#FF7A00" : "rgba(255,255,255,0.25)",
-          }}
           type="button"
+          onClick={() => setter(star)}
+          aria-label={`${star} نجوم`}
+          style={{ ...styles.starButton, color: star <= value ? "#FF7A00" : "rgba(255,255,255,0.24)" }}
         >
           ★
         </button>
@@ -84,253 +100,62 @@ function stars(value: number, setter: (value: number) => void) {
   );
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top right, rgba(255,122,0,0.16), transparent 34%), #050505",
-    color: "white",
-    padding: "26px 16px",
-    fontFamily: "Arial, sans-serif",
-  },
-  shell: {
-    width: "100%",
-    maxWidth: 1100,
-    margin: "0 auto",
-  },
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-    flexWrap: "wrap",
-    marginBottom: 16,
-  },
-  pill: {
-    border: "1px solid rgba(255,255,255,0.13)",
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.05)",
-    minHeight: 52,
-    padding: "13px 20px",
-    color: "white",
-    textDecoration: "none",
-    fontSize: 16,
-    fontWeight: 900,
-  },
-  hero: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 34,
-    background:
-      "linear-gradient(135deg, rgba(255,255,255,0.075), rgba(255,122,0,0.10))",
-    boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
-    padding: 22,
-    marginBottom: 16,
-  },
-  heroGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 0.45fr)",
-    gap: 14,
-    alignItems: "stretch",
-  },
-  card: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(0,0,0,0.36)",
-    padding: 20,
-  },
-  eyebrow: {
-    margin: 0,
-    color: "#FF7A00",
-    fontSize: 13,
-    fontWeight: 950,
-  },
-  title: {
-    margin: "8px 0 0",
-    fontSize: "clamp(38px, 6vw, 66px)",
-    lineHeight: 1.08,
-    fontWeight: 950,
-  },
-  orange: {
-    color: "#FF7A00",
-  },
-  muted: {
-    color: "rgba(255,255,255,0.58)",
-    lineHeight: 1.85,
-    fontSize: 14,
-  },
-  searchBox: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 28,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-    marginBottom: 16,
-  },
-  input: {
-    width: "100%",
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "15px 16px",
-    outline: "none",
-    fontSize: 15,
-  },
-  textarea: {
-    width: "100%",
-    minHeight: 100,
-    boxSizing: "border-box",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 18,
-    background: "#070707",
-    color: "white",
-    padding: "15px 16px",
-    outline: "none",
-    fontSize: 15,
-    resize: "vertical",
-  },
-  resultGrid: {
-    display: "grid",
-    gap: 14,
-  },
-  orderCard: {
-    border: "1px solid rgba(255,255,255,0.10)",
-    borderRadius: 30,
-    background: "rgba(255,255,255,0.045)",
-    padding: 18,
-  },
-  orderTop: {
-    display: "grid",
-    gridTemplateColumns: "minmax(260px, 1fr) minmax(220px, 0.45fr)",
-    gap: 12,
-    alignItems: "start",
-  },
-  ratingBox: {
-    border: "1px solid rgba(255,122,0,0.22)",
-    borderRadius: 26,
-    background: "rgba(255,122,0,0.08)",
-    padding: 16,
-  },
-  stars: {
-    display: "flex",
-    gap: 4,
-    justifyContent: "flex-start",
-    direction: "ltr",
-    marginTop: 8,
-  },
-  starButton: {
-    border: 0,
-    background: "transparent",
-    cursor: "pointer",
-    fontSize: 34,
-    lineHeight: 1,
-    padding: 0,
-  },
-  submit: {
-    width: "100%",
-    border: 0,
-    borderRadius: 18,
-    background: "#FF7A00",
-    color: "#000",
-    padding: "15px 16px",
-    cursor: "pointer",
-    fontSize: 14,
-    fontWeight: 950,
-    marginTop: 14,
-  },
-  disabled: {
-    width: "100%",
-    border: 0,
-    borderRadius: 18,
-    background: "rgba(255,255,255,0.09)",
-    color: "rgba(255,255,255,0.35)",
-    padding: "15px 16px",
-    fontSize: 14,
-    fontWeight: 950,
-    marginTop: 14,
-  },
-  statLabel: {
-    margin: 0,
-    color: "rgba(255,255,255,0.52)",
-    fontSize: 13,
-    fontWeight: 850,
-  },
-  statValue: {
-    margin: "10px 0 0",
-    fontSize: 30,
-    fontWeight: 950,
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    border: "1px solid rgba(34,197,94,0.42)",
-    borderRadius: 999,
-    background: "rgba(34,197,94,0.12)",
-    color: "#86EFAC",
-    padding: "7px 11px",
-    fontSize: 12,
-    fontWeight: 950,
-  },
-  empty: {
-    border: "1px dashed rgba(255,255,255,0.16)",
-    borderRadius: 30,
-    background: "rgba(255,255,255,0.035)",
-    padding: 28,
-    textAlign: "center",
-  },
-  success: {
-    border: "1px solid rgba(34,197,94,0.30)",
-    borderRadius: 18,
-    background: "rgba(34,197,94,0.10)",
-    color: "#86EFAC",
-    padding: 14,
-    marginTop: 14,
-    fontSize: 14,
-    fontWeight: 900,
-  },
-  error: {
-    border: "1px solid rgba(239,68,68,0.30)",
-    borderRadius: 18,
-    background: "rgba(239,68,68,0.10)",
-    color: "#FCA5A5",
-    padding: 14,
-    marginTop: 14,
-    fontSize: 14,
-    fontWeight: 900,
-  },
-};
-
 export default function RatingsPage() {
+  const [session, setSession] = useState<FuseSession | null>(null);
   const [orders, setOrders] = useState<OrderDoc[]>([]);
-  const [search, setSearch] = useState("");
+  const [ratedOrderIds, setRatedOrderIds] = useState<Set<string>>(new Set());
   const [restaurantRating, setRestaurantRating] = useState(5);
   const [driverRating, setDriverRating] = useState(5);
   const [note, setNote] = useState("");
+  const [selectedOrderId, setSelectedOrderId] = useState("");
   const [loading, setLoading] = useState(true);
-  const [savingOrderId, setSavingOrderId] = useState("");
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("fuse_session");
+    const saved = readSession();
+    if (!saved) {
+      window.location.href = "/login?next=/ratings";
+      return;
+    }
+    if (saved.role !== "customer" && saved.role !== "admin") {
+      window.location.href = "/";
+      return;
+    }
+    setSession(saved);
+  }, []);
 
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as { phone?: string };
-        if (parsed?.phone) setSearch(parsed.phone);
-      } catch {}
+  useEffect(() => {
+    if (!session) return;
+
+    const constraints = [orderBy("createdAt", "desc")];
+    const sessionUid = clean(session.uid || session.customerId);
+    const sessionEmail = clean(session.email);
+    const sessionPhone = String(session.phone || "").replace(/\D/g, "");
+
+    let ordersQuery;
+    if (session.role === "admin") {
+      ordersQuery = query(collection(db, "orders"), ...constraints);
+    } else if (sessionUid) {
+      ordersQuery = query(collection(db, "orders"), where("customerUid", "==", sessionUid), ...constraints);
+    } else if (sessionEmail) {
+      ordersQuery = query(collection(db, "orders"), where("customerEmail", "==", sessionEmail), ...constraints);
+    } else if (sessionPhone) {
+      ordersQuery = query(collection(db, "orders"), where("customerPhone", "==", sessionPhone), ...constraints);
+    } else {
+      setOrders([]);
+      setLoading(false);
+      setError("الحساب غير مربوط بمعرّف زبون أو رقم هاتف.");
+      return;
     }
 
-    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-
-    const unsubscribe = onSnapshot(
-      q,
+    return onSnapshot(
+      ordersQuery,
       (snapshot) => {
-        const data = snapshot.docs.map((item) => ({
-          ...(item.data() as Omit<OrderDoc, "documentId">),
-          documentId: item.id,
-        }));
-
+        const data = snapshot.docs
+          .map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }))
+          .filter((order) => session.role === "admin" || belongsToSession(order, session));
         setOrders(data);
         setLoading(false);
         setError("");
@@ -338,48 +163,99 @@ export default function RatingsPage() {
       (snapshotError) => {
         setOrders([]);
         setLoading(false);
-        setError(snapshotError.message || "تعذر تحميل الطلبات");
+        setError(snapshotError.message.includes("index") ? "هذا الاستعلام يحتاج Firestore Index." : "تعذر تحميل طلباتك.");
       }
     );
+  }, [session]);
 
-    return () => unsubscribe();
-  }, []);
+  useEffect(() => {
+    if (!session) return;
+    const ids = orders.map((order) => order.documentId);
+    if (!ids.length) {
+      setRatedOrderIds(new Set());
+      return;
+    }
 
-  const visibleOrders = useMemo(() => {
-    return orders
-      .filter((order) => matchesSearch(order, search))
-      .slice(0, 8);
-  }, [orders, search]);
+    let cancelled = false;
+    Promise.all(ids.map(async (id) => ({ id, exists: (await getDoc(doc(db, "ratings", id))).exists() }))).then((results) => {
+      if (cancelled) return;
+      setRatedOrderIds(new Set(results.filter((item) => item.exists).map((item) => item.id)));
+    });
 
-  async function submitRating(order: OrderDoc) {
+    return () => {
+      cancelled = true;
+    };
+  }, [orders, session]);
+
+  const eligibleOrders = useMemo(
+    () => orders.filter(isDelivered).filter((order) => !ratedOrderIds.has(order.documentId)),
+    [orders, ratedOrderIds]
+  );
+
+  const selectedOrder = eligibleOrders.find((order) => order.documentId === selectedOrderId) || eligibleOrders[0] || null;
+
+  useEffect(() => {
+    if (!selectedOrderId && eligibleOrders[0]) setSelectedOrderId(eligibleOrders[0].documentId);
+    if (selectedOrderId && !eligibleOrders.some((order) => order.documentId === selectedOrderId)) {
+      setSelectedOrderId(eligibleOrders[0]?.documentId || "");
+    }
+  }, [eligibleOrders, selectedOrderId]);
+
+  async function submitRating() {
+    if (!session || !selectedOrder) return;
+    if (session.role !== "admin" && !belongsToSession(selectedOrder, session)) {
+      setError("هذا الطلب لا يخص حسابك.");
+      return;
+    }
+    if (!isDelivered(selectedOrder)) {
+      setError("التقييم متاح بعد تسليم الطلب فقط.");
+      return;
+    }
+    if (ratedOrderIds.has(selectedOrder.documentId)) {
+      setError("هذا الطلب مقيّم مسبقاً.");
+      return;
+    }
+
+    setSaving(true);
     setMessage("");
     setError("");
-    setSavingOrderId(order.documentId);
 
     try {
-      await addDoc(collection(db, "ratings"), {
-        orderId: order.orderId || order.documentId,
-        orderDocumentId: order.documentId,
-        customerName: getCustomer(order),
-        phone: getPhone(order),
-        restaurant: getRestaurant(order),
-        driverName: order.driverName || "",
-        driverPhone: order.driverPhone || "",
+      const ratingRef = doc(db, "ratings", selectedOrder.documentId);
+      const existing = await getDoc(ratingRef);
+      if (existing.exists()) throw new Error("هذا الطلب مقيّم مسبقاً.");
+
+      await setDoc(ratingRef, {
+        orderId: selectedOrder.orderId || selectedOrder.documentId,
+        orderDocumentId: selectedOrder.documentId,
+        customerId: selectedOrder.customerId || session.customerId || session.uid || "",
+        customerUid: selectedOrder.customerUid || session.uid || "",
+        customerEmail: selectedOrder.customerEmail || session.email,
+        customerName: getCustomer(selectedOrder),
+        phone: selectedOrder.customerPhone || selectedOrder.phone || session.phone || "",
+        restaurantId: selectedOrder.restaurantId || "",
+        restaurant: getRestaurant(selectedOrder),
+        driverId: selectedOrder.driverId || "",
+        driverName: selectedOrder.driverName || "",
+        driverPhone: selectedOrder.driverPhone || "",
         restaurantRating,
-        driverRating,
-        note: note.trim(),
-        status: order.status || "",
+        driverRating: selectedOrder.driverName ? driverRating : null,
+        note: note.trim().slice(0, 1000),
+        status: selectedOrder.status || "",
         createdAt: serverTimestamp(),
+        createdByUid: session.uid || "",
+        createdByEmail: session.email,
       });
 
+      setRatedOrderIds((current) => new Set(current).add(selectedOrder.documentId));
       setMessage("تم إرسال التقييم، شكراً إلك.");
       setNote("");
       setRestaurantRating(5);
       setDriverRating(5);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "تعذر إرسال التقييم");
+      setError(submitError instanceof Error ? submitError.message : "تعذر إرسال التقييم.");
     } finally {
-      setSavingOrderId("");
+      setSaving(false);
     }
   }
 
@@ -387,141 +263,97 @@ export default function RatingsPage() {
     <main dir="rtl" style={styles.page}>
       <section style={styles.shell}>
         <div style={styles.topBar}>
-          <Link href="/order-status" style={styles.pill}>
-            ← طلباتي
-          </Link>
-
-          <Link href="/" style={styles.pill}>
-            الرئيسية
-          </Link>
+          <Link href="/order-status" style={styles.pill}>← طلباتي</Link>
+          <Link href="/" style={styles.pill}>الرئيسية</Link>
         </div>
 
         <header style={styles.hero}>
-          <div style={styles.heroGrid}>
-            <div style={styles.card}>
-              <p style={styles.eyebrow}>تقييم الطلب</p>
-              <h1 style={styles.title}>
-                قيّم تجربتك
-                <br />
-                <span style={styles.orange}>وخلينا نحسّن</span>
-              </h1>
-              <p style={styles.muted}>
-                اكتب رقم الهاتف أو رقم الطلب، واختار الطلب حتى تقيّم المطعم والسائق.
-              </p>
-            </div>
-
-            <div style={styles.card}>
-              <p style={styles.statLabel}>الحالة</p>
-              <p style={{ ...styles.statValue, color: "#86EFAC" }}>
-                {loading ? "تحميل" : "جاهز"}
-              </p>
-              <p style={styles.muted}>التقييم ينحفظ مباشرة في Firestore</p>
-            </div>
-          </div>
+          <p style={styles.eyebrow}>تقييم الطلب</p>
+          <h1 style={styles.title}>قيّم طلبك <span style={styles.orange}>بعد التسليم</span></h1>
+          <p style={styles.muted}>نعرض فقط الطلبات المسلّمة التابعة لحسابك، وكل طلب يمكن تقييمه مرة واحدة.</p>
         </header>
 
-        <section style={styles.searchBox}>
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>
-              رقم الهاتف أو رقم الطلب
-            </span>
-            <input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setMessage("");
-                setError("");
-              }}
-              style={styles.input}
-              placeholder="0770... أو رقم الطلب"
-              dir="ltr"
-            />
-          </label>
-        </section>
+        {loading ? <section style={styles.empty}>جاري تحميل طلباتك...</section> : null}
+        {error ? <section style={styles.error}>{error}</section> : null}
+        {message ? <section style={styles.success}>{message}</section> : null}
 
-        <section style={styles.resultGrid}>
-          {loading ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>جاري تحميل الطلبات...</h2>
-              <p style={styles.muted}>انتظر لحظات.</p>
-            </div>
-          ) : visibleOrders.length === 0 ? (
-            <div style={styles.empty}>
-              <h2 style={{ margin: 0 }}>ما لقينا طلب مطابق</h2>
-              <p style={styles.muted}>
-                اكتب نفس رقم الهاتف المستخدم بالطلب أو رقم الطلب.
-              </p>
-            </div>
-          ) : (
-            visibleOrders.map((order) => (
-              <article key={order.documentId} style={styles.orderCard}>
-                <div style={styles.orderTop}>
-                  <div>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <h2 style={{ margin: 0, fontSize: 26, fontWeight: 950 }}>
-                        {getRestaurant(order)}
-                      </h2>
+        {!loading && !error && eligibleOrders.length === 0 ? (
+          <section style={styles.empty}>
+            <h2 style={{ margin: 0 }}>ماكو طلب جاهز للتقييم</h2>
+            <p style={styles.muted}>الطلب يظهر هنا بعد التسليم، ويختفي بعد إرسال تقييمه.</p>
+          </section>
+        ) : null}
 
-                      {isDelivered(order) ? (
-                        <span style={styles.badge}>تم التسليم</span>
-                      ) : null}
-                    </div>
+        {eligibleOrders.length > 0 ? (
+          <section style={styles.card}>
+            <label style={styles.label}>
+              <span>اختار الطلب</span>
+              <select value={selectedOrder?.documentId || ""} onChange={(event) => setSelectedOrderId(event.target.value)} style={styles.input}>
+                {eligibleOrders.map((order) => (
+                  <option key={order.documentId} value={order.documentId}>
+                    {getRestaurant(order)} — #{order.orderId || order.documentId.slice(0, 8)}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-                    <p style={styles.muted}>
-                      {getCustomer(order)} — رقم الطلب: {order.orderId || order.documentId.slice(0, 8)}
-                    </p>
-
-                    <p style={styles.muted}>
-                      السائق: {order.driverName || "غير محدد"}
-                    </p>
-
-                    {!isDelivered(order) ? (
-                      <p style={{ ...styles.muted, color: "#FDE68A" }}>
-                        تگدر تقيّم الطلب حتى لو بعده مو مؤرشف، لكن الأفضل بعد التسليم.
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div style={styles.ratingBox}>
-                    <p style={styles.statLabel}>تقييم المطعم</p>
-                    {stars(restaurantRating, setRestaurantRating)}
-
-                    <div style={{ height: 14 }} />
-
-                    <p style={styles.statLabel}>تقييم السائق</p>
-                    {stars(driverRating, setDriverRating)}
-                  </div>
+            {selectedOrder ? (
+              <div style={styles.ratingGrid}>
+                <div>
+                  <h2 style={{ marginTop: 0 }}>{getRestaurant(selectedOrder)}</h2>
+                  <p style={styles.muted}>رقم الطلب: {selectedOrder.orderId || selectedOrder.documentId.slice(0, 8)}</p>
+                  <p style={styles.muted}>السائق: {selectedOrder.driverName || "غير محدد"}</p>
                 </div>
 
-                <div style={{ marginTop: 14 }}>
-                  <label style={{ display: "grid", gap: 8 }}>
-                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontWeight: 900 }}>
-                      ملاحظتك
-                    </span>
-                    <textarea
-                      value={note}
-                      onChange={(event) => setNote(event.target.value)}
-                      style={styles.textarea}
-                      placeholder="اكتب رأيك بالخدمة، المطعم، أو السائق..."
-                    />
-                  </label>
-
-                  <button
-                    onClick={() => submitRating(order)}
-                    disabled={savingOrderId === order.documentId}
-                    style={savingOrderId === order.documentId ? styles.disabled : styles.submit}
-                  >
-                    {savingOrderId === order.documentId ? "جاري الإرسال..." : "إرسال التقييم"}
-                  </button>
-
-                  {message ? <div style={styles.success}>{message}</div> : null}
-                  {error ? <div style={styles.error}>{error}</div> : null}
+                <div>
+                  <p style={styles.labelText}>تقييم المطعم</p>
+                  {stars(restaurantRating, setRestaurantRating)}
+                  {selectedOrder.driverName ? (
+                    <>
+                      <p style={{ ...styles.labelText, marginTop: 18 }}>تقييم السائق</p>
+                      {stars(driverRating, setDriverRating)}
+                    </>
+                  ) : null}
                 </div>
-              </article>
-            ))
-          )}
-        </section>
+              </div>
+            ) : null}
+
+            <label style={{ ...styles.label, marginTop: 18 }}>
+              <span>ملاحظتك</span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} style={styles.textarea} placeholder="اكتب رأيك بالخدمة..." />
+            </label>
+
+            <button type="button" onClick={submitRating} disabled={saving || !selectedOrder} style={saving ? styles.disabled : styles.submit}>
+              {saving ? "جاري الإرسال..." : "إرسال التقييم"}
+            </button>
+          </section>
+        ) : null}
       </section>
     </main>
   );
 }
+
+const styles: Record<string, CSSProperties> = {
+  page: { minHeight: "100vh", background: "radial-gradient(circle at top right, rgba(255,122,0,.16), transparent 34%), #050505", color: "white", padding: "24px 14px 100px", fontFamily: "Cairo, Arial, sans-serif" },
+  shell: { width: "100%", maxWidth: 880, margin: "0 auto" },
+  topBar: { display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 },
+  pill: { border: "1px solid rgba(255,255,255,.13)", borderRadius: 999, background: "rgba(255,255,255,.05)", padding: "12px 18px", color: "white", textDecoration: "none", fontWeight: 900 },
+  hero: { border: "1px solid rgba(255,255,255,.10)", borderRadius: 30, background: "linear-gradient(135deg, rgba(255,255,255,.075), rgba(255,122,0,.10))", padding: 24, marginBottom: 16 },
+  eyebrow: { margin: 0, color: "#FF7A00", fontWeight: 950 },
+  title: { margin: "10px 0", fontSize: "clamp(34px, 7vw, 58px)", lineHeight: 1.1, fontWeight: 950 },
+  orange: { color: "#FF7A00" },
+  muted: { color: "rgba(255,255,255,.62)", lineHeight: 1.8 },
+  card: { border: "1px solid rgba(255,255,255,.10)", borderRadius: 28, background: "rgba(255,255,255,.05)", padding: 20 },
+  label: { display: "grid", gap: 8, fontWeight: 900 },
+  labelText: { margin: 0, color: "rgba(255,255,255,.72)", fontWeight: 900 },
+  input: { width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,.14)", borderRadius: 16, background: "#090909", color: "white", padding: "14px 15px", fontSize: 15 },
+  textarea: { width: "100%", minHeight: 110, boxSizing: "border-box", border: "1px solid rgba(255,255,255,.14)", borderRadius: 16, background: "#090909", color: "white", padding: "14px 15px", fontSize: 15, resize: "vertical" },
+  ratingGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 18, marginTop: 20 },
+  stars: { display: "flex", direction: "ltr", gap: 4 },
+  starButton: { border: 0, background: "transparent", cursor: "pointer", fontSize: 36, lineHeight: 1, padding: 0 },
+  submit: { width: "100%", border: 0, borderRadius: 17, background: "#FF7A00", color: "#111", padding: 16, marginTop: 18, fontWeight: 950, fontSize: 16, cursor: "pointer" },
+  disabled: { width: "100%", border: 0, borderRadius: 17, background: "rgba(255,255,255,.10)", color: "rgba(255,255,255,.45)", padding: 16, marginTop: 18, fontWeight: 950, fontSize: 16 },
+  empty: { border: "1px dashed rgba(255,255,255,.16)", borderRadius: 24, background: "rgba(255,255,255,.035)", padding: 24, textAlign: "center", marginTop: 14 },
+  success: { border: "1px solid rgba(34,197,94,.3)", borderRadius: 18, background: "rgba(34,197,94,.10)", color: "#86EFAC", padding: 14, marginBottom: 14, fontWeight: 900 },
+  error: { border: "1px solid rgba(239,68,68,.3)", borderRadius: 18, background: "rgba(239,68,68,.10)", color: "#FCA5A5", padding: 14, marginBottom: 14, fontWeight: 900 },
+};
