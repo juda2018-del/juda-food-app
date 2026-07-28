@@ -659,8 +659,8 @@ export default function HomePage() {
           overflow: hidden;
           padding: 18px 16px 96px;
           background:
-            radial-gradient(circle at 90% 0%, rgba(18, 63, 189, 0.1), transparent 26%),
-            #fffaf1;
+            radial-gradient(circle at 90% 0%, rgba(255, 90, 0, 0.07), transparent 25%),
+            #fffaf4;
           color: #0b1220;
           box-shadow:
             0 42px 100px rgba(11, 18, 32, 0.16),
@@ -673,8 +673,8 @@ export default function HomePage() {
           align-items: center;
           gap: 12px;
           margin: -18px -16px 0;
-          padding: 24px 16px 14px;
-          background: linear-gradient(135deg, #123fbd, #082d8f);
+          padding: 20px 16px 12px;
+          background: linear-gradient(135deg, #171717, #2c2926);
           color: #fff;
         }
 
@@ -683,9 +683,9 @@ export default function HomePage() {
         .icon-btn,
         .profile {
           border: 0;
-          width: 54px;
-          height: 54px;
-          border-radius: 20px;
+          width: 48px;
+          height: 48px;
+          border-radius: 16px;
           display: grid;
           place-items: center;
           text-decoration: none;
@@ -787,21 +787,21 @@ export default function HomePage() {
 
         .search-row {
           display: grid;
-          grid-template-columns: 1fr 54px;
+          grid-template-columns: 1fr 48px;
           gap: 11px;
-          margin: 0 -16px 17px;
-          padding: 0 16px 18px;
-          background: linear-gradient(135deg, #123fbd, #082d8f);
+          margin: 0 -16px 14px;
+          padding: 0 16px 15px;
+          background: linear-gradient(135deg, #171717, #2c2926);
         }
 
         .search-box {
-          height: 58px;
-          border-radius: 22px;
+          height: 52px;
+          border-radius: 17px;
           background: #fffdf9;
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 0 18px;
+          padding: 0 15px;
           color: #8d847b;
           box-shadow: 0 18px 36px rgba(11, 18, 32, 0.08);
         }
@@ -829,10 +829,10 @@ export default function HomePage() {
         .categories {
           display: grid;
           grid-auto-flow: column;
-          grid-auto-columns: 78px;
-          gap: 10px;
+          grid-auto-columns: 68px;
+          gap: 7px;
           overflow-x: auto;
-          padding: 2px 0 18px;
+          padding: 1px 0 14px;
           scrollbar-width: none;
           scroll-padding-inline: 16px;
         }
@@ -846,15 +846,15 @@ export default function HomePage() {
           background: transparent;
           display: grid;
           justify-items: center;
-          gap: 8px;
+          gap: 6px;
           color: #0b1220;
           cursor: pointer;
         }
 
         .categories span {
-          width: 62px;
-          height: 62px;
-          border-radius: 22px;
+          width: 54px;
+          height: 54px;
+          border-radius: 18px;
           background: #fffdf9;
           display: grid;
           place-items: center;
@@ -869,22 +869,22 @@ export default function HomePage() {
         }
 
         .categories b {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 700;
         }
 
         .hero {
           position: relative;
           overflow: hidden;
-          min-height: 220px;
-          border-radius: 32px;
+          min-height: 184px;
+          border-radius: 25px;
           background:
             radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.18), transparent 36%),
-            linear-gradient(135deg, #082d8f 0%, #123fbd 58%, #1e51d1 100%);
+            linear-gradient(135deg, #171717 0%, #26211d 62%, #3a2a20 100%);
           display: grid;
           grid-template-columns: 1fr 46%;
           margin-bottom: 13px;
-          box-shadow: 0 24px 50px rgba(8, 45, 143, 0.24);
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
         }
 
         .hero::after {
@@ -893,12 +893,12 @@ export default function HomePage() {
           inset: 0;
           background:
             radial-gradient(circle at 25% 50%, rgba(11, 18, 32, 0.12), transparent 32%),
-            linear-gradient(90deg, rgba(11, 18, 32, 0.14), transparent 44%);
+            linear-gradient(90deg, rgba(0, 0, 0, 0.16), transparent 44%);
           pointer-events: none;
         }
 
         .hero-copy {
-          padding: 25px 22px;
+          padding: 19px 18px;
           color: #fff7ee;
           position: relative;
           z-index: 3;
@@ -914,23 +914,23 @@ export default function HomePage() {
         }
 
         .hero-copy h1 {
-          margin: 14px 0 0;
+          margin: 10px 0 0;
           font-family: var(--fuse-title-font);
-          font-size: 39px;
+          font-size: 32px;
           line-height: 0.98;
           font-weight: 900;
           letter-spacing: -1px;
         }
 
         .hero-copy p {
-          margin: 12px 0 19px;
-          font-size: 15px;
+          margin: 9px 0 13px;
+          font-size: 13px;
           font-weight: 600;
         }
 
         .hero-copy a {
-          height: 44px;
-          min-width: 124px;
+          height: 38px;
+          min-width: 105px;
           border-radius: 999px;
           display: inline-grid;
           place-items: center;
@@ -950,8 +950,8 @@ export default function HomePage() {
           width: 49%;
           z-index: 2;
           overflow: hidden;
-          border-top-left-radius: 32px;
-          border-bottom-left-radius: 32px;
+          border-top-left-radius: 25px;
+          border-bottom-left-radius: 25px;
         }
 
         .hero-food::after {
@@ -959,7 +959,7 @@ export default function HomePage() {
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(90deg, transparent 0%, rgba(18, 63, 189, 0.12) 55%, rgba(8, 45, 143, 0.92) 100%);
+            linear-gradient(90deg, transparent 0%, rgba(23, 23, 23, 0.12) 55%, rgba(23, 23, 23, 0.92) 100%);
           pointer-events: none;
         }
 
@@ -978,11 +978,11 @@ export default function HomePage() {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 8px;
-          padding: 12px;
-          border-radius: 24px;
+          padding: 10px;
+          border-radius: 20px;
           background: #fffdf9;
           box-shadow: 0 16px 34px rgba(11, 18, 32, 0.08);
-          margin-bottom: 24px;
+          margin-bottom: 19px;
         }
 
         .benefits div {
@@ -1034,7 +1034,7 @@ export default function HomePage() {
           margin: 0;
           color: #0b1220;
           font-family: var(--fuse-title-font);
-          font-size: 26px;
+          font-size: 23px;
           line-height: 1.1;
           font-weight: 900;
         }
@@ -1050,13 +1050,13 @@ export default function HomePage() {
         .restaurants {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-          padding-bottom: 22px;
+          gap: 11px;
+          padding-bottom: 18px;
         }
 
         .rest-card {
           overflow: hidden;
-          border-radius: 26px;
+          border-radius: 21px;
           background: #fffdf9;
           color: #0b1220;
           text-decoration: none;
@@ -1065,7 +1065,7 @@ export default function HomePage() {
 
         .rest-img-wrap {
           position: relative;
-          height: 126px;
+          height: 116px;
           background: #0b1220;
           overflow: hidden;
         }
@@ -1134,7 +1134,7 @@ export default function HomePage() {
           margin: 0;
           color: #0b1220;
           font-family: var(--fuse-title-font);
-          font-size: 20px;
+          font-size: 18px;
           line-height: 1.1;
           font-weight: 900;
         }
@@ -1400,13 +1400,13 @@ export default function HomePage() {
           }
 
           .categories span {
-            width: clamp(44px, 13vw, 54px);
-            height: clamp(44px, 13vw, 54px);
-            border-radius: 17px;
+            width: clamp(42px, 12vw, 50px);
+            height: clamp(42px, 12vw, 50px);
+            border-radius: 15px;
           }
 
           .categories b {
-            font-size: clamp(10px, 2.8vw, 12px);
+            font-size: clamp(9px, 2.6vw, 11px);
             white-space: nowrap;
           }
 
@@ -1439,12 +1439,10 @@ export default function HomePage() {
             height: 50px;
           }
 
-          .hero {
-            min-height: 205px;
-          }
+          .hero { min-height: 180px; }
 
           .hero-copy h1 {
-            font-size: 34px;
+            font-size: 29px;
           }
 
           .hero-food {
@@ -1456,7 +1454,7 @@ export default function HomePage() {
           }
 
           .rest-img-wrap {
-            height: 118px;
+            height: 108px;
           }
 
           .products {
