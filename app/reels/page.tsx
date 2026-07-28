@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { addFuseCartItem } from "@/lib/fuse-cart";
 
@@ -91,7 +91,11 @@ export default function ReelsPage() {
   const [activeId, setActiveId] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => onSnapshot(query(collection(db, "reels")), (snapshot) => {
+  useEffect(() => onSnapshot(query(
+    collection(db, "reels"),
+    where("approved", "==", true),
+    where("active", "==", true)
+  ), (snapshot) => {
     setReels(snapshot.docs.map((item) => ({ ...(item.data() as Omit<ReelDoc, "documentId">), documentId: item.id })).filter(isVisible));
   }, () => setReels([])), []);
 

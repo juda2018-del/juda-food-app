@@ -71,12 +71,14 @@ const ROLE_PATHS: Record<FuseRole, string[]> = {
     "/driver",
     "/driver-admin",
     "/driver-earnings",
+    "/live-orders",
     "/live-tracking",
     "/live-map-tracking",
   ],
 
   customer: [
     "/customer",
+    "/live-orders",
     "/cart",
     "/orders",
     "/order-status",
@@ -94,24 +96,21 @@ function isPublicRoute(pathname: string) {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-function requiredRoleForPath(pathname: string): FuseRole | null {
-  for (const role of Object.keys(ROLE_PATHS) as FuseRole[]) {
-    if (ROLE_PATHS[role].some((prefix) => pathname.startsWith(prefix))) {
-      return role;
-    }
-  }
-
-  return null;
+function allowedRolesForPath(pathname: string): FuseRole[] {
+  return (Object.keys(ROLE_PATHS) as FuseRole[]).filter((role) =>
+    ROLE_PATHS[role].some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    )
+  );
 }
 
 function readRole(request: NextRequest): FuseRole | null {
-  const urlRole = request.nextUrl.searchParams.get("fuseRole");
   const cookieRole =
     request.cookies.get(FUSE_COOKIE_ROLE)?.value ||
     request.cookies.get("fuseRole")?.value ||
     request.cookies.get("role")?.value;
 
-  return parseFuseRole(urlRole || cookieRole);
+  return parseFuseRole(cookieRole);
 }
 
 function loginRedirect(request: NextRequest) {
@@ -135,9 +134,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const requiredRole = requiredRoleForPath(pathname);
+  const allowedRoles = allowedRolesForPath(pathname);
 
-  if (!requiredRole) {
+  if (!allowedRoles.length) {
     return NextResponse.next();
   }
 
@@ -147,7 +146,7 @@ export function proxy(request: NextRequest) {
     return loginRedirect(request);
   }
 
-  if (currentRole !== requiredRole) {
+  if (!allowedRoles.includes(currentRole)) {
     return roleRedirect(request, currentRole);
   }
 

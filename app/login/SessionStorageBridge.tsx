@@ -12,11 +12,11 @@ export default function SessionStorageBridge() {
     Storage.prototype.setItem = function patchedSetItem(key: string, value: string) {
       originalSetItem.call(this, key, value);
 
-      if (this === window.localStorage && key === LEGACY_SESSION_KEY && FUSE_LOCAL_SESSION !== LEGACY_SESSION_KEY) {
+      if (this === window.localStorage && key === LEGACY_SESSION_KEY) {
         originalSetItem.call(this, FUSE_LOCAL_SESSION, value);
       }
 
-      if (this === window.localStorage && key === FUSE_LOCAL_SESSION && FUSE_LOCAL_SESSION !== LEGACY_SESSION_KEY) {
+      if (this === window.localStorage && key === FUSE_LOCAL_SESSION) {
         originalSetItem.call(this, LEGACY_SESSION_KEY, value);
       }
     };

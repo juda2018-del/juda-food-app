@@ -62,7 +62,7 @@ export const roleHome: Record<FuseRole, string> = {
 };
 
 export const fuseNavigation: FuseNavItem[] = [
-  { title: "📡 الطلبات المباشرة", label: "الطلبات المباشرة", href: "/live-orders", desc: "متابعة الطلبات والتحديثات المباشرة", icon: "orders", roles: ["admin", "restaurant", "driver"] },
+  { title: "📡 الطلبات المباشرة", label: "الطلبات المباشرة", href: "/live-orders", desc: "متابعة الطلبات والتحديثات المباشرة", icon: "orders", roles: ["admin", "restaurant", "driver", "customer"] },
   { title: "🍽️ لوحة المطعم", label: "لوحة المطعم", href: "/restaurant-admin", desc: "طلبات المطعم والمنيو والتنبيهات", icon: "restaurant", roles: ["admin", "restaurant"] },
   { title: "🛵 تطبيق السائق", label: "تطبيق السائق", href: "/driver-app", desc: "طلبات السائق والحالة والموقع", icon: "driver", roles: ["driver"] },
   { title: "🎬 ريلز المطاعم", label: "الريلز", href: "/reels", desc: "فيديوهات قصيرة للأصناف والعروض داخل FUSE", icon: "reels", roles: ["admin", "restaurant", "customer"] },
@@ -138,7 +138,7 @@ const protectedPrefixesByRole: Record<FuseRole, string[]> = {
   admin: ["/fuse-admin", "/live-orders", "/restaurant-admin", "/reports", "/notification-center", "/auto-dispatch", "/drivers-admin", "/system-tools", "/reels-review"],
   restaurant: ["/restaurant-admin", "/live-orders", "/reports", "/notification-center", "/restaurant-reels"],
   driver: ["/driver", "/driver-app", "/live-orders", "/live-tracking"],
-  customer: ["/customer", "/reels", "/order-status", "/ratings", "/fayrouz", "/ahram", "/khan", "/restaurants", "/cart", "/profile"],
+  customer: ["/customer", "/live-orders", "/reels", "/order-status", "/ratings", "/fayrouz", "/ahram", "/khan", "/restaurants", "/cart", "/profile"],
 };
 
 export function isPublicPath(pathname: string) {

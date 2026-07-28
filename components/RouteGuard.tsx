@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { fuseAuth } from "../lib/fuseAuthClient";
+import { getIdTokenResult, onAuthStateChanged, type User } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../app/firebase";
+import { saveFuseSession } from "../lib/fuse-auth";
 
 type FuseRole = "admin" | "restaurant" | "driver" | "customer" | "guest";
 
@@ -16,13 +18,46 @@ const ACCESS_RULES: AccessRule[] = [
   {
     prefixes: [
       "/fuse-admin",
+      "/admin",
+      "/admin-requests",
+      "/dashboard",
+      "/mission-control",
+      "/operations-center",
+      "/control-tower",
+      "/ceo-command-center",
+      "/ceo-dashboard",
+      "/analytics",
+      "/ai-engine",
+      "/autonomous-ai",
+      "/customer-intelligence",
+      "/dispatch",
+      "/dispatch-ai",
+      "/dispatch-ai-pro",
+      "/fleet-control",
+      "/fleet-intelligence",
+      "/fuse-ai",
+      "/fuse-brain",
+      "/fuse-command-live",
+      "/fuse-copilot",
+      "/fuse-gpt",
+      "/fuse-map",
+      "/fuse-os",
+      "/fuse-universe",
+      "/fuse-voice",
+      "/ratings-admin",
+      "/reports-live",
+      "/smart-city-map",
+      "/smart-dispatch",
       "/system-tools",
       "/drivers-admin",
       "/auto-dispatch",
-      "/reports",
       "/reels-review",
     ],
     roles: ["admin"],
+  },
+  {
+    prefixes: ["/reports", "/notification-center"],
+    roles: ["admin", "restaurant"],
   },
   {
     prefixes: [
@@ -31,30 +66,22 @@ const ACCESS_RULES: AccessRule[] = [
       "/restaurants-admin",
       "/restaurant-orders",
       "/restaurant-dashboard",
-      "/live-orders",
     ],
     roles: ["admin", "restaurant"],
+  },
+  {
+    prefixes: ["/live-orders"],
+    roles: ["admin", "restaurant", "driver", "customer"],
   },
   {
     prefixes: ["/restaurant-reels"],
     roles: ["admin", "restaurant", "customer"],
   },
   {
-    prefixes: ["/driver-app", "/driver"],
+    prefixes: ["/driver-app", "/driver", "/live-tracking", "/live-map-tracking"],
     roles: ["admin", "driver"],
   },
 ];
-
-function roleFromEmail(email?: string | null): FuseRole {
-  const clean = String(email || "").toLowerCase().trim();
-
-  if (clean === "admin@fuse.iq") return "admin";
-  if (clean === "restaurant@fuse.iq") return "restaurant";
-  if (clean === "driver@fuse.iq") return "driver";
-  if (clean === "customer@fuse.iq") return "customer";
-
-  return "guest";
-}
 
 function normalizeRole(value?: string | null): FuseRole {
   const clean = String(value || "").toLowerCase().trim();
@@ -65,61 +92,30 @@ function normalizeRole(value?: string | null): FuseRole {
   return "guest";
 }
 
-function saveSession(user: User) {
+async function verifiedSession(user: User): Promise<FuseRole> {
+  const token = await getIdTokenResult(user);
+  const profileSnapshot = await getDoc(doc(db, "users", user.uid));
+  const profile = profileSnapshot.exists()
+    ? (profileSnapshot.data() as Record<string, unknown>)
+    : {};
+  const role = normalizeRole(
+    String(token.claims.role || token.claims.fuseRole || profile.role || profile.fuseRole || "")
+  );
   const email = user.email || "";
-  const role = roleFromEmail(email);
-  const payload = {
+  if (role === "guest") return role;
+
+  saveFuseSession({
     uid: user.uid,
     email,
     role,
-    name:
-      role === "admin"
-        ? "إدارة FUSE"
-        : role === "restaurant"
-        ? "حساب المطعم"
-        : role === "driver"
-        ? "سائق FUSE"
-        : "زبون FUSE",
-    label:
-      role === "admin"
-        ? "إدارة"
-        : role === "restaurant"
-        ? "مطعم"
-        : role === "driver"
-        ? "سائق"
-        : "زبون",
-  };
-
-  window.localStorage.setItem("fuseUser", JSON.stringify(payload));
-  window.localStorage.setItem("fuseUid", user.uid);
-  window.localStorage.setItem("fuseEmail", email);
-  window.localStorage.setItem("fuseRole", role);
-  window.localStorage.setItem("email", email);
-  window.localStorage.setItem("role", role);
+    name: String(profile.name || user.displayName || ""),
+    phone: String(profile.phone || ""),
+    restaurant: String(profile.restaurantName || profile.restaurant || profile.restaurantId || ""),
+    restaurantId: String(profile.restaurantId || ""),
+    restaurantName: String(profile.restaurantName || profile.restaurant || ""),
+    source: "firebase-auth",
+  });
   return role;
-}
-
-function readStoredRole(): FuseRole {
-  if (typeof window === "undefined") return "guest";
-
-  const rawUser = window.localStorage.getItem("fuseUser");
-  if (rawUser) {
-    try {
-      const parsed = JSON.parse(rawUser) as { role?: string; email?: string; uid?: string };
-      const emailRole = roleFromEmail(parsed.email);
-      if (emailRole !== "guest" && parsed.uid) return emailRole;
-
-      // Customer sessions may be phone/local sessions, but privileged roles are never
-      // trusted from localStorage alone.
-      const storedRole = normalizeRole(parsed.role);
-      if (storedRole === "customer") return "customer";
-    } catch {}
-  }
-
-  const storedRole = normalizeRole(
-    window.localStorage.getItem("fuseRole") || window.localStorage.getItem("role")
-  );
-  return storedRole === "customer" ? "customer" : "guest";
 }
 
 function getRule(pathname: string): AccessRule | null {
@@ -148,19 +144,13 @@ export default function RouteGuard() {
       return;
     }
 
-    const storedRole = readStoredRole();
-    if (storedRole === "customer" && rule.roles.includes("customer")) {
-      setChecking(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(fuseAuth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         goLogin(pathname);
         return;
       }
 
-      const firebaseRole = saveSession(user);
+      const firebaseRole = await verifiedSession(user).catch(() => "guest" as FuseRole);
       if (rule.roles.includes(firebaseRole)) {
         setChecking(false);
         return;
