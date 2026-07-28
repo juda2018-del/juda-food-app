@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, onSnapshot, query, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
 import { addFuseCartItem } from "@/lib/fuse-cart";
 
 type RestaurantState = {
@@ -275,6 +275,7 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
   const router = useRouter();
   const [menu, setMenu] = useState<MenuDoc[]>([]);
   const [restaurantOpen, setRestaurantOpen] = useState(true);
+  const [restaurantDocumentId, setRestaurantDocumentId] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("الكل");
@@ -312,6 +313,7 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
           documentId: item.id,
         }));
         const current = restaurants.find((item) => (item.restaurantName || item.name || item.title || "") === restaurant);
+        setRestaurantDocumentId(current?.documentId || "");
         setRestaurantOpen(current ? current.active !== false && current.open !== false && current.isOpen !== false && current.status !== "مغلق" : true);
       },
       () => setRestaurantOpen(true)
@@ -425,10 +427,20 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
     setSaving(true);
 
     try {
+      const user = auth.currentUser;
+      if (!user) {
+        router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+        throw new Error("سجّل دخولك أولاً حتى ترسل الطلب.");
+      }
+      if (!restaurantDocumentId) {
+        throw new Error("تعذر تحديد المطعم. حدّث الصفحة وحاول مرة ثانية.");
+      }
       const shortOrderId = "FUSE-" + Date.now().toString().slice(-6);
 
-      await addDoc(collection(db, "orders"), {
+      const orderRef = await addDoc(collection(db, "orders"), {
         orderId: shortOrderId,
+        customerUid: user.uid,
+        customerEmail: user.email || "",
         customerName: customerName.trim(),
         customer: customerName.trim(),
         phone: phone.trim(),
@@ -437,6 +449,7 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
         note: note.trim(),
         restaurant,
         restaurantName: restaurant,
+        restaurantId: restaurantDocumentId,
         items: cart.map((item) => ({
           name: item.name,
           title: item.name,
@@ -449,19 +462,25 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
         deliveryFee,
         total,
         amount: total,
+        currency: "IQD",
         status: "جديد",
         source: "customer-restaurant-page",
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
       });
 
       await addDoc(collection(db, "notifications"), {
         type: "order",
+        audience: "restaurant",
         title: "طلب جديد",
         message: "وصل طلب جديد من " + customerName.trim() + " إلى مطعم " + restaurant + ".",
+        customerUid: user.uid,
         restaurant,
         restaurantName: restaurant,
+        restaurantId: restaurantDocumentId,
         phone: phone.trim(),
         orderId: shortOrderId,
+        orderDocumentId: orderRef.id,
         read: false,
         createdAt: serverTimestamp()
       });
