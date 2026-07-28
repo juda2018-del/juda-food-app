@@ -268,14 +268,6 @@ export default function RestaurantMenuClient({
 
       {notice ? <div className="toast">{notice}</div> : null}
 
-      <nav className="bottom-nav">
-        <Link href="/"><b>⌂</b><span>الرئيسية</span></Link>
-        <Link href="/restaurants" className="active"><b>⌕</b><span>المطاعم</span></Link>
-        <Link href="/reels"><b>▶</b><span>ريلز</span></Link>
-        <Link href="/order-status"><b>▣</b><span>طلباتي</span></Link>
-        <Link href="/profile"><b>●</b><span>حسابي</span></Link>
-      </nav>
-
       <style jsx>{`
         :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;background:#efe8df}
         .page{width:100%;max-width:430px;min-height:100dvh;margin:auto;background:linear-gradient(180deg,#fff8f0,#fff);color:#171717;padding:16px 16px 170px;font-family:Cairo,Arial,sans-serif}
@@ -287,7 +279,6 @@ export default function RestaurantMenuClient({
         .menu-grid{display:grid;gap:11px;margin-top:12px}.menu-card{display:grid;grid-template-columns:70px 1fr 46px;gap:12px;align-items:center;background:#fff;border:1px solid #f1e7dd;border-radius:22px;padding:11px;box-shadow:0 10px 28px rgba(0,0,0,.055)}.food-image{width:70px;height:70px;border-radius:19px;background:linear-gradient(135deg,#222,#443a32);color:#ff7a00;display:grid;place-items:center;font-size:29px;font-weight:900}.food-info{min-width:0}.food-info small{color:#8b8179;font-size:10px;font-weight:800}.food-info h3{margin:3px 0 7px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.food-info strong{color:#ff5a00;font-size:14px}.menu-card>button{width:44px;height:44px;border:0;border-radius:15px;background:#ff5a00;color:#fff;font-size:25px;font-weight:900}.menu-card>button:disabled{background:#d6d3d1}
         .empty{text-align:center;padding:30px;color:#78716c;font-weight:800}.checkout-bar{position:fixed;z-index:90;left:50%;transform:translateX(-50%);bottom:88px;width:calc(100% - 32px);max-width:398px;min-height:64px;border-radius:20px;background:#171717;color:#fff;text-decoration:none;padding:11px 15px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 16px 38px rgba(0,0,0,.3)}.checkout-bar div{display:grid;gap:2px}.checkout-bar div b{font-size:13px}.checkout-bar div span{font-size:11px;color:#ff8a3d}.checkout-bar>strong{font-size:13px}
         .toast{position:fixed;z-index:120;left:50%;transform:translateX(-50%);bottom:170px;background:#fff;color:#111;padding:12px 17px;border-radius:999px;font-weight:900;box-shadow:0 12px 35px rgba(0,0,0,.2);white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
-        .bottom-nav{position:fixed;bottom:max(8px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;height:72px;background:rgba(255,255,255,.98);border-radius:24px;box-shadow:0 12px 35px rgba(0,0,0,.18);display:grid;grid-template-columns:repeat(5,1fr);padding:6px;z-index:99}.bottom-nav a{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;text-decoration:none;color:#78716c;font-size:10px;font-weight:900;border-radius:17px}.bottom-nav a.active{color:#ff5a00;background:#fff1e8}.bottom-nav b{font-size:19px;line-height:1}
       `}</style>
     </main>
   );
