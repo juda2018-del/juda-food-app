@@ -28,6 +28,14 @@ type OrderDoc = {
 };
 
 const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
+const LOAD_TIMEOUT_MS = 9000;
+
+async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => window.setTimeout(() => resolve(fallback), LOAD_TIMEOUT_MS)),
+  ]);
+}
 
 function normalizeStatus(status?: string) {
   if (!status) return "جديد";
@@ -92,7 +100,12 @@ export default function OrderStatusPage() {
       }
 
       try {
-        const token = await currentUser.getIdTokenResult();
+        const token = await withTimeout(currentUser.getIdTokenResult(), null);
+        if (!token) {
+          setUser(currentUser);
+          setError("الاتصال بطيء، عرضنا حسابك ونحاول تحميل الطلبات.");
+          return;
+        }
         const role = parseFuseRole(token.claims.role || token.claims.fuseRole);
         if (role && role !== "customer") {
           router.replace(roleHome[role]);
@@ -111,10 +124,15 @@ export default function OrderStatusPage() {
     if (!user) return;
 
     setLoading(true);
+    const loadingTimer = window.setTimeout(() => {
+      setLoading(false);
+      setError("تأخر الاتصال بالطلبات. تأكد من الإنترنت وحاول مرة ثانية.");
+    }, LOAD_TIMEOUT_MS);
     const q = query(collection(db, "orders"), where("customerUid", "==", user.uid));
-    return onSnapshot(
+    const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        window.clearTimeout(loadingTimer);
         const data = snapshot.docs
           .map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }))
           .sort((a, b) => timestamp(b.createdAt) - timestamp(a.createdAt));
@@ -123,11 +141,16 @@ export default function OrderStatusPage() {
         setError("");
       },
       (snapshotError) => {
+        window.clearTimeout(loadingTimer);
         setOrders([]);
         setLoading(false);
         setError(snapshotError.message || "تعذر تحميل طلباتك.");
       }
     );
+    return () => {
+      window.clearTimeout(loadingTimer);
+      unsubscribe();
+    };
   }, [user]);
 
   const current = useMemo(() => {
@@ -215,13 +238,10 @@ export default function OrderStatusPage() {
           </article>
         )}
 
-        <nav className="bottom">
-          <Link href="/">⌂<span>الرئيسية</span></Link><Link href="/restaurants">⌕<span>المطاعم</span></Link><Link href="/reels">▶<span>ريلز</span></Link><Link href="/order-status" className="selected">▣<span>طلباتي</span></Link><Link href="/profile">○<span>حسابي</span></Link>
-        </nav>
       </section>
 
       <style jsx>{`
-        *{box-sizing:border-box}.page{min-height:100vh;background:#efe8df;color:#171717;font-family:Arial,sans-serif}.phone{width:min(100%,430px);min-height:100vh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);padding:18px 18px 112px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.back,.support{height:44px;min-width:44px;border-radius:15px;background:#fff;color:#171717;text-decoration:none;display:grid;place-items:center;box-shadow:0 10px 25px rgba(0,0,0,.07);font-weight:900}.back{font-size:30px}.support{font-size:12px;color:#f45100;padding:0 12px}.heading{text-align:center}.heading span{font-size:11px;color:#f45100;font-weight:900}.heading h1{margin:2px 0 0;font-size:25px}.hero{background:linear-gradient(135deg,#151515,#2c2c2c);color:#fff;border-radius:28px;padding:22px;margin-bottom:14px}.hero span{color:#ff8a00;font-size:12px;font-weight:900}.hero h2{margin:7px 0;font-size:27px}.hero p{margin:0;color:#ccc;line-height:1.7;font-size:13px}.picker,.orderCard,.state{background:#fff;border-radius:24px;padding:17px;box-shadow:0 13px 32px rgba(0,0,0,.07);margin-bottom:14px}.picker{display:grid;gap:8px}.picker label{font-size:13px;font-weight:900}.picker select{width:100%;border:1px solid #ece4dc;border-radius:16px;padding:14px;background:#fff;font:inherit}.state{text-align:center;padding:28px 18px}.state b{font-size:19px}.state p{color:#817870;margin:8px 0 14px}.state a,.rate{display:block;border-radius:16px;background:#f45100;color:#fff;padding:13px;text-align:center;text-decoration:none;font-weight:900}.state.bad{background:#fff0f0;color:#a52323}.orderHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid #f0e7df}.orderHead span,.infoGrid span{display:block;color:#857b73;font-size:11px;font-weight:800}.orderHead b{display:block;margin-top:4px}.orderHead strong{color:#f45100}.infoGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.infoGrid div{background:#fff7ef;border-radius:15px;padding:11px}.infoGrid b{display:block;margin-top:5px;font-size:12px;overflow-wrap:anywhere}.progress{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:18px 0}.progress div{text-align:center;color:#aaa;font-size:8px;font-weight:800}.progress i{display:block;width:13px;height:13px;border-radius:50%;background:#ddd;margin:0 auto 6px}.progress .active{color:#f45100}.progress .active i{background:#f45100;box-shadow:0 0 0 4px #ffe4d2}.items{border-top:1px solid #f0e7df;padding-top:13px}.items h3{margin:0 0 8px}.item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f5eee8;font-size:12px}.item b{color:#f45100}.rate{margin-top:15px}.bottom{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;height:70px;background:rgba(255,255,255,.97);border-radius:23px;box-shadow:0 12px 35px rgba(0,0,0,.16);display:grid;grid-template-columns:repeat(5,1fr);padding:6px;z-index:99}.bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#666;text-decoration:none;font-size:18px;font-weight:900}.bottom span{font-size:9px}.bottom .selected{color:#f45100}
+        *{box-sizing:border-box}.page{min-height:100dvh;background:#efe8df;color:#171717;font-family:var(--fuse-body-font)}.phone{width:min(100%,430px);min-height:100dvh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);padding:calc(14px + env(safe-area-inset-top)) 16px 104px}.top{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:10px;margin-bottom:14px}.back,.support{height:44px;border-radius:15px;background:#fff;color:#171717;text-decoration:none;display:grid;place-items:center;box-shadow:0 8px 22px rgba(0,0,0,.07);font-weight:900}.back{font-size:28px}.support{font-size:12px;color:#f45100}.heading{text-align:center}.heading span{font-size:11px;color:#f45100;font-weight:900}.heading h1{margin:2px 0 0;font-size:24px}.hero{background:linear-gradient(135deg,#151515,#2c2c2c);color:#fff;border-radius:26px;padding:20px;margin-bottom:14px}.hero span{color:#ff8a00;font-size:12px;font-weight:900}.hero h2{margin:7px 0;font-size:25px}.hero p{margin:0;color:#ccc;line-height:1.7;font-size:13px}.picker,.orderCard,.state{background:#fff;border-radius:22px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,.07);margin-bottom:14px}.picker{display:grid;gap:8px}.picker label{font-size:13px;font-weight:900}.picker select{width:100%;border:1px solid #ece4dc;border-radius:16px;padding:14px;background:#fff;font:inherit}.state{text-align:center;padding:24px 16px}.state b{font-size:17px}.state p{color:#817870;margin:8px 0 14px}.state a,.rate{display:block;border-radius:16px;background:#f45100;color:#fff;padding:13px;text-align:center;text-decoration:none;font-weight:900}.state.bad{background:#fff0f0;color:#a52323}.orderHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid #f0e7df}.orderHead span,.infoGrid span{display:block;color:#857b73;font-size:11px;font-weight:800}.orderHead b{display:block;margin-top:4px}.orderHead strong{color:#f45100}.infoGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.infoGrid div{background:#fff7ef;border-radius:15px;padding:11px}.infoGrid b{display:block;margin-top:5px;font-size:12px;overflow-wrap:anywhere}.progress{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:18px 0}.progress div{text-align:center;color:#aaa;font-size:8px;font-weight:800}.progress i{display:block;width:13px;height:13px;border-radius:50%;background:#ddd;margin:0 auto 6px}.progress .active{color:#f45100}.progress .active i{background:#f45100;box-shadow:0 0 0 4px #ffe4d2}.items{border-top:1px solid #f0e7df;padding-top:13px}.items h3{margin:0 0 8px}.item{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f5eee8;font-size:12px}.item b{color:#f45100}.rate{margin-top:15px}
       `}</style>
     </main>
   );

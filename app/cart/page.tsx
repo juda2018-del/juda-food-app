@@ -279,8 +279,6 @@ export default function CartPage() {
       {message && <div className="message ok">{message}</div>}
       {error && <div className="message bad">{error}</div>}
 
-      <nav className="nav"><Link href="/">⌂<span>الرئيسية</span></Link><Link href="/restaurants">⌕<span>المطاعم</span></Link><Link href="/reels">▶<span>ريلز</span></Link><Link href="/order-status">▣<span>طلباتي</span></Link><Link href="/profile">●<span>حسابي</span></Link></nav>
-
       <style jsx>{`
         :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;background:#efe8df}
         .app{width:100%;max-width:430px;min-height:100dvh;margin:auto;padding:18px 16px 105px;background:linear-gradient(180deg,#fffaf4,#fff);color:#171717;font-family:Cairo,system-ui,sans-serif}
@@ -289,7 +287,6 @@ export default function CartPage() {
         .groupHead,.row,.summary>div{display:flex;justify-content:space-between;align-items:center;gap:8px}.groupHead h2{margin:0}.groupHead small,.row strong,.total b{color:#f45100;font-weight:900}.item{display:grid;grid-template-columns:68px 1fr;gap:11px;padding:13px 0;border-top:1px solid #f3e8dc}.thumb{width:68px;height:68px;border-radius:20px;background:#171717;color:#ff7800;display:grid;place-items:center;font-size:29px;font-weight:900}.info h3{margin:0;font-size:16px}.info p{margin:3px 0 9px;color:#777;font-size:11px;font-weight:700}.qty{display:flex;align-items:center;gap:9px;padding:4px;border-radius:14px;background:#fff0e5}.qty button{width:30px;height:30px;border:0;border-radius:10px;background:#f45100;color:#fff;font-size:18px;font-weight:900}.qty b{min-width:18px;text-align:center}
         .summary h2,.form h2{margin:0 0 13px}.summary>div{margin:9px 0;color:#666;font-weight:800}.summary .total{padding-top:13px;border-top:1px solid #eee;color:#171717;font-size:19px}.summary small{display:block;color:#8a8179;line-height:1.6}.form{display:grid;gap:10px}.form input{width:100%;border:1px solid #eee2d8;border-radius:16px;padding:14px;font:inherit;font-size:13px;outline:none}
         .checkout,.clear{width:100%;border:0;border-radius:19px;padding:16px;font:inherit;font-weight:900;margin-top:9px}.checkout{background:#f45100;color:#fff}.checkout:disabled,.clear:disabled{opacity:.55}.clear{background:#171717;color:#fff}.message{margin-top:12px;border-radius:18px;padding:13px;font-weight:900}.ok{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}
-        .nav{position:fixed;left:50%;bottom:max(8px,env(safe-area-inset-bottom));transform:translateX(-50%);width:calc(100% - 24px);max-width:406px;height:70px;background:rgba(255,255,255,.97);border-radius:23px;box-shadow:0 12px 35px rgba(0,0,0,.16);display:grid;grid-template-columns:repeat(5,1fr);padding:6px;z-index:99}.nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#666;text-decoration:none;font-size:18px;font-weight:900}.nav span{font-size:9px}
       `}</style>
     </main>
   );
