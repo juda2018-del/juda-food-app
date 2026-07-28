@@ -56,7 +56,7 @@ type MenuDoc = {
   image?: string;
 };
 
-const heroImage = "/images/m1.jpg";
+const heroImage = "/images/m6.jpg";
 
 const fallbackRestaurants: RestaurantDoc[] = [
   {
@@ -69,7 +69,7 @@ const fallbackRestaurants: RestaurantDoc[] = [
     rating: 4.9,
     deliveryTime: "20 - 30 دقيقة",
     priceRange: "25-35 د",
-    image: "/images/m2.jpg",
+    image: "/images/m7.jpg",
   },
   {
     documentId: "shalteta",
