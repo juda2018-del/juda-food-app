@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, orderBy, query, where, type QueryConstraint } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, where, type Query } from "firebase/firestore";
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
 
@@ -64,7 +64,7 @@ export default function LiveOrdersPage() {
   useEffect(() => {
     const saved = readSession();
     if (!saved) { window.location.href = "/login?next=/live-orders"; return; }
-    if (!["admin", "restaurant", "driver"].includes(saved.role)) {
+    if (!["admin", "restaurant", "driver", "customer"].includes(saved.role)) {
       window.location.href = roleHome[saved.role] || "/"; return;
     }
     if (saved.role === "restaurant" && !(saved.restaurantId || saved.restaurant || saved.restaurantName)) {
@@ -76,20 +76,37 @@ export default function LiveOrdersPage() {
 
   useEffect(() => {
     if (!session || error) return;
-    const constraints: QueryConstraint[] = [];
+    const requests: Query[] = [];
     if (session.role === "restaurant") {
       const restaurantId = session.restaurantId || session.restaurant;
-      if (restaurantId) constraints.push(where("restaurantId", "==", restaurantId));
+      if (restaurantId) requests.push(query(collection(db, "orders"), where("restaurantId", "==", restaurantId)));
     } else if (session.role === "driver") {
-      constraints.push(where("assignedDriverEmail", "==", session.email));
+      if (session.uid) {
+        requests.push(query(collection(db, "orders"), where("assignedDriverId", "==", session.uid)));
+        requests.push(query(collection(db, "orders"), where("driverId", "==", session.uid)));
+      }
+    } else if (session.role === "customer") {
+      if (session.uid) requests.push(query(collection(db, "orders"), where("customerUid", "==", session.uid)));
+    } else {
+      requests.push(query(collection(db, "orders"), orderBy("createdAt", "desc")));
     }
-    constraints.push(orderBy("createdAt", "desc"));
-    const q = query(collection(db, "orders"), ...constraints);
-    return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({ ...(doc.data() as Omit<OrderDoc, "documentId">), documentId: doc.id }));
-      setOrders(session.role === "driver" ? data.filter((o) => belongsToDriver(o, session)) : data);
-      setLoading(false); setError("");
-    }, (e) => { setError(e.message || "تعذر تحميل الطلبات"); setLoading(false); });
+    const merged = new Map<string, OrderDoc>();
+    const refresh = () => {
+      const data = Array.from(merged.values())
+        .filter((order) => session.role !== "driver" || belongsToDriver(order, session))
+        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      setOrders(data);
+      setLoading(false);
+      setError("");
+    };
+    const unsubscribes = requests.map((request) => onSnapshot(request, (snapshot) => {
+      snapshot.docs.forEach((item) => merged.set(item.id, {
+        ...(item.data() as Omit<OrderDoc, "documentId">),
+        documentId: item.id,
+      }));
+      refresh();
+    }, (e) => { setError(e.message || "تعذر تحميل الطلبات"); setLoading(false); }));
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
   }, [session, error]);
 
   const visible = useMemo(() => {
