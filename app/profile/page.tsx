@@ -18,7 +18,7 @@ type Profile = {
   role?: string;
   fuseRole?: string;
 };
-const LOAD_TIMEOUT_MS = 9000;
+const LOAD_TIMEOUT_MS = 7000;
 
 async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return Promise.race([
@@ -61,9 +61,19 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    return onAuthStateChanged(firebaseAuth, async (currentUser) => {
+    let settled = false;
+    const watchdog = window.setTimeout(() => {
+      if (settled) return;
+      setLoadError("تعذر تحميل جلسة الحساب. تقدر تعيد المحاولة أو تسجل الدخول من جديد.");
+      setLoading(false);
+    }, LOAD_TIMEOUT_MS);
+
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentUser) => {
+      settled = true;
+      window.clearTimeout(watchdog);
       if (!currentUser) {
-        window.location.replace("/login?next=/profile");
+        setLoadError("سجّل الدخول حتى تظهر معلومات حسابك وطلباتك.");
+        setLoading(false);
         return;
       }
 
@@ -87,6 +97,11 @@ export default function ProfilePage() {
         setLoading(false);
       }
     });
+    return () => {
+      settled = true;
+      window.clearTimeout(watchdog);
+      unsubscribe();
+    };
   }, []);
 
   async function handleLogout() {
@@ -125,6 +140,12 @@ export default function ProfilePage() {
         <Link className="edit" href="/settings">تعديل</Link>
       </section>
       {loadError ? <p className="load-warning">{loadError}</p> : null}
+      {!user ? (
+        <section className="session-actions">
+          <Link href="/login?next=/profile">تسجيل الدخول</Link>
+          <button type="button" onClick={() => window.location.reload()}>إعادة المحاولة</button>
+        </section>
+      ) : null}
 
       <section className="notice">
         <h2>كل طلباتك مرتبطة بحسابك</h2>
@@ -143,13 +164,13 @@ export default function ProfilePage() {
         ))}
       </section>
 
-      <section className="danger">
+      {user ? <section className="danger">
         <button className="logout" type="button" onClick={handleLogout}>تسجيل الخروج</button>
         <Link className="delete" href="/data-deletion">طلب حذف الحساب والبيانات</Link>
-      </section>
+      </section> : null}
 
       <style jsx>{`
-        :global(*){box-sizing:border-box}:global(body){margin:0;background:#efe8df;font-family:var(--fuse-body-font);color:#181818}.loading{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#fffaf4;padding:24px;text-align:center}.loading small{color:#8d837a;font-weight:700}.spinner{width:36px;height:36px;border:4px solid #ffe0cc;border-top-color:#ff5a00;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.profile-shell{width:100%;max-width:430px;min-height:100dvh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);padding:calc(14px + env(safe-area-inset-top)) 16px 104px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.brand{font-size:12px;font-weight:900;color:#ff4d00;background:#fff1e8;border:1px solid #ffd5c2;padding:8px 12px;border-radius:999px}.top-actions{display:flex;gap:8px}.icon-btn{width:44px;height:44px;border-radius:16px;background:#fff;display:grid;place-items:center;text-decoration:none;color:#181818;box-shadow:0 8px 24px rgba(0,0,0,.08);font-size:20px}.profile-card{background:#fff;border-radius:28px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 14px 34px rgba(0,0,0,.08)}.load-warning{margin:10px 0 0;padding:10px 12px;border-radius:14px;background:#fff4d8;color:#7b5700;font-size:11px;font-weight:800}.user{display:flex;align-items:center;gap:13px;min-width:0}.avatar{width:64px;height:64px;flex:0 0 64px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:25px;font-weight:900;background:linear-gradient(135deg,#ff8a00,#ff3d00);box-shadow:0 10px 24px rgba(255,77,0,.25)}.user div:last-child{min-width:0}.user h1{font-size:19px;margin:0 0 5px;font-weight:900}.user p{margin:2px 0;color:#777;font-size:11px;font-weight:700;overflow-wrap:anywhere}.edit{padding:10px 12px;background:#fff3e9;border-radius:14px;text-decoration:none;color:#ff4d00;font-size:12px;font-weight:900}.notice{margin-top:16px;border-radius:24px;padding:17px;background:linear-gradient(135deg,#191919,#303030);color:#fff;box-shadow:0 16px 34px rgba(0,0,0,.16)}.notice h2{margin:0 0 7px;font-size:18px}.notice p,.notice small{display:block;margin:0;color:rgba(255,255,255,.72);font-size:12px;line-height:1.7}.notice small{margin-top:6px}.notice a{display:inline-flex;margin-top:12px;padding:10px 14px;border-radius:13px;background:#ff5a00;color:#fff;text-decoration:none;font-size:12px;font-weight:900}.section-title{font-size:15px;font-weight:900;margin:22px 3px 10px}.menu{background:#fff;border-radius:26px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,.06)}.item{min-height:66px;display:flex;align-items:center;justify-content:space-between;padding:9px 10px;text-decoration:none;color:#181818;border-bottom:1px solid #f1ece6}.item:last-child{border-bottom:0}.item-main{display:flex;align-items:center;gap:12px}.emoji{width:44px;height:44px;border-radius:16px;background:#fff5ec;display:grid;place-items:center;font-size:20px}.item h3{margin:0 0 3px;font-size:13px;font-weight:900}.item p{margin:0;color:#999;font-size:10px;font-weight:700}.arrow{font-size:24px;color:#bbb}.danger{margin-top:16px;background:#fff;border-radius:24px;padding:8px;box-shadow:0 12px 28px rgba(0,0,0,.05)}.logout,.delete{width:100%;height:52px;border:0;border-radius:16px;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer}.logout{background:#fff3e9;color:#e65300}.delete{margin-top:8px;background:#fff1f2;color:#dc2626;text-decoration:none;display:grid;place-items:center}
+        :global(*){box-sizing:border-box}:global(body){margin:0;background:#efe8df;font-family:var(--fuse-body-font);color:#181818}.loading{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#fffaf4;padding:24px;text-align:center}.loading small{color:#8d837a;font-weight:700}.spinner{width:36px;height:36px;border:4px solid #ffe0cc;border-top-color:#ff5a00;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.profile-shell{width:100%;max-width:430px;min-height:100dvh;margin:auto;background:linear-gradient(180deg,#fffaf4,#fff);padding:calc(14px + env(safe-area-inset-top)) 16px 104px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.brand{font-size:12px;font-weight:900;color:#ff4d00;background:#fff1e8;border:1px solid #ffd5c2;padding:8px 12px;border-radius:999px}.top-actions{display:flex;gap:8px}.icon-btn{width:44px;height:44px;border-radius:16px;background:#fff;display:grid;place-items:center;text-decoration:none;color:#181818;box-shadow:0 8px 24px rgba(0,0,0,.08);font-size:20px}.profile-card{background:#fff;border-radius:28px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 14px 34px rgba(0,0,0,.08)}.load-warning{margin:10px 0 0;padding:10px 12px;border-radius:14px;background:#fff4d8;color:#7b5700;font-size:11px;font-weight:800}.session-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.session-actions a,.session-actions button{height:46px;border:0;border-radius:15px;display:grid;place-items:center;font-family:inherit;font-size:12px;font-weight:900;text-decoration:none}.session-actions a{background:#ff5a00;color:#fff}.session-actions button{background:#fff;color:#222}.user{display:flex;align-items:center;gap:13px;min-width:0}.avatar{width:64px;height:64px;flex:0 0 64px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:25px;font-weight:900;background:linear-gradient(135deg,#ff8a00,#ff3d00);box-shadow:0 10px 24px rgba(255,77,0,.25)}.user div:last-child{min-width:0}.user h1{font-size:19px;margin:0 0 5px;font-weight:900}.user p{margin:2px 0;color:#777;font-size:11px;font-weight:700;overflow-wrap:anywhere}.edit{padding:10px 12px;background:#fff3e9;border-radius:14px;text-decoration:none;color:#ff4d00;font-size:12px;font-weight:900}.notice{margin-top:16px;border-radius:24px;padding:17px;background:linear-gradient(135deg,#191919,#303030);color:#fff;box-shadow:0 16px 34px rgba(0,0,0,.16)}.notice h2{margin:0 0 7px;font-size:18px}.notice p,.notice small{display:block;margin:0;color:rgba(255,255,255,.72);font-size:12px;line-height:1.7}.notice small{margin-top:6px}.notice a{display:inline-flex;margin-top:12px;padding:10px 14px;border-radius:13px;background:#ff5a00;color:#fff;text-decoration:none;font-size:12px;font-weight:900}.section-title{font-size:15px;font-weight:900;margin:22px 3px 10px}.menu{background:#fff;border-radius:26px;padding:5px;box-shadow:0 12px 32px rgba(0,0,0,.06)}.item{min-height:66px;display:flex;align-items:center;justify-content:space-between;padding:9px 10px;text-decoration:none;color:#181818;border-bottom:1px solid #f1ece6}.item:last-child{border-bottom:0}.item-main{display:flex;align-items:center;gap:12px}.emoji{width:44px;height:44px;border-radius:16px;background:#fff5ec;display:grid;place-items:center;font-size:20px}.item h3{margin:0 0 3px;font-size:13px;font-weight:900}.item p{margin:0;color:#999;font-size:10px;font-weight:700}.arrow{font-size:24px;color:#bbb}.danger{margin-top:16px;background:#fff;border-radius:24px;padding:8px;box-shadow:0 12px 28px rgba(0,0,0,.05)}.logout,.delete{width:100%;height:52px;border:0;border-radius:16px;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer}.logout{background:#fff3e9;color:#e65300}.delete{margin-top:8px;background:#fff1f2;color:#dc2626;text-decoration:none;display:grid;place-items:center}
       `}</style>
     </main>
   );
