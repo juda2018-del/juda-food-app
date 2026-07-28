@@ -27,6 +27,16 @@ service cloud.firestore {
     function driverOwns(data) {
       return isDriver() && ((data.driverUid is string && data.driverUid == request.auth.uid) || (data.driverId is string && data.driverId == request.auth.uid));
     }
+    function restaurantTransition(from, to) {
+      return (from in ['جديد','new'] && to in ['قيد التحضير','preparing','مرفوض','rejected'])
+        || (from in ['قيد التحضير','preparing'] && to in ['جاهز للتوصيل','جاهز','ready','مرفوض','rejected'])
+        || from == to;
+    }
+    function driverTransition(from, to) {
+      return (from in ['جاهز للتوصيل','جاهز','ready'] && to in ['قيد التوصيل','السائق استلم','out_for_delivery'])
+        || (from in ['قيد التوصيل','السائق استلم','out_for_delivery'] && to in ['تم التسليم','delivered'])
+        || from == to;
+    }
     function restaurantExists(id) { return id is string && id.size() > 0 && exists(/databases/$(database)/documents/restaurants/$(id)); }
     function restaurantAccepts(id) {
       let r = get(/databases/$(database)/documents/restaurants/$(id)).data;
@@ -71,12 +81,16 @@ service cloud.firestore {
       allow create: if validOrder();
       allow read: if isAdmin() || customerOwns(resource.data) || restaurantOwns(resource.data) || driverOwns(resource.data);
       allow update: if isAdmin()
-        || (restaurantOwns(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','acceptedAt','rejectedAt','readyAt','preparingAt','restaurantNote']))
-        || (driverOwns(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','pickedUpAt','deliveredAt','driverLatitude','driverLongitude','driverLocationUpdatedAt']));
+        || (restaurantOwns(resource.data)
+          && restaurantTransition(resource.data.status, request.resource.data.status)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusAr','updatedAt','updatedAtText','restaurantUpdatedAt','acceptedAt','rejectedAt','readyAt','preparingAt','restaurantNote']))
+        || (driverOwns(resource.data)
+          && driverTransition(resource.data.status, request.resource.data.status)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','driverUpdatedAt','pickedUpAt','deliveredAt','driverLatitude','driverLongitude','driverLocationUpdatedAt','driverId','driverEmail','driverName','assignedDriverId','assignedDriverEmail','assignedDriverName']));
       allow delete: if isAdmin();
     }
     match /notifications/{id} {
-      allow create: if isCustomer()
+      allow create: if isAdmin() || (isCustomer()
         && request.resource.data.keys().hasAll(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
         && request.resource.data.keys().hasOnly(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
         && request.resource.data.type == 'order'
@@ -97,10 +111,49 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurantName
         && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurant
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.phone == request.resource.data.phone;
-      allow read: if isAdmin() || (isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId());
-      allow update: if isAdmin() || (isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']));
+        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.phone == request.resource.data.phone);
+      allow read: if isAdmin()
+        || (isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId())
+        || (isDriver() && (resource.data.driverId == request.auth.uid || resource.data.assignedDriverId == request.auth.uid))
+        || (isCustomer() && resource.data.customerUid == request.auth.uid);
+      allow update: if isAdmin()
+        || ((isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+        || ((isDriver() && (resource.data.driverId == request.auth.uid || resource.data.assignedDriverId == request.auth.uid))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+        || ((isCustomer() && resource.data.customerUid == request.auth.uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']));
       allow delete: if isAdmin();
+    }
+    match /reels/{id} {
+      allow read: if (resource.data.approved == true && resource.data.active == true)
+        || isAdmin()
+        || (signedIn() && resource.data.submittedByUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.submittedByUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.approved == false
+        && request.resource.data.active == false
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 2
+        && request.resource.data.title.size() <= 120;
+      allow update, delete: if isAdmin()
+        || (signedIn()
+          && resource.data.submittedByUid == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.submittedByUid == resource.data.submittedByUid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.approved == false
+          && request.resource.data.active == false);
+    }
+    match /reelComments/{id} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 1
+        && request.resource.data.text.size() <= 500;
+      allow update, delete: if isAdmin() || (signedIn() && resource.data.userUid == request.auth.uid);
     }
     match /ratings/{orderId} {
       allow create: if isCustomer() && request.resource.data.orderDocumentId == orderId && request.resource.data.customerUid == request.auth.uid
