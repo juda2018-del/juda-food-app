@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, onSnapshot, query, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { db, storage } from "../firebase";
 import {
@@ -20,6 +20,7 @@ type ReelDoc = {
   status?: string;
   videoUrl?: string;
   submittedBy?: string;
+  submittedByUid?: string;
   createdAt?: unknown;
 };
 
@@ -83,7 +84,10 @@ export default function RestaurantReelsPage() {
 
   useEffect(() => {
     if (!session) return;
-    return onSnapshot(query(collection(db, "reels")), (snapshot) => {
+    const ownQuery = session.role === "admin"
+      ? query(collection(db, "reels"))
+      : query(collection(db, "reels"), where("submittedByUid", "==", session.uid));
+    return onSnapshot(ownQuery, (snapshot) => {
       const own = snapshot.docs
         .map((item) => ({
           ...(item.data() as Omit<ReelDoc, "documentId">),
@@ -91,7 +95,7 @@ export default function RestaurantReelsPage() {
         }))
         .filter((item) => {
           if (session.role === "admin") return true;
-          return item.submittedBy === session.email;
+          return item.submittedByUid === session.uid;
         });
       setReels(own);
     });
@@ -135,6 +139,7 @@ export default function RestaurantReelsPage() {
         restaurantName,
         restaurantId: session?.restaurantId || "",
         submittedBy: session?.email || "",
+        submittedByUid: session?.uid || "",
         submittedByName: creatorName,
         submitterType: isCustomer ? "customer" : "restaurant",
         status: "pending",
