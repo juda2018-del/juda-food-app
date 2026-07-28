@@ -35,11 +35,6 @@ const hiddenPrefixes = [
   "/dispatch",
   "/smart-",
   "/live-map",
-  "/reels",
-  "/order-status",
-  "/cart",
-  "/profile",
-  "/restaurants/",
 ];
 
 function isItemActive(pathname: string, href: string) {
