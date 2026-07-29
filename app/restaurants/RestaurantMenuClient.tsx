@@ -208,7 +208,7 @@ export default function RestaurantMenuClient({
     <main className="page" dir="rtl">
       <header className="header">
         <Link href="/restaurants" className="back" aria-label="الرجوع إلى المطاعم">
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          <span aria-hidden="true">→</span>
           <span>المطاعم</span>
         </Link>
         <div>
@@ -274,7 +274,7 @@ export default function RestaurantMenuClient({
       <style jsx>{`
         :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;background:#efe8df}
         .page{width:100%;max-width:430px;min-height:100dvh;margin:auto;background:#fffaf4;color:#171717;padding:calc(12px + env(safe-area-inset-top)) 16px 170px;font-family:Cairo,Arial,sans-serif}
-        .header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}.header small{color:#ff5a00;font-weight:900}.header h1{margin:1px 0 0;font-size:22px;line-height:1.2}.back{height:44px;border-radius:15px;background:#171717;display:flex;direction:ltr;align-items:center;gap:5px;padding:0 11px;text-decoration:none;color:#fff;font-size:11px;font-weight:900;box-shadow:0 9px 22px rgba(0,0,0,.14)}
+        .header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px}.header>div{text-align:center;min-width:0}.header small{color:#ff5a00;font-weight:900}.header h1{margin:1px 0 0;font-size:21px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.back{height:46px;border-radius:16px;background:#171717;display:flex;direction:rtl;align-items:center;justify-content:center;gap:5px;padding:0 12px;text-decoration:none;color:#fff;font-size:11px;font-weight:900;box-shadow:0 9px 22px rgba(0,0,0,.14)}.back span:first-child{font-size:19px}
         .cart-link{height:46px;border-radius:16px;background:#171717;color:#fff;text-decoration:none;display:flex;align-items:center;gap:8px;padding:0 13px;font-size:12px;font-weight:900}.cart-link b{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#ff5a00}
         .closed{margin-top:14px;border-radius:20px;background:#fff1f2;border:1px solid #fecdd3;color:#be123c;padding:14px;display:grid;gap:4px}.closed span{font-size:12px}
         .hero{margin-top:14px;border-radius:24px;background:linear-gradient(135deg,#181818,#2b2723);color:#fff;padding:17px;display:grid;grid-template-columns:1fr 72px;gap:10px;align-items:center;box-shadow:0 14px 32px rgba(0,0,0,.16)}.status{display:inline-block;padding:5px 8px;border-radius:999px;background:#ff5a00;font-size:9px;font-weight:900}.hero h2{margin:8px 0 5px;font-size:21px;line-height:1.3}.hero p{margin:0;color:#d6d3d1;font-size:11px;line-height:1.65}.hero-stat{height:76px;border-radius:20px;background:rgba(255,255,255,.1);display:grid;place-items:center;align-content:center}.hero-stat b{font-size:25px;color:#ff7a00}.hero-stat span{font-size:9px;color:#e7e5e4}

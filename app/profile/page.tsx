@@ -18,7 +18,7 @@ type Profile = {
   role?: string;
   fuseRole?: string;
 };
-const LOAD_TIMEOUT_MS = 7000;
+const LOAD_TIMEOUT_MS = 3500;
 
 async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return Promise.race([
@@ -61,17 +61,21 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
-    let settled = false;
+    let disposed = false;
+    let receivedAuthState = false;
     const watchdog = window.setTimeout(() => {
-      if (settled) return;
-      setLoadError("تعذر تحميل جلسة الحساب. تقدر تعيد المحاولة أو تسجل الدخول من جديد.");
+      if (disposed || receivedAuthState) return;
+      setLoadError("تعذر تحميل جلسة الحساب. تقدر تدخل من جديد أو تعيد المحاولة.");
       setLoading(false);
     }, LOAD_TIMEOUT_MS);
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentUser) => {
-      settled = true;
+      receivedAuthState = true;
       window.clearTimeout(watchdog);
       if (!currentUser) {
+        if (disposed) return;
+        setUser(null);
+        setProfile(null);
         setLoadError("سجّل الدخول حتى تظهر معلومات حسابك وطلباتك.");
         setLoading(false);
         return;
@@ -91,14 +95,19 @@ export default function ProfilePage() {
           window.location.replace(roleHome[role]);
           return;
         }
+        if (disposed) return;
         setUser(currentUser);
         setProfile(savedProfile);
+      } catch {
+        if (disposed) return;
+        setUser(currentUser);
+        setLoadError("تعذر تحميل بعض معلومات الحساب؛ عرضنا المعلومات الأساسية.");
       } finally {
-        setLoading(false);
+        if (!disposed) setLoading(false);
       }
     });
     return () => {
-      settled = true;
+      disposed = true;
       window.clearTimeout(watchdog);
       unsubscribe();
     };
@@ -115,7 +124,7 @@ export default function ProfilePage() {
   const initial = name.trim().slice(0, 1).toUpperCase() || "F";
 
   if (loading) {
-    return <main dir="rtl" className="loading"><span className="spinner" /><b>جاري تحميل حسابك...</b><small>لن يستغرق أكثر من بضع ثوانٍ</small></main>;
+    return <main dir="rtl" className="loading"><span className="spinner" /><b>جاري تحميل حسابك...</b><small>نجهّز معلوماتك الآن</small></main>;
   }
 
   return (
