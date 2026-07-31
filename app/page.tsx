@@ -431,20 +431,23 @@ export default function HomePage() {
   }
 
   return (
-    <main dir="rtl" className="page">
+    <main dir="rtl" className="page home-page">
       <section className="phone">
         <header className="topbar">
           <Link className="menu-btn" aria-label="القائمة" href="/profile">
             <Icon name="menu" />
           </Link>
 
-          <button className="location" type="button" onClick={() => {
-            setLocationNotice((current) => current === "بغداد - المنصور" ? "بغداد - زيونة" : "بغداد - المنصور");
-            showNotice("تم تحديث موقع العرض التجريبي");
-          }}>
-            <Icon name="pin" />
-            <b>{locationNotice}</b>
-          </button>
+          <div className="brand-location">
+            <strong>FUSE IRAQ</strong>
+            <button className="location" type="button" onClick={() => {
+              setLocationNotice((current) => current === "بغداد - المنصور" ? "بغداد - زيونة" : "بغداد - المنصور");
+              showNotice("تم تحديث موقع العرض التجريبي");
+            }}>
+              <Icon name="pin" />
+              <b>{locationNotice}</b>
+            </button>
+          </div>
 
           <div className="top-actions">
             <Link href="/notification-center" className="icon-btn">
