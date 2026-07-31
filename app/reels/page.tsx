@@ -152,7 +152,7 @@ export default function ReelsPage() {
   }
 
   return (
-    <main dir="rtl" className="page">
+    <main dir="rtl" className="page reels-page">
       <div className="feed" ref={containerRef}>
         {visibleReels.map((reel, index) => {
           const id = reel.documentId;
