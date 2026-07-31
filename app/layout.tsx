@@ -2,15 +2,21 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import ClientRouteGuard from "../components/ClientRouteGuard";
 import FuseCustomerNav from "../components/FuseCustomerNav";
+import "@fontsource/ibm-plex-sans-arabic/400.css";
+import "@fontsource/ibm-plex-sans-arabic/500.css";
+import "@fontsource/ibm-plex-sans-arabic/600.css";
+import "@fontsource/ibm-plex-sans-arabic/700.css";
+import "@fontsource-variable/noto-kufi-arabic";
 import "./globals.css";
 import "./mobile-responsive.css";
+import "./glass-theme.css";
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
-  themeColor: "#ff5a00",
+  themeColor: "#f8f5ef",
 };
 
 export const metadata: Metadata = {
