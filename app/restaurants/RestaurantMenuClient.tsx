@@ -37,15 +37,15 @@ type RestaurantDoc = {
 };
 
 const fallbackMenu: MenuDoc[] = [
-  { documentId: "fayrouz-1", restaurantId: "fayrouz", restaurant: "فيروز", name: "مخلمة", category: "فطور", price: 7000 },
-  { documentId: "fayrouz-2", restaurantId: "fayrouz", restaurant: "فيروز", name: "كاهي وقيمر", category: "كاهي", price: 5000 },
-  { documentId: "fayrouz-3", restaurantId: "fayrouz", restaurant: "فيروز", name: "باقلة بالدهن", category: "فطور", price: 6000 },
-  { documentId: "shalteta-1", restaurantId: "shalteta", restaurant: "شلتتة", name: "مشلتت سادة", category: "مشلتت", price: 8000 },
-  { documentId: "shalteta-2", restaurantId: "shalteta", restaurant: "شلتتة", name: "فطير جبن", category: "فطائر", price: 9000 },
-  { documentId: "khan-1", restaurantId: "khan", restaurant: "خان قدوري", name: "وجبة عراقية", category: "وجبات", price: 12000 },
-  { documentId: "khan-2", restaurantId: "khan", restaurant: "خان قدوري", name: "دجاج مشوي", category: "مشاوي", price: 9000 },
-  { documentId: "forn-1", restaurantId: "alforn", restaurant: "الفرن", name: "منقوشة جبن", category: "مناقيش", price: 5000 },
-  { documentId: "forn-2", restaurantId: "alforn", restaurant: "الفرن", name: "وافل شوكولاتة", category: "حلويات", price: 7000 },
+  { documentId: "fayrouz-1", restaurantId: "fayrouz", restaurant: "فيروز", name: "مخلمة", category: "فطور", price: 7000, image: "/images/m1.jpg" },
+  { documentId: "fayrouz-2", restaurantId: "fayrouz", restaurant: "فيروز", name: "كاهي وقيمر", category: "كاهي", price: 5000, image: "/images/m2.jpg" },
+  { documentId: "fayrouz-3", restaurantId: "fayrouz", restaurant: "فيروز", name: "باقلة بالدهن", category: "فطور", price: 6000, image: "/images/m3.jpg" },
+  { documentId: "shalteta-1", restaurantId: "shalteta", restaurant: "شلتتة", name: "مشلتت سادة", category: "مشلتت", price: 8000, image: "/images/m4.jpg" },
+  { documentId: "shalteta-2", restaurantId: "shalteta", restaurant: "شلتتة", name: "فطير جبن", category: "فطائر", price: 9000, image: "/images/m5.jpg" },
+  { documentId: "khan-1", restaurantId: "khan", restaurant: "خان قدوري", name: "وجبة عراقية", category: "وجبات", price: 12000, image: "/images/m6.jpg" },
+  { documentId: "khan-2", restaurantId: "khan", restaurant: "خان قدوري", name: "دجاج مشوي", category: "مشاوي", price: 9000, image: "/images/m7.jpg" },
+  { documentId: "forn-1", restaurantId: "alforn", restaurant: "الفرن", name: "منقوشة جبن", category: "مناقيش", price: 5000, image: "/images/m8.jpg" },
+  { documentId: "forn-2", restaurantId: "alforn", restaurant: "الفرن", name: "وافل شوكولاتة", category: "حلويات", price: 7000, image: "/images/m9.jpg" },
 ];
 
 function itemName(item: MenuDoc) {
@@ -87,20 +87,32 @@ export default function RestaurantMenuClient({
   const [category, setCategory] = useState("الكل");
   const [cart, setCart] = useState<FuseCartItem[]>([]);
   const [notice, setNotice] = useState("");
+  const [connectionWarning, setConnectionWarning] = useState(false);
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => setConnectionWarning(true), 3500);
     const unsubscribe = onSnapshot(
       query(collection(db, "menu")),
-      (snapshot) =>
+      (snapshot) => {
+        window.clearTimeout(timeout);
+        setConnectionWarning(false);
         setMenu(
           snapshot.docs.map((doc) => ({
             ...(doc.data() as Omit<MenuDoc, "documentId">),
             documentId: doc.id,
           }))
-        ),
-      () => setMenu([])
+        );
+      },
+      () => {
+        window.clearTimeout(timeout);
+        setConnectionWarning(true);
+        setMenu([]);
+      }
     );
-    return unsubscribe;
+    return () => {
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -205,11 +217,10 @@ export default function RestaurantMenuClient({
   }
 
   return (
-    <main className="page" dir="rtl">
-      <header className="header">
+    <main className="page restaurant-detail-page" dir="rtl">
+      <header className="header customer-header">
         <Link href="/restaurants" className="back" aria-label="الرجوع إلى المطاعم">
           <span aria-hidden="true">→</span>
-          <span>المطاعم</span>
         </Link>
         <div>
           <small>مطعم</small>
@@ -227,6 +238,8 @@ export default function RestaurantMenuClient({
           <span>تقدر تشوف المنيو، لكن الإضافة للسلة متوقفة مؤقتاً.</span>
         </section>
       ) : null}
+
+      {connectionWarning ? <p className="warning">تعذر تحديث المنيو الآن؛ عرضنا الأصناف المتاحة داخل التطبيق.</p> : null}
 
       <section className="hero">
         <div>
@@ -249,7 +262,7 @@ export default function RestaurantMenuClient({
       <section className="menu-grid">
         {visibleMenu.map((item) => (
           <article className="menu-card" key={item.documentId}>
-            <div className="food-image">{itemName(item).slice(0, 1)}</div>
+            <div className="food-image">{item.image ? <img src={item.image} alt={itemName(item)} /> : itemName(item).slice(0, 1)}</div>
             <div className="food-info">
               <small>{item.category || "عام"}</small>
               <h3>{itemName(item)}</h3>
