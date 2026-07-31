@@ -100,12 +100,11 @@ export default function RestaurantsPage() {
   }, [restaurants, search]);
 
   return (
-    <main dir="rtl" className="page">
+    <main dir="rtl" className="page restaurants-page">
       <section className="phone">
-        <header className="top">
+        <header className="top customer-header">
           <Link href="/" className="back" aria-label="الرجوع للرئيسية">
             <span aria-hidden="true">→</span>
-            <b>الرئيسية</b>
           </Link>
           <div><p>FUSE Iraq</p><h1>المطاعم</h1></div>
           <Link href="/cart" className="cart">السلة</Link>

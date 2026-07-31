@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap");
-
 :root {
   --fuse-orange: #ff5a00;
   --fuse-orange-2: #ff7a00;
@@ -11,8 +9,8 @@
   --fuse-black-2: #07101d;
   --fuse-cream: #fffaf1;
   --fuse-cream-2: #f4e5cf;
-  --fuse-title-font: "Cairo", "IBM Plex Sans Arabic", Arial, sans-serif;
-  --fuse-body-font: "IBM Plex Sans Arabic", "Cairo", Arial, sans-serif;
+  --fuse-title-font: "Noto Kufi Arabic Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --fuse-body-font: "IBM Plex Sans Arabic", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }

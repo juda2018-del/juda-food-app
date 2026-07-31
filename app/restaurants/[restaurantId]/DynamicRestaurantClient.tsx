@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, onSnapshot, query } from "firebase/firestore";
+import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { addFuseCartItem, readFuseCart } from "@/lib/fuse-cart";
 
@@ -55,21 +55,41 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   const [menu, setMenu] = useState<MenuDoc[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [connectionWarning, setConnectionWarning] = useState(false);
 
   useEffect(() => {
-    const unsubscribeRestaurants = onSnapshot(query(collection(db, "restaurants")), (snapshot) => {
-      setRestaurants(snapshot.docs.map((item) => ({
-        ...(item.data() as Omit<RestaurantDoc, "documentId">),
-        documentId: item.id,
-      })));
-    });
-    const unsubscribeMenu = onSnapshot(query(collection(db, "menu")), (snapshot) => {
-      setMenu(snapshot.docs.map((item) => ({
+    const timeout = window.setTimeout(() => {
+      setLoading(false);
+      setConnectionWarning(true);
+    }, 4500);
+    const unsubscribeRestaurants = onSnapshot(
+      query(collection(db, "restaurants")),
+      (snapshot) => {
+        window.clearTimeout(timeout);
+        setRestaurants(snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<RestaurantDoc, "documentId">),
+          documentId: item.id,
+        })));
+        setLoading(false);
+        setConnectionWarning(false);
+      },
+      () => {
+        window.clearTimeout(timeout);
+        setLoading(false);
+        setConnectionWarning(true);
+      }
+    );
+    const unsubscribeMenu = onSnapshot(
+      query(collection(db, "menu")),
+      (snapshot) => setMenu(snapshot.docs.map((item) => ({
         ...(item.data() as Omit<MenuDoc, "documentId">),
         documentId: item.id,
-      })));
-    });
+      }))),
+      () => setConnectionWarning(true)
+    );
     return () => {
+      window.clearTimeout(timeout);
       unsubscribeRestaurants();
       unsubscribeMenu();
     };
@@ -119,13 +139,16 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   const image = restaurant?.image || restaurant?.cover || restaurant?.logo || "";
 
   return (
-    <main dir="rtl" className="page">
+    <main dir="rtl" className="page restaurant-detail-page dynamic-restaurant-page">
       <section className="phone">
-        <header>
-          <Link href="/restaurants" className="back">‹</Link>
+        <header className="customer-header">
+          <Link href="/restaurants" className="back" aria-label="العودة إلى المطاعم">→</Link>
           <div><small>FUSE IRAQ</small><b>{restaurantName}</b></div>
           <Link href="/cart" className="cart">السلة {cartCount ? `(${cartCount})` : ""}</Link>
         </header>
+
+        {loading ? <div className="state-card">جاري تحميل المطعم…</div> : null}
+        {connectionWarning ? <div className="state-card">تعذر تحديث المطعم الآن. ارجع لقائمة المطاعم وحاول مرة ثانية.</div> : null}
 
         <section className="hero" style={image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.78)),url(${image})` } : undefined}>
           <span className="emoji">{restaurant?.emoji || "🍽️"}</span>
