@@ -95,6 +95,8 @@ export default function OrderStatusPage() {
 
     return onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
+        setAuthLoading(false);
+        setLoading(false);
         router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         return;
       }

@@ -103,8 +103,8 @@ export default function RestaurantsPage() {
     <main dir="rtl" className="page restaurants-page">
       <section className="phone">
         <header className="top customer-header">
-          <Link href="/" className="back" aria-label="الرجوع للرئيسية">
-            <span aria-hidden="true">→</span>
+          <Link href="/notification-center" className="back" aria-label="الإشعارات">
+            <span aria-hidden="true">♢</span>
           </Link>
           <div><p>FUSE Iraq</p><h1>المطاعم</h1></div>
           <Link href="/cart" className="cart">السلة</Link>
@@ -127,7 +127,7 @@ export default function RestaurantsPage() {
             const image = restaurant.image || restaurant.cover || restaurant.logo || "";
             const open = restaurant.open !== false && restaurant.isOpen !== false;
             return (
-              <Link href={`/restaurants/${restaurant.documentId}`} className="card" key={restaurant.documentId}>
+              <a href={`/restaurants/${restaurant.documentId}/`} className="card" key={restaurant.documentId}>
                 <div className="icon"><RestaurantImage src={image} name={name} fallback={restaurant.emoji} /></div>
                 <div>
                   <div className="name-row"><h3>{name}</h3><span className={open ? "open" : "closed"}>{open ? "مفتوح" : "مغلق"}</span></div>
@@ -135,7 +135,7 @@ export default function RestaurantsPage() {
                   <small>⭐ {Number(restaurant.rating || 5).toFixed(1)} · {restaurant.deliveryTime || "25 - 35 دقيقة"}</small>
                 </div>
                 <b>{open ? "اطلب" : "مغلق"}</b>
-              </Link>
+              </a>
             );
           })}
         </section>

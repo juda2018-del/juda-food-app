@@ -399,7 +399,7 @@ export default function HomePage() {
     });
   }, [availableRestaurants, category, search]);
 
-  const featuredRestaurants = visibleRestaurants.slice(0, 8);
+  const featuredRestaurants = visibleRestaurants.slice(0, 3);
   const popularMenu = sourceMenu.filter((item) => menuAvailable(item) && availableRestaurants.some((restaurant) => menuBelongsToRestaurant(item, restaurant))).slice(0, 6);
 
   function showNotice(text: string) {

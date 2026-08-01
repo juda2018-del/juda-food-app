@@ -9,8 +9,10 @@
   --fuse-black-2: #07101d;
   --fuse-cream: #fffaf1;
   --fuse-cream-2: #f4e5cf;
+  --fuse-sky: #55b9ff;
+  --fuse-coral: #ff5964;
   --fuse-title-font: "Noto Kufi Arabic Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
-  --fuse-body-font: "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --fuse-body-font: "Tajawal", "IBM Plex Sans Arabic", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -123,7 +125,7 @@ textarea { direction: rtl; }
 
 .fuse-customer-nav > a.is-active {
   color: var(--fuse-orange);
-  background: rgba(255, 90, 0, 0.11);
+  background: linear-gradient(135deg, rgba(255,89,100,.12), rgba(255,122,0,.13));
 }
 
 .fuse-customer-nav > a b {

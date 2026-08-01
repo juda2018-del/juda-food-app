@@ -219,9 +219,9 @@ export default function RestaurantMenuClient({
   return (
     <main className="page restaurant-detail-page" dir="rtl">
       <header className="header customer-header">
-        <Link href="/restaurants" className="back" aria-label="الرجوع إلى المطاعم">
+        <a href="/restaurants/" className="back" aria-label="العودة إلى المطاعم">
           <span aria-hidden="true">→</span>
-        </Link>
+        </a>
         <div>
           <small>مطعم</small>
           <h1>{restaurant}</h1>

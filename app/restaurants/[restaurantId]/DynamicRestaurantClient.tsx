@@ -45,14 +45,27 @@ type MenuDoc = {
   isAvailable?: boolean;
 };
 
+const fallbackRestaurants: RestaurantDoc[] = [
+  { documentId: "fayrouz", name: "فيروز", description: "فطور عراقي، كاهي وقيمر وبورك.", area: "زيونة", cuisine: "فطور", image: "/images/m6.jpg", open: true, active: true, rating: 4.9, deliveryTime: "20 - 30 دقيقة" },
+  { documentId: "shalteta", name: "شلتتة", description: "مشلتت وفطائر حار وحلو.", area: "زيونة", cuisine: "فطور", image: "/images/m7.jpg", open: true, active: true, rating: 4.7, deliveryTime: "25 - 35 دقيقة" },
+  { documentId: "khan", name: "خان قدوري", description: "أكلات عراقية شعبية ووجبات يومية.", area: "بغداد", cuisine: "مشاوي", image: "/images/m4.jpg", open: true, active: true, rating: 4.6, deliveryTime: "30 - 40 دقيقة" },
+  { documentId: "alforn", name: "الفرن", description: "مناقيش، معجنات، كريب ووافل.", area: "بغداد", cuisine: "بيتزا", image: "/images/m5.jpg", open: true, active: true, rating: 4.5, deliveryTime: "30 - 40 دقيقة" },
+];
+
+const fallbackMenu: MenuDoc[] = [
+  { documentId: "fayrouz-makhlema", restaurantId: "fayrouz", name: "مخلمة", category: "فطور", price: 7000, image: "/images/m6.jpg", available: true },
+  { documentId: "fayrouz-kahi", restaurantId: "fayrouz", name: "كاهي وقيمر", category: "كاهي", price: 5000, image: "/images/m6.jpg", available: true },
+  { documentId: "fayrouz-baqala", restaurantId: "fayrouz", name: "باقلة بالدهن", category: "فطور", price: 6000, image: "/images/m6.jpg", available: true },
+];
+
 function formatIQD(value?: number) {
   return `${Number(value || 0).toLocaleString("ar-IQ")} د.ع`;
 }
 
 export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp }: { restaurantId: string }) {
   const restaurantId = decodeURIComponent(restaurantIdProp || "");
-  const [restaurants, setRestaurants] = useState<RestaurantDoc[]>([]);
-  const [menu, setMenu] = useState<MenuDoc[]>([]);
+  const [restaurants, setRestaurants] = useState<RestaurantDoc[]>(fallbackRestaurants);
+  const [menu, setMenu] = useState<MenuDoc[]>(fallbackMenu);
   const [cartCount, setCartCount] = useState(0);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -60,6 +73,8 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      setRestaurants((current) => current.length ? current : fallbackRestaurants);
+      setMenu((current) => current.length ? current : fallbackMenu);
       setLoading(false);
       setConnectionWarning(true);
     }, 4500);
@@ -67,26 +82,31 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
       query(collection(db, "restaurants")),
       (snapshot) => {
         window.clearTimeout(timeout);
-        setRestaurants(snapshot.docs.map((item) => ({
+        const remote = snapshot.docs.map((item) => ({
           ...(item.data() as Omit<RestaurantDoc, "documentId">),
           documentId: item.id,
-        })));
+        }));
+        setRestaurants(remote.length ? remote : fallbackRestaurants);
         setLoading(false);
         setConnectionWarning(false);
       },
       () => {
         window.clearTimeout(timeout);
+        setRestaurants(fallbackRestaurants);
         setLoading(false);
         setConnectionWarning(true);
       }
     );
     const unsubscribeMenu = onSnapshot(
       query(collection(db, "menu")),
-      (snapshot) => setMenu(snapshot.docs.map((item) => ({
+      (snapshot) => {
+        const remote = snapshot.docs.map((item) => ({
         ...(item.data() as Omit<MenuDoc, "documentId">),
         documentId: item.id,
-      }))),
-      () => setConnectionWarning(true)
+        }));
+        setMenu(remote.length ? remote : fallbackMenu);
+      },
+      () => { setMenu(fallbackMenu); setConnectionWarning(true); }
     );
     return () => {
       window.clearTimeout(timeout);
@@ -142,7 +162,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
     <main dir="rtl" className="page restaurant-detail-page dynamic-restaurant-page">
       <section className="phone">
         <header className="customer-header">
-          <Link href="/restaurants" className="back" aria-label="العودة إلى المطاعم">→</Link>
+          <a href="/restaurants/" className="back" aria-label="العودة إلى المطاعم">→</a>
           <div><small>FUSE IRAQ</small><b>{restaurantName}</b></div>
           <Link href="/cart" className="cart">السلة {cartCount ? `(${cartCount})` : ""}</Link>
         </header>

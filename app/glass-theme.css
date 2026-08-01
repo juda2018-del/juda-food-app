@@ -1,6 +1,8 @@
 :root {
   --glass-orange: #ff6500;
   --glass-orange-2: #ff8a24;
+  --glass-sky: #54b9ff;
+  --glass-coral: #ff5964;
   --glass-ink: #15171a;
   --glass-muted: #64696f;
   --glass-line: rgba(255, 255, 255, 0.78);
@@ -8,6 +10,70 @@
   --glass-panel-strong: rgba(255, 255, 255, 0.74);
   --glass-shadow: 0 16px 42px rgba(65, 55, 38, 0.13), inset 0 1px 0 rgba(255,255,255,.92);
   --glass-blur: blur(22px) saturate(145%);
+}
+
+/* Approved launch palette: warm cream glass with light sky/coral accents. */
+.home-page,
+.home-page .phone,
+.restaurants-page,
+.restaurants-page .phone,
+.restaurant-detail-page,
+.restaurant-detail-page .phone,
+.profile-shell {
+  font-family: "Tajawal", var(--fuse-body-font) !important;
+  background:
+    radial-gradient(circle at 8% 4%, rgba(255,224,117,.52), transparent 26%),
+    radial-gradient(circle at 92% 9%, rgba(84,185,255,.24), transparent 30%),
+    radial-gradient(circle at 12% 66%, rgba(255,89,100,.16), transparent 31%),
+    radial-gradient(circle at 90% 76%, rgba(202,194,235,.43), transparent 29%),
+    linear-gradient(155deg,#fbfaf6 0%,#f4f5ec 47%,#faf4ee 100%) !important;
+}
+
+.home-page .filter-btn,
+.home-page .hero-badge,
+.profile-shell .logout,
+.profile-shell .danger a {
+  background: linear-gradient(135deg, var(--glass-coral), var(--glass-orange)) !important;
+}
+
+.home-page .section-head small,
+.home-page .section-head button,
+.home-page .rest-rating,
+.home-page .product-body strong,
+.restaurants-page .top p,
+.restaurant-detail-page .header small,
+.restaurant-detail-page .food-info strong,
+.profile-shell .brand,
+.profile-shell .edit {
+  color: var(--glass-sky) !important;
+}
+
+.profile-shell .avatar {
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--glass-sky), var(--glass-coral)) !important;
+}
+
+.home-page .hero {
+  min-height: 242px !important;
+  background-position: center !important;
+  background-size: cover !important;
+}
+
+.home-page .restaurants {
+  grid-template-columns: repeat(3, minmax(0,1fr)) !important;
+  gap: 9px !important;
+}
+
+.home-page .rest-card { min-width: 0 !important; }
+.home-page .rest-img { height: 112px !important; }
+
+.home-page .benefits > div:nth-child(1) svg { color: var(--glass-orange) !important; }
+.home-page .benefits > div:nth-child(2) svg { color: var(--glass-coral) !important; }
+.home-page .benefits > div:nth-child(3) svg { color: var(--glass-sky) !important; }
+
+.fuse-customer-nav > a.is-active {
+  color: var(--glass-orange) !important;
+  background: linear-gradient(135deg, rgba(255,89,100,.1), rgba(255,138,36,.14)) !important;
 }
 
 html,
