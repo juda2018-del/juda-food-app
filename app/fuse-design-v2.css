@@ -1,0 +1,153 @@
+/* FUSE UI v2 — structural mobile normalization. Loaded after legacy theme files so the real page components share one layout. */
+@media (max-width: 520px) {
+  :root {
+    --fuse-page-width: 430px;
+    --fuse-gutter: 16px;
+    --fuse-surface: rgba(255,255,255,.78);
+    --fuse-border: rgba(23,25,29,.08);
+    --fuse-radius: 24px;
+  }
+
+  body { background: #f7f2ea !important; }
+
+  .page.home-page,
+  .page.restaurants-page,
+  .profile-shell {
+    width: min(100%, var(--fuse-page-width)) !important;
+    max-width: var(--fuse-page-width) !important;
+    min-height: 100dvh !important;
+    margin-inline: auto !important;
+    background: linear-gradient(180deg,#fffaf2 0%,#f6f1e9 100%) !important;
+    color: #17191d !important;
+  }
+
+  .page.home-page,
+  .page.restaurants-page { padding: max(12px,env(safe-area-inset-top)) var(--fuse-gutter) calc(108px + env(safe-area-inset-bottom)) !important; }
+  .page.home-page > .phone,
+  .page.restaurants-page > .phone {
+    width: 100% !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 0 calc(108px + env(safe-area-inset-bottom)) !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* One header language on all three customer screens. */
+  .home-page .topbar,
+  .restaurants-page .customer-header,
+  .profile-shell .profile-header {
+    min-height: 68px !important;
+    margin: 0 0 14px !important;
+    padding: 7px 8px !important;
+    border: 1px solid rgba(255,255,255,.9) !important;
+    border-radius: 24px !important;
+    background: rgba(255,252,247,.78) !important;
+    color: #17191d !important;
+    box-shadow: 0 8px 26px rgba(23,25,29,.055) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+    backdrop-filter: blur(20px) saturate(140%) !important;
+  }
+  .home-page .topbar { grid-template-columns: 48px 1fr auto !important; gap: 8px !important; margin-inline: 0 !important; padding-top: 7px !important; }
+  .home-page .top-actions { gap: 7px !important; }
+  .home-page .menu-btn,
+  .home-page .icon-btn,
+  .home-page .profile,
+  .restaurants-page .back,
+  .restaurants-page .cart,
+  .profile-shell .icon-btn {
+    width: 46px !important;
+    height: 46px !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(23,25,29,.06) !important;
+    background: rgba(255,255,255,.88) !important;
+    color: #17191d !important;
+    box-shadow: none !important;
+  }
+  .home-page .menu-btn { background: #ff6a0a !important; color:#fff !important; }
+  .home-page .profile { border-radius: 16px !important; background:#fff !important; }
+  .home-page .brand-location { text-align:center !important; min-width:0 !important; }
+  .home-page .brand-location strong { display:block !important; font-size:16px !important; line-height:1.15 !important; }
+  .home-page .location { color:#676c73 !important; font-size:11px !important; margin-top:2px !important; }
+  .home-page .location svg { width:14px !important; height:14px !important; }
+
+  .restaurants-page .customer-header { display:grid !important; grid-template-columns:74px 1fr 58px !important; align-items:center !important; gap:8px !important; }
+  .restaurants-page .customer-header > div { text-align:center !important; }
+  .restaurants-page .customer-header p { margin:0 !important; color:#ff6500 !important; font-size:11px !important; font-weight:900 !important; }
+  .restaurants-page .customer-header h1 { margin:1px 0 0 !important; font-size:27px !important; line-height:1.05 !important; }
+  .restaurants-page .cart { color:#ff6500 !important; font-size:12px !important; }
+
+  .profile-shell { padding: max(12px,env(safe-area-inset-top)) var(--fuse-gutter) calc(108px + env(safe-area-inset-bottom)) !important; }
+  .profile-shell .profile-header { display:grid !important; grid-template-columns:46px 1fr 46px !important; }
+  .profile-shell .brand { justify-self:center !important; color:#17191d !important; background:transparent !important; border:0 !important; padding:0 !important; font-family:var(--fuse-title-font) !important; font-size:23px !important; font-weight:950 !important; }
+
+  /* Home: compact, aligned vertical rhythm. */
+  .home-page .search-row {
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) 52px !important;
+    gap:8px !important;
+    margin:0 0 13px !important;
+    padding:0 !important;
+    background:transparent !important;
+  }
+  .home-page .search-box { height:52px !important; min-height:52px !important; border-radius:19px !important; padding-inline:15px !important; background:rgba(255,255,255,.72) !important; border:1px solid var(--fuse-border) !important; box-shadow:none !important; }
+  .home-page .filter-btn { width:52px !important; height:52px !important; border-radius:19px !important; box-shadow:none !important; }
+  .home-page .categories { display:grid !important; grid-auto-flow:column !important; grid-auto-columns:64px !important; gap:8px !important; padding:0 0 13px !important; margin:0 !important; }
+  .home-page .categories span { width:54px !important; height:54px !important; border-radius:18px !important; box-shadow:none !important; border:1px solid rgba(23,25,29,.06) !important; }
+  .home-page .categories b { font-size:11px !important; }
+  .home-page .hero { min-height:174px !important; margin:0 0 13px !important; border-radius:25px !important; }
+  .home-page .hero-copy { padding:17px !important; }
+  .home-page .hero-copy h1 { font-size:30px !important; }
+  .home-page .benefits { margin:0 0 17px !important; border-radius:21px !important; box-shadow:none !important; border:1px solid var(--fuse-border) !important; }
+  .home-page .section-head { margin:0 2px 10px !important; }
+  .home-page .section-head h2 { font-size:22px !important; }
+  .home-page .restaurants { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:9px !important; }
+  .home-page .rest-card { border-radius:20px !important; box-shadow:none !important; border:1px solid var(--fuse-border) !important; }
+  .home-page .rest-img-wrap { height:112px !important; }
+
+  /* Restaurants: same card geometry, no oversized title/hero jumps. */
+  .restaurants-page .hero { margin:0 0 12px !important; padding:17px !important; border-radius:22px !important; }
+  .restaurants-page .hero h2 { margin:7px 0 !important; font-size:21px !important; line-height:1.3 !important; }
+  .restaurants-page .search { margin:0 0 12px !important; }
+  .restaurants-page .search input { height:52px !important; border-radius:18px !important; box-shadow:none !important; border:1px solid var(--fuse-border) !important; }
+  .restaurants-page .grid { gap:10px !important; }
+  .restaurants-page .card { min-height:104px !important; grid-template-columns:82px minmax(0,1fr) !important; gap:11px !important; padding:9px !important; border-radius:20px !important; box-shadow:none !important; border:1px solid var(--fuse-border) !important; }
+  .restaurants-page .icon { width:82px !important; height:82px !important; border-radius:17px !important; }
+  .restaurants-page .card h3 { font-size:16px !important; }
+  .restaurants-page .card p { font-size:11px !important; margin:5px 0 !important; }
+  .restaurants-page .card small { font-size:10px !important; }
+
+  /* Profile: match the same card scale and spacing. */
+  .profile-shell .profile-card { margin:0 !important; padding:15px !important; border-radius:22px !important; box-shadow:none !important; border:1px solid var(--fuse-border) !important; background:rgba(255,255,255,.82) !important; }
+  .profile-shell .avatar { width:58px !important; height:58px !important; flex-basis:58px !important; }
+  .profile-shell .user h1 { font-size:18px !important; }
+  .profile-shell .edit { padding:9px 11px !important; }
+  .profile-shell .load-warning { margin:10px 0 0 !important; border-radius:16px !important; }
+  .profile-shell .session-actions { margin-top:10px !important; gap:8px !important; }
+  .profile-shell .session-actions a,.profile-shell .session-actions button { height:46px !important; border-radius:15px !important; }
+  .profile-shell .notice { margin-top:12px !important; border-radius:22px !important; box-shadow:none !important; }
+  .profile-shell .section-title { margin:18px 3px 9px !important; font-size:18px !important; }
+  .profile-shell .menu { border-radius:22px !important; padding:4px !important; box-shadow:none !important; border:1px solid var(--fuse-border) !important; }
+  .profile-shell .item { min-height:62px !important; padding:8px 9px !important; }
+  .profile-shell .emoji { width:42px !important; height:42px !important; border-radius:14px !important; }
+
+  /* Shared bottom nav: one fixed component, always above content and safe-area aware. */
+  .fuse-customer-nav {
+    width:min(414px,calc(100% - 20px)) !important;
+    left:50% !important;
+    right:auto !important;
+    transform:translateX(-50%) !important;
+    bottom:max(8px,env(safe-area-inset-bottom)) !important;
+    height:68px !important;
+    border-radius:24px !important;
+  }
+}
+
+@media (max-width:360px) {
+  .page.home-page,.page.restaurants-page,.profile-shell { --fuse-gutter:12px; }
+  .restaurants-page .customer-header { grid-template-columns:68px 1fr 54px !important; }
+  .restaurants-page .card { grid-template-columns:76px minmax(0,1fr) !important; }
+  .restaurants-page .icon { width:76px !important; height:76px !important; }
+}
