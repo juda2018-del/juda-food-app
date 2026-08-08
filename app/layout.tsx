@@ -14,6 +14,7 @@ import "@fontsource/tajawal/800.css";
 import "./globals.css";
 import "./mobile-responsive.css";
 import "./glass-theme.css";
+import "./fuse-final-ui.css";
 
 export const viewport: Viewport = {
   width: "device-width",
