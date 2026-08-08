@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, setPersistence, type Auth } from "firebase/auth";
 
 const fallbackConfig = {
   "apiKey": "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0",
@@ -43,3 +43,8 @@ export const firebaseApp: FirebaseApp = getApps().length
   : initializeApp(firebaseConfig);
 
 export const firebaseAuth: Auth = getAuth(firebaseApp);
+
+// Keep the signed-in customer session available across iOS/WebView reloads.
+// Firebase may fall back to another supported persistence mechanism if local
+// storage is unavailable in the current browser context.
+void setPersistence(firebaseAuth, browserLocalPersistence).catch(() => undefined);
