@@ -1,7 +1,7 @@
- import { getApp, getApps, initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getMessaging, isSupported } from "firebase/messaging";
-import { getAuth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -19,6 +19,13 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 
 export const auth = getAuth(app);
+
+// Keep the same customer session available to every page that imports this
+// Firebase entry point, including the iOS/WebView screens for addresses and
+// account data. If local persistence is unavailable Firebase will reject this
+// call and continue with its supported fallback behavior.
+void setPersistence(auth, browserLocalPersistence).catch(() => undefined);
+
 export const storage = getStorage(app);
 
 export let messaging: any = null;
