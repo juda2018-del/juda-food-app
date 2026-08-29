@@ -1,23 +1,25 @@
-﻿import { Suspense } from "react";
-import DriverClient from "./DriverClient";
+﻿"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function DriverPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/driver-app");
+  }, [router]);
+
   return (
-    <Suspense
-      fallback={
-        <main style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          background: "#050505",
-          color: "#fff",
-          fontFamily: "Cairo, system-ui, sans-serif"
-        }}>
-          جاري تحميل لوحة السائق...
-        </main>
-      }
-    >
-      <DriverClient />
-    </Suspense>
+    <main dir="rtl" style={{
+      minHeight: "100vh",
+      display: "grid",
+      placeItems: "center",
+      background: "#050505",
+      color: "#fff",
+      fontFamily: "Cairo, system-ui, sans-serif"
+    }}>
+      جاري فتح تطبيق السائق...
+    </main>
   );
 }

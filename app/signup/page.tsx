@@ -7,6 +7,8 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { db } from "../firebase";
+import { saveFuseSession } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
 function normalizePhone(value: string) {
   return value
@@ -66,6 +68,8 @@ export default function SignupPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      const session = await resolveFuseSession(credential.user);
+      saveFuseSession(session);
       router.replace("/restaurants");
       router.refresh();
     } catch (signupError) {

@@ -1,0 +1,394 @@
+/* FUSE Reference Theme — glass premium food delivery (loaded last) */
+:root {
+  --ref-bg: #f4efe6;
+  --ref-bg-2: #fdf6ec;
+  --ref-cream: rgba(255, 252, 247, 0.82);
+  --ref-glass: rgba(255, 255, 255, 0.58);
+  --ref-glass-strong: rgba(255, 255, 255, 0.82);
+  --ref-green: #1f7a4f;
+  --ref-green-2: #2f915f;
+  --ref-green-soft: rgba(31, 122, 79, 0.12);
+  --ref-navy: #1a2235;
+  --ref-ink: #15171a;
+  --ref-muted: #6f7175;
+  --ref-line: rgba(21, 23, 26, 0.08);
+  --ref-orange: #ff6a0a;
+  --ref-star: #f4b400;
+  --ref-radius-xl: 28px;
+  --ref-radius-lg: 22px;
+  --ref-radius-md: 18px;
+  --ref-shadow: 0 16px 42px rgba(65, 55, 38, 0.12);
+  --ref-shadow-soft: 0 10px 28px rgba(21, 23, 26, 0.08);
+  --ref-blur: blur(22px) saturate(145%);
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 8% 4%, rgba(255, 224, 117, 0.35), transparent 28%),
+    radial-gradient(circle at 92% 8%, rgba(84, 185, 255, 0.18), transparent 32%),
+    radial-gradient(circle at 14% 72%, rgba(31, 122, 79, 0.1), transparent 34%),
+    linear-gradient(155deg, var(--ref-bg-2) 0%, var(--ref-bg) 52%, #faf4ee 100%) !important;
+  color: var(--ref-ink) !important;
+}
+
+/* ── Bottom navigation (reference: floating glass + green active) ── */
+.fuse-customer-nav {
+  height: 72px !important;
+  padding: 6px 8px !important;
+  border-radius: var(--ref-radius-xl) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
+  background: var(--ref-glass-strong) !important;
+  box-shadow: var(--ref-shadow) !important;
+  -webkit-backdrop-filter: var(--ref-blur) !important;
+  backdrop-filter: var(--ref-blur) !important;
+}
+
+.fuse-customer-nav > a {
+  color: var(--ref-muted) !important;
+  border-radius: var(--ref-radius-md) !important;
+}
+
+.fuse-customer-nav > a.is-active {
+  color: var(--ref-green) !important;
+  background: var(--ref-green-soft) !important;
+}
+
+.fuse-customer-nav > a.is-active .fuse-nav-icon {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+}
+
+/* ── Shared customer canvas ── */
+.page.home-page,
+.page.restaurants-page,
+.profile-shell,
+.page.restaurant-detail-page {
+  background: transparent !important;
+  color: var(--ref-ink) !important;
+}
+
+.page.home-page > .phone,
+.page.restaurants-page > .phone,
+.profile-shell,
+.page.restaurant-detail-page > .phone {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Glass headers */
+.home-page .topbar,
+.restaurants-page .customer-header,
+.profile-shell .profile-header,
+.restaurant-detail-page .customer-header {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-radius: var(--ref-radius-xl) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  -webkit-backdrop-filter: var(--ref-blur) !important;
+  backdrop-filter: var(--ref-blur) !important;
+  color: var(--ref-ink) !important;
+}
+
+.home-page .brand-location strong,
+.restaurants-page .customer-header h1,
+.profile-shell .brand {
+  color: var(--ref-ink) !important;
+  font-family: var(--fuse-title-font) !important;
+}
+
+.home-page .location,
+.home-page .location b {
+  color: var(--ref-muted) !important;
+}
+
+.home-page .location svg {
+  color: var(--ref-green) !important;
+}
+
+/* Primary actions: reference green */
+.home-page .filter-btn,
+.home-page .menu-btn,
+.restaurants-page .cart,
+.profile-shell .session-actions a,
+.profile-shell .notice a,
+.dynamic-restaurant-page .menu button:not(:disabled) {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2)) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 28px rgba(31, 122, 79, 0.22) !important;
+}
+
+/* Search */
+.home-page .search-box,
+.restaurants-page .search input {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid var(--ref-line) !important;
+  border-radius: var(--ref-radius-lg) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  -webkit-backdrop-filter: var(--ref-blur) !important;
+  backdrop-filter: var(--ref-blur) !important;
+}
+
+/* Categories */
+.home-page .categories span {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid var(--ref-line) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+}
+
+.home-page .categories button.active span {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2)) !important;
+  color: #fff !important;
+}
+
+/* Cards */
+.home-page .rest-card,
+.home-page .product,
+.restaurants-page .card,
+.profile-shell .profile-card,
+.profile-shell .menu,
+.profile-shell .danger,
+.dynamic-restaurant-page .menu article,
+.dynamic-restaurant-page .info div {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
+  border-radius: var(--ref-radius-lg) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  -webkit-backdrop-filter: var(--ref-blur) !important;
+  backdrop-filter: var(--ref-blur) !important;
+}
+
+.home-page .benefits {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+}
+
+.home-page .benefits svg {
+  color: var(--ref-green) !important;
+}
+
+.home-page .section-head small,
+.restaurants-page .hero span,
+.dynamic-restaurant-page .title small,
+.dynamic-restaurant-page .copy small {
+  color: var(--ref-green) !important;
+}
+
+.home-page .section-head button {
+  color: var(--ref-green) !important;
+}
+
+/* Rating badges on cards */
+.home-page .rest-rating,
+.home-page .time {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid var(--ref-line) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.home-page .rest-rating {
+  color: var(--ref-ink) !important;
+}
+
+/* Hero banners */
+.home-page .hero,
+.restaurants-page .hero {
+  background:
+    radial-gradient(circle at 18% 40%, rgba(255, 255, 255, 0.14), transparent 38%),
+    linear-gradient(135deg, var(--ref-navy) 0%, #263759 100%) !important;
+  border-radius: var(--ref-radius-xl) !important;
+  box-shadow: var(--ref-shadow) !important;
+}
+
+.home-page .hero-copy a {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2)) !important;
+  color: #fff !important;
+}
+
+/* Circular back buttons */
+.restaurants-page .back,
+.dynamic-restaurant-page .back {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid var(--ref-line) !important;
+  color: var(--ref-green) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+}
+
+.restaurants-page .cart {
+  border-radius: var(--ref-radius-md) !important;
+  font-size: 11px !important;
+}
+
+/* Profile */
+.profile-shell .avatar {
+  background: linear-gradient(135deg, var(--ref-green), #54b9ff) !important;
+  box-shadow: 0 12px 28px rgba(31, 122, 79, 0.22) !important;
+}
+
+.profile-shell .edit {
+  color: var(--ref-green) !important;
+  background: var(--ref-green-soft) !important;
+}
+
+.profile-shell .notice {
+  background:
+    radial-gradient(circle at 90% 0%, rgba(84, 185, 255, 0.22), transparent 40%),
+    linear-gradient(135deg, var(--ref-navy), #2a3348) !important;
+}
+
+.profile-shell .icon-btn {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid var(--ref-line) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+}
+
+/* Restaurant detail hero */
+.dynamic-restaurant-page .hero {
+  border-radius: var(--ref-radius-xl) !important;
+  min-height: 220px !important;
+}
+
+.dynamic-restaurant-page .green {
+  color: var(--ref-green) !important;
+}
+
+/* Cart, favorites, orders */
+main.app,
+.page > .phone {
+  background: transparent !important;
+  color: var(--ref-ink) !important;
+}
+
+main.app .top,
+.page > .phone > .top {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-radius: var(--ref-radius-xl) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  -webkit-backdrop-filter: var(--ref-blur) !important;
+  backdrop-filter: var(--ref-blur) !important;
+}
+
+main.app .back,
+.page > .phone > .top .back {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid var(--ref-line) !important;
+  color: var(--ref-green) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+}
+
+main.app .support,
+.page > .phone > .top .support {
+  border-radius: var(--ref-radius-md) !important;
+  background: var(--ref-green-soft) !important;
+  color: var(--ref-green) !important;
+  border: 1px solid rgba(31, 122, 79, 0.14) !important;
+  box-shadow: none !important;
+}
+
+main.app .empty,
+main.app .group,
+main.app .summary,
+main.app .form,
+main.app .notice,
+main.app .hero,
+.page > .phone .hero,
+.page > .phone .picker,
+.page > .phone .orderCard,
+.page > .phone .state {
+  background: var(--ref-glass-strong) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
+  border-radius: var(--ref-radius-lg) !important;
+  box-shadow: var(--ref-shadow-soft) !important;
+  -webkit-backdrop-filter: var(--ref-blur) !important;
+  backdrop-filter: var(--ref-blur) !important;
+}
+
+.page > .phone .hero {
+  background:
+    radial-gradient(circle at 18% 40%, rgba(255, 255, 255, 0.14), transparent 38%),
+    linear-gradient(135deg, var(--ref-navy) 0%, #263759 100%) !important;
+  border-radius: var(--ref-radius-xl) !important;
+  box-shadow: var(--ref-shadow) !important;
+  color: #fff !important;
+}
+
+.page > .phone .hero span {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+main.app .checkout,
+main.app .empty a,
+main.app .notice a,
+.page > .phone .state a,
+.page > .phone .rate {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2)) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 28px rgba(31, 122, 79, 0.22) !important;
+}
+
+main.app .qty button,
+.page > .phone .progress .active i {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2)) !important;
+}
+
+main.app .groupHead small,
+main.app .row strong,
+main.app .total b,
+.page > .phone .orderHead strong,
+.page > .phone .item b,
+.page > .phone .progress .active {
+  color: var(--ref-green) !important;
+}
+
+main.app .heart {
+  background: var(--ref-green-soft) !important;
+  color: var(--ref-green) !important;
+}
+
+/* Reels accents (keep immersive dark feed) */
+.reels-page .tabs b:after {
+  background: var(--ref-green) !important;
+}
+
+.reels-page .product-card button,
+.reels-page .order-btn {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2)) !important;
+}
+
+.reels-page .avatar i {
+  background: var(--ref-green) !important;
+}
+
+.reels-page .actions button.active span {
+  color: var(--ref-green) !important;
+}
+
+.reels-page .toast {
+  background: var(--ref-glass-strong) !important;
+  color: var(--ref-ink) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: var(--ref-blur) !important;
+}
+
+@media (max-width: 520px) {
+  body {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+}

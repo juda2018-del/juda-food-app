@@ -5,23 +5,10 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { performFuseLogout } from "@/lib/fuse-logout";
-import { FUSE_LOCAL_SESSION } from "@/lib/fuse-auth";
+import { FUSE_LOCAL_SESSION, saveFuseSession } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
-function buildAdminSession(email: string) {
-  return {
-    role: "admin",
-    fuseRole: "admin",
-    email,
-    fuseEmail: email,
-    name: "FUSE Admin",
-    displayName: "FUSE Admin",
-    uid: "fuse-admin",
-    restaurantId: "all",
-    restaurantName: "FUSE",
-    createdAt: new Date().toISOString(),
-    source: "firebase-admin-bridge"
-  };
-}
+const LOAD_TIMEOUT_MS = 8000;
 
 export default function FuseAdminBridge({
   children,
@@ -31,42 +18,56 @@ export default function FuseAdminBridge({
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [blockedEmail, setBlockedEmail] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      const email = user?.email?.trim().toLowerCase() || "";
+    const timeout = window.setTimeout(() => {
+      setError("تأخر التحقق من حساب الأدمن. حاول تسجيل الدخول مرة ثانية.");
+    }, LOAD_TIMEOUT_MS);
 
-      if (!email) {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+      window.clearTimeout(timeout);
+
+      if (!user) {
         setReady(false);
         router.replace("/login?next=/fuse-admin");
         return;
       }
 
-      if (email !== "admin@fuse.iq") {
-        setBlockedEmail(email);
-        setReady(false);
-        return;
-      }
-
       try {
-        const session = buildAdminSession(email);
+        const session = await resolveFuseSession(user);
 
-        localStorage.setItem(FUSE_LOCAL_SESSION, JSON.stringify(session));
-        localStorage.setItem("FUSE_LOCAL_SESSION", JSON.stringify(session));
-        localStorage.setItem("fuseRole", "admin");
-        localStorage.setItem("fuseEmail", email);
-      } catch (error) {
-        console.error("FUSE admin bridge localStorage error", error);
+        if (session.role !== "admin") {
+          setBlockedEmail(session.email);
+          setReady(false);
+          return;
+        }
+
+        saveFuseSession(session);
+        try {
+          localStorage.setItem("FUSE_LOCAL_SESSION", JSON.stringify(session));
+          localStorage.setItem(FUSE_LOCAL_SESSION, JSON.stringify(session));
+        } catch {
+          // localStorage may be unavailable in some WebViews.
+        }
+
+        setBlockedEmail("");
+        setError("");
+        setReady(true);
+      } catch (resolveError) {
+        setBlockedEmail(user.email?.trim().toLowerCase() || "");
+        setError(resolveError instanceof Error ? resolveError.message : "تعذر التحقق من صلاحيات الأدمن.");
+        setReady(false);
       }
-
-      setBlockedEmail("");
-      setReady(true);
     });
 
-    return () => unsubscribe();
+    return () => {
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
   }, [router]);
 
-  if (blockedEmail) {
+  if (blockedEmail || error) {
     return (
       <main dir="rtl" style={{
         minHeight: "100vh",
@@ -88,10 +89,10 @@ export default function FuseAdminBridge({
             FUSE Admin Guard
           </p>
           <h1 style={{ margin: "12px 0", fontSize: 28 }}>
-            هذا الحساب مو أدمن
+            {blockedEmail ? "هذا الحساب مو أدمن" : "تعذر فتح لوحة الأدمن"}
           </h1>
           <p style={{ color: "rgba(255,255,255,0.72)", lineHeight: 1.8 }}>
-            الحساب الحالي: <b>{blockedEmail}</b>
+            {blockedEmail ? <>الحساب الحالي: <b>{blockedEmail}</b></> : error}
           </p>
           <button
             onClick={() => performFuseLogout("/fuse-admin")}

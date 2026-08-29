@@ -4,29 +4,19 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
+import { parseFuseRole, roleHome, saveFuseSession, type FuseRole } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
 type GateState = "checking" | "allowed" | "redirecting";
+
+const LOAD_TIMEOUT_MS = 8000;
 
 function normalize(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
 
-function roleFromEmail(email: string) {
-  const clean = normalize(email);
-
-  if (clean === "admin@fuse.iq") return "admin";
-  if (clean === "restaurant@fuse.iq") return "restaurant";
-  if (clean === "driver@fuse.iq") return "driver";
-  if (clean === "customer@fuse.iq") return "customer";
-
-  return "";
-}
-
-function targetForRole(role: string) {
-  if (role === "driver") return "/driver?fuseRole=driver&fuseEmail=driver%40fuse.iq";
-  if (role === "admin") return "/fuse-admin";
-  if (role === "customer") return "/customer?fuseRole=customer&fuseEmail=customer%40fuse.iq";
-  return "";
+function targetForRole(role: FuseRole) {
+  return roleHome[role];
 }
 
 export default function RestaurantAdminGate({
@@ -47,47 +37,48 @@ export default function RestaurantAdminGate({
   }, [searchParams]);
 
   useEffect(() => {
-    const roleFromUrl = urlRole || roleFromEmail(urlEmail);
-    const urlTarget = targetForRole(roleFromUrl);
-
-    if (urlTarget) {
+    const parsedUrlRole = parseFuseRole(urlRole);
+    if (parsedUrlRole && parsedUrlRole !== "restaurant") {
       setState("redirecting");
-      router.replace(urlTarget);
+      router.replace(targetForRole(parsedUrlRole));
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
-      const email = normalize(user?.email);
-      const role = roleFromEmail(email);
+    const timeout = window.setTimeout(() => {
+      setState("redirecting");
+      router.replace("/login?next=/restaurant-admin");
+    }, LOAD_TIMEOUT_MS);
 
-      if (!email) {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+      window.clearTimeout(timeout);
+
+      if (!user) {
         setState("redirecting");
         router.replace("/login?next=/restaurant-admin");
         return;
       }
 
-      if (role === "driver" || role === "customer") {
+      try {
+        const session = await resolveFuseSession(user);
+        saveFuseSession(session);
+
+        if (session.role === "restaurant") {
+          setState("allowed");
+          return;
+        }
+
         setState("redirecting");
-        router.replace(targetForRole(role));
-        return;
-      }
-
-      if (role === "admin") {
+        router.replace(targetForRole(session.role));
+      } catch {
         setState("redirecting");
-        router.replace("/fuse-admin");
-        return;
+        router.replace("/login?next=/restaurant-admin");
       }
-
-      if (role === "restaurant") {
-        setState("allowed");
-        return;
-      }
-
-      setState("redirecting");
-      router.replace("/login?next=/restaurant-admin");
     });
 
-    return () => unsubscribe();
+    return () => {
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
   }, [router, urlRole, urlEmail]);
 
   if (state !== "allowed") {

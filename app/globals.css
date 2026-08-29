@@ -1,16 +1,18 @@
 :root {
-  --fuse-orange: #ff5a00;
-  --fuse-orange-2: #ff7a00;
+  --fuse-orange: #ff6a0a;
+  --fuse-orange-2: #ff8a24;
   --fuse-orange-3: #ff3d00;
   --fuse-blue: #123fbd;
   --fuse-blue-2: #082d8f;
   --fuse-blue-3: #071f67;
-  --fuse-black: #0b1220;
-  --fuse-black-2: #07101d;
-  --fuse-cream: #fffaf1;
-  --fuse-cream-2: #f4e5cf;
-  --fuse-sky: #55b9ff;
+  --fuse-black: #15171a;
+  --fuse-black-2: #0b1220;
+  --fuse-cream: #fdf6ec;
+  --fuse-cream-2: #f4efe6;
+  --fuse-sky: #54b9ff;
   --fuse-coral: #ff5964;
+  --fuse-green: #1f7a4f;
+  --fuse-green-2: #2f915f;
   --fuse-title-font: "Noto Kufi Arabic Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --fuse-body-font: "Tajawal", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --fuse-surface: rgba(255,255,255,.78);

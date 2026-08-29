@@ -640,45 +640,43 @@ export default function HomePage() {
         :global(body) {
           margin: 0;
           padding: 0;
-          background: #fff7ee;
+          background: #f4efe6;
         }
 
         .page {
           min-height: 100vh;
-          background:
-            radial-gradient(circle at 20% 0%, rgba(255, 90, 0, 0.14), transparent 28%),
-            linear-gradient(180deg, #fffaf4 0%, #fff1e3 100%);
-          display: grid;
-          place-items: start center;
-          padding: 26px;
+          background: transparent;
+          display: block;
+          padding: calc(12px + env(safe-area-inset-top)) 14px calc(104px + env(safe-area-inset-bottom));
           font-family: var(--fuse-body-font);
         }
 
         .phone {
           width: min(100%, 430px);
-          min-height: calc(100vh - 52px);
+          min-height: 0;
           position: relative;
-          border-radius: 42px;
-          overflow: hidden;
-          padding: 18px 16px 96px;
-          background:
-            radial-gradient(circle at 90% 0%, rgba(255, 90, 0, 0.07), transparent 25%),
-            #fffaf4;
-          color: #0b1220;
-          box-shadow:
-            0 42px 100px rgba(11, 18, 32, 0.16),
-            inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+          margin: 0 auto;
+          border-radius: 0;
+          overflow: visible;
+          padding: 0;
+          background: transparent;
+          color: var(--ref-ink, #15171a);
+          box-shadow: none;
         }
 
         .topbar {
           display: grid;
-          grid-template-columns: 54px 1fr auto;
+          grid-template-columns: 48px 1fr auto;
           align-items: center;
-          gap: 12px;
-          margin: -18px -16px 0;
-          padding: 20px 16px 12px;
-          background: linear-gradient(135deg, #171717, #2c2926);
-          color: #fff;
+          gap: 10px;
+          margin: 0 0 14px;
+          padding: 8px 10px;
+          border-radius: 28px;
+          background: rgba(255, 252, 247, 0.82);
+          border: 1px solid rgba(255, 255, 255, 0.95);
+          box-shadow: 0 10px 28px rgba(21, 23, 26, 0.08);
+          backdrop-filter: blur(22px) saturate(145%);
+          color: #15171a;
         }
 
         .menu-btn,
@@ -696,15 +694,15 @@ export default function HomePage() {
         }
 
         .menu-btn {
-          background: #ff6500;
+          background: linear-gradient(135deg, #1f7a4f, #2f915f);
           color: #fff;
-          box-shadow: 0 12px 28px rgba(255, 90, 0, 0.25);
+          box-shadow: 0 10px 24px rgba(31, 122, 79, 0.22);
         }
 
         .location {
           border: 0;
           background: transparent;
-          color: #fff;
+          color: #6f7175;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -715,7 +713,7 @@ export default function HomePage() {
         }
 
         .location svg {
-          color: #ff5a00;
+          color: #1f7a4f;
           flex: 0 0 auto;
         }
 
@@ -734,9 +732,10 @@ export default function HomePage() {
         .icon-btn {
           width: 44px;
           height: 44px;
-          border-radius: 999px;
-          color: #fff;
-          background: rgba(255, 255, 255, 0.14);
+          border-radius: 16px;
+          color: #15171a;
+          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(21, 23, 26, 0.08);
           box-shadow: none;
         }
 
@@ -744,7 +743,7 @@ export default function HomePage() {
           width: 48px;
           height: 48px;
           border-radius: 999px;
-          background: #ff6500;
+          background: linear-gradient(135deg, #1f7a4f, #2f915f);
           color: #fff;
           overflow: hidden;
         }
@@ -790,23 +789,25 @@ export default function HomePage() {
 
         .search-row {
           display: grid;
-          grid-template-columns: 1fr 48px;
-          gap: 11px;
-          margin: 0 -16px 14px;
-          padding: 0 16px 15px;
-          background: linear-gradient(135deg, #171717, #2c2926);
+          grid-template-columns: 1fr 52px;
+          gap: 10px;
+          margin: 0 0 14px;
+          padding: 0;
+          background: transparent;
         }
 
         .search-box {
           height: 52px;
-          border-radius: 17px;
-          background: #fffdf9;
+          border-radius: 22px;
+          background: rgba(255, 252, 247, 0.82);
+          border: 1px solid rgba(21, 23, 26, 0.08);
           display: flex;
           align-items: center;
           gap: 12px;
           padding: 0 15px;
           color: #8d847b;
-          box-shadow: 0 18px 36px rgba(11, 18, 32, 0.08);
+          box-shadow: 0 10px 28px rgba(21, 23, 26, 0.06);
+          backdrop-filter: blur(18px);
         }
 
         .search-box input {
@@ -824,9 +825,10 @@ export default function HomePage() {
         }
 
         .filter-btn {
-          background: linear-gradient(135deg, #ff7a00, #ff3d00);
-          color: #fff7ee;
-          box-shadow: 0 18px 36px rgba(255, 90, 0, 0.24);
+          background: linear-gradient(135deg, #1f7a4f, #2f915f);
+          color: #fff;
+          border-radius: 18px;
+          box-shadow: 0 12px 28px rgba(31, 122, 79, 0.22);
         }
 
         .categories {
@@ -866,9 +868,9 @@ export default function HomePage() {
         }
 
         .categories button.active span {
-          color: #fff7ee;
-          background: linear-gradient(135deg, #ff7a00, #ff3d00);
-          box-shadow: 0 16px 30px rgba(255, 90, 0, 0.22);
+          color: #fff;
+          background: linear-gradient(135deg, #1f7a4f, #2f915f);
+          box-shadow: 0 12px 24px rgba(31, 122, 79, 0.2);
         }
 
         .categories b {
@@ -880,14 +882,14 @@ export default function HomePage() {
           position: relative;
           overflow: hidden;
           min-height: 184px;
-          border-radius: 25px;
+          border-radius: 28px;
           background:
-            radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.18), transparent 36%),
-            linear-gradient(135deg, #171717 0%, #26211d 62%, #3a2a20 100%);
+            radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.16), transparent 36%),
+            linear-gradient(135deg, #1a2235 0%, #263759 100%);
           display: grid;
           grid-template-columns: 1fr 46%;
           margin-bottom: 13px;
-          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18);
+          box-shadow: 0 16px 42px rgba(26, 34, 53, 0.18);
         }
 
         .hero::after {
@@ -938,8 +940,8 @@ export default function HomePage() {
           display: inline-grid;
           place-items: center;
           padding: 0 17px;
-          background: #0b1220;
-          color: #fff7ee;
+          background: linear-gradient(135deg, #1f7a4f, #2f915f);
+          color: #fff;
           font-size: 14px;
           font-weight: 700;
           text-decoration: none;
@@ -1028,7 +1030,7 @@ export default function HomePage() {
         .section-head small {
           display: block;
           margin-bottom: 4px;
-          color: #ff5a00;
+          color: #1f7a4f;
           font-size: 11px;
           font-weight: 700;
         }
@@ -1045,7 +1047,7 @@ export default function HomePage() {
         .section-head button {
           border: 0;
           background: transparent;
-          color: #ff5a00;
+          color: #1f7a4f;
           font-size: 13px;
           font-weight: 700;
         }
