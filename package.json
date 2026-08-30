@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:catalog": "node scripts/check-firestore-catalog.mjs",
+    "seed:catalog": "node scripts/seed-fuse-catalog.mjs",
+    "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {
     "@capacitor/android": "8.4.2",
@@ -32,6 +35,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "firebase-admin": "^13.4.0",
+    "firebase-tools": "^14.9.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

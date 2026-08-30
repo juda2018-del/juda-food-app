@@ -17,7 +17,7 @@ const restaurants = [
   {
     name: "شلتتة",
     desc: "مشلتت، فطائر، بيتزا وقلبض رول",
-    href: "/ahram",
+    href: "/restaurants/shalteta/",
     image: "/images/ahram.jpg",
     rating: 4.7,
     time: "30-40 د",
