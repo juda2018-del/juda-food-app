@@ -215,6 +215,103 @@
   opacity: 0.55;
 }
 
+.fuse-auth-page .fuse-auth-eyebrow {
+  margin: 8px 0 0;
+  color: var(--ref-green, #1f7a4f);
+  font-weight: 900;
+  font-size: 11px;
+}
+
+.fuse-auth-page .fuse-auth-sub {
+  margin: 0;
+  color: var(--ref-muted, #6f7175);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+.fuse-auth-page .fuse-auth-form label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 900;
+  font-size: 12px;
+  color: var(--ref-muted, #6f7175);
+}
+
+.fuse-auth-page .fuse-auth-message {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: var(--fuse-radius-btn);
+  background: rgba(31, 122, 79, 0.08);
+  color: #7b5700;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.fuse-auth-page .fuse-auth-secondary {
+  width: 100%;
+  min-height: var(--fuse-touch);
+  border: 1px solid rgba(21, 23, 26, 0.08);
+  border-radius: var(--fuse-radius-btn);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ref-ink, #15171a);
+  font-family: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.fuse-auth-page .fuse-auth-secondary:disabled {
+  opacity: 0.55;
+}
+
+.fuse-auth-page .fuse-auth-panel {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: var(--fuse-radius-shell);
+  background: rgba(255, 252, 247, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: var(--ref-shadow-soft);
+  display: grid;
+  gap: 10px;
+}
+
+.fuse-auth-page .fuse-auth-panel-label {
+  color: var(--ref-muted, #6f7175);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.fuse-auth-page .fuse-auth-panel b {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.fuse-auth-page .fuse-auth-panel strong {
+  color: var(--ref-green, #1f7a4f);
+  font-size: 14px;
+}
+
+.fuse-auth-page .fuse-auth-back,
+.fuse-auth-page .fuse-auth-link-row {
+  display: block;
+  margin-top: 12px;
+  min-height: var(--fuse-touch);
+  border-radius: var(--fuse-radius-shell);
+  border: 1px solid rgba(21, 23, 26, 0.08);
+  background: rgba(255, 252, 247, 0.86);
+  text-align: center;
+  line-height: var(--fuse-touch);
+  text-decoration: none;
+  color: var(--ref-ink, #15171a);
+  font-weight: 900;
+}
+
+.fuse-auth-page .fuse-auth-link-row {
+  color: var(--ref-orange, #ff6a0a);
+}
+
 /* Desktop canvas */
 @media (min-width: 900px) {
   body {

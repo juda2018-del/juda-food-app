@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   onAuthStateChanged,
@@ -148,84 +149,76 @@ export default function LoginClient() {
   }
 
   return (
-    <main dir="rtl" className="page">
-      <section className="card">
-        <div className="brand">FUSE Iraq</div>
-        <p className="eyebrow">تسجيل دخول آمن</p>
-        <h1>دخول حسابك</h1>
-        <p className="sub">
-          الصلاحية تُقرأ من Firebase، وليس من البريد أو بيانات المتصفح وحدها.
-        </p>
+    <main dir="rtl" className="fuse-auth-page">
+      <section className="fuse-auth-card">
+        <div className="fuse-auth-head text-center">
+          <img
+            src="/images/fuse-logo.png"
+            alt="FUSE"
+            className="fuse-auth-logo mx-auto"
+          />
+          <p className="fuse-auth-eyebrow">تسجيل دخول آمن</p>
+          <h1>دخول حسابك</h1>
+          <p className="fuse-auth-sub">
+            الصلاحية تُقرأ من Firebase، وليس من البريد أو بيانات المتصفح وحدها.
+          </p>
+        </div>
 
         {currentSession ? (
-          <section className="current">
-            <span>الحساب الحالي</span>
+          <section className="fuse-auth-panel">
+            <span className="fuse-auth-panel-label">الحساب الحالي</span>
             <b dir="ltr">{currentSession.email}</b>
             <strong>{roleTitle[currentSession.role]}</strong>
-            <button type="button" onClick={openDashboard} disabled={busy}>
+            <button type="button" className="fuse-auth-submit" onClick={openDashboard} disabled={busy}>
               فتح لوحة الحساب
             </button>
-            <button type="button" className="secondary" onClick={handleLogout} disabled={busy}>
+            <button type="button" className="fuse-auth-secondary" onClick={handleLogout} disabled={busy}>
               تسجيل الخروج
             </button>
           </section>
         ) : (
-          <form onSubmit={handleLogin}>
-            <label>
-              البريد الإلكتروني
-              <input
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-                dir="ltr"
-                placeholder="name@example.com"
-              />
-            </label>
-            <label>
-              كلمة المرور
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                dir="ltr"
-              />
-            </label>
-            <button type="submit" disabled={busy}>
+          <form className="fuse-auth-form" onSubmit={handleLogin}>
+            <label htmlFor="login-email">البريد الإلكتروني</label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              dir="ltr"
+              placeholder="name@example.com"
+            />
+
+            <label htmlFor="login-password">كلمة المرور</label>
+            <input
+              id="login-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              dir="ltr"
+              placeholder="اكتب كلمة المرور"
+            />
+
+            <button type="submit" className="fuse-auth-submit" disabled={busy}>
               {busy ? "جاري التحقق..." : "تسجيل الدخول"}
             </button>
           </form>
         )}
 
-        <div className="message">{message}</div>
-        <button type="button" className="home" onClick={() => router.push("/")}>
-          الرجوع للرئيسية
-        </button>
+        {message ? <p className="fuse-auth-message">{message}</p> : null}
+
+        <Link href="/signup" className="fuse-auth-link-row">
+          مستخدم جديد؟ إنشاء حساب زبون
+        </Link>
+        <Link href="/" className="fuse-auth-back">
+          رجوع للرئيسية
+        </Link>
       </section>
 
       <style jsx>{`
-        :global(*){box-sizing:border-box}
-        :global(body){margin:0;background:#050505}
-        .page{min-height:100dvh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at top right,rgba(255,122,0,.2),transparent 38%),#050505;color:#fff;font-family:var(--fuse-body-font)}
-        .card{width:min(100%,520px);border:1px solid rgba(255,255,255,.12);border-radius:32px;padding:28px;background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,122,0,.08));box-shadow:0 28px 80px rgba(0,0,0,.5)}
-        .brand{display:inline-flex;border-radius:999px;padding:10px 16px;background:#ff7a00;color:#111;font-weight:950}
-        .eyebrow{margin:24px 0 0;color:#ff9f43;font-weight:900}
-        h1{margin:6px 0 8px;font-size:clamp(38px,8vw,64px);line-height:1.08}
-        .sub{margin:0 0 22px;color:rgba(255,255,255,.68);line-height:1.8}
-        form,label,.current{display:grid;gap:10px}
-        label{font-weight:900;font-size:14px}
-        input{width:100%;border:1px solid rgba(255,255,255,.14);border-radius:17px;padding:15px;background:#090909;color:#fff;font:inherit;outline:none}
-        input:focus{border-color:#ff7a00;box-shadow:0 0 0 3px rgba(255,122,0,.15)}
-        button{border:0;border-radius:17px;padding:15px;background:#ff7a00;color:#111;font:inherit;font-weight:950;cursor:pointer}
-        button:disabled{opacity:.55;cursor:not-allowed}
-        .secondary,.home{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12)}
-        .current{padding:18px;border-radius:22px;background:rgba(0,0,0,.32)}
-        .current span{color:rgba(255,255,255,.58)}
-        .current b{font-size:20px;overflow-wrap:anywhere}
-        .current strong{color:#ff9f43}
-        .message{margin-top:16px;border-radius:16px;padding:13px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.75);font-weight:800}
-        .home{width:100%;margin-top:10px}
+        .text-center { text-align: center; }
+        .mx-auto { margin-inline: auto; display: block; }
       `}</style>
     </main>
   );
