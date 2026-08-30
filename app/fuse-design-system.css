@@ -237,6 +237,43 @@
   }
 }
 
+.fuse-state-card,
+.dynamic-restaurant-page .state-card,
+.restaurants-page .loading,
+.restaurants-page .empty,
+.restaurants-page .warning {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border-radius: var(--fuse-radius-card, 22px);
+  background: rgba(255, 252, 247, 0.88);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.7;
+  border: 1px solid rgba(21, 23, 26, 0.06);
+  text-align: center;
+}
+
+.restaurants-page .warning,
+.dynamic-restaurant-page .state-card {
+  color: #7b5700;
+}
+
+.restaurants-page .loading,
+.restaurants-page .empty {
+  color: #6f7175;
+}
+
+.dynamic-restaurant-page .add-btn {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.dynamic-restaurant-page .rating-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .profile-shell .notice-pin {
   display: inline-flex !important;
   align-items: center !important;

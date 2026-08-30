@@ -1,5 +1,5 @@
-import RestaurantMenuClient from "../RestaurantMenuClient";
+import DynamicRestaurantClient from "../[restaurantId]/DynamicRestaurantClient";
 
 export default function Page() {
-  return <RestaurantMenuClient restaurant="الفرن" restaurantId="alforn" />;
+  return <DynamicRestaurantClient restaurantId="alforn" />;
 }
