@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import FuseIcon from "@/components/FuseIcon";
 
 const restaurants = [
   {
@@ -329,14 +330,16 @@ export default function ExplorePage() {
         }
 
         .nav .active {
-          color: #ff4d00;
+          color: var(--ref-green);
           font-weight: 900;
         }
       `}</style>
 
       <main className="app">
-        <header className="top">
-          <Link className="back" href="/">‹</Link>
+        <header className="top customer-header">
+          <Link className="back fuse-back-btn" href="/" aria-label="الرئيسية">
+            <FuseIcon name="chevron-back" />
+          </Link>
 
           <div className="title">
             <h1>استكشف</h1>
@@ -382,7 +385,7 @@ export default function ExplorePage() {
                 <div className="image">
                   <img src={item.image} alt={item.name} />
                   <div className="badge">{item.category}</div>
-                  <div className="heart">♡</div>
+                  <div className="heart"><FuseIcon name="heart" size="sm" /></div>
                 </div>
 
                 <div className="info">

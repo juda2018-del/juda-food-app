@@ -36,7 +36,9 @@ export type FuseIconName =
   | "info"
   | "help"
   | "gift"
-  | "map-pin";
+  | "map-pin"
+  | "check"
+  | "mail";
 
 export type FuseIconSize = "sm" | "md" | "lg";
 
@@ -327,6 +329,19 @@ export default function FuseIcon({ name, size = "md", className }: FuseIconProps
           <path d="M12 8v13" />
           <path d="M3 12h18" />
           <path d="M12 8c-2-3-5-3-5 0s3 0 5 0 5-3 5 0-3 0-5 0" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...p}>
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+      );
+    case "mail":
+      return (
+        <svg {...p}>
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <path d="M3 7l9 6 9-6" />
         </svg>
       );
     default:

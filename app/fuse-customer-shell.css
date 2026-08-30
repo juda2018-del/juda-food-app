@@ -24,6 +24,7 @@ body {
 .page.restaurants-page,
 .page.restaurant-detail-page,
 main.page,
+main.page.fuse-satellite,
 .profile-shell,
 main.app {
   padding-top: var(--fuse-page-top) !important;
@@ -45,6 +46,7 @@ main.app {
 .page.restaurants-page,
 .page.restaurant-detail-page,
 main.page,
+main.page.fuse-satellite,
 .profile-shell,
 main.app {
   width: min(100%, 430px) !important;

@@ -988,7 +988,7 @@ export default function HomePage() {
         }
 
         .benefits svg {
-          color: #ff5a00;
+          color: var(--ref-green);
           width: 23px;
           height: 23px;
         }
@@ -1113,7 +1113,7 @@ export default function HomePage() {
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          color: #ff5a00;
+          color: var(--ref-green);
           font-size: 12px;
           font-weight: 700;
           margin-bottom: 6px;
@@ -1227,7 +1227,7 @@ export default function HomePage() {
         }
 
         .product strong {
-          color: #ff5a00;
+          color: var(--ref-green);
           font-size: 12px;
           font-weight: 700;
         }
@@ -1239,7 +1239,7 @@ export default function HomePage() {
           border-radius: 999px;
           display: grid;
           place-items: center;
-          background: #ff5a00;
+          background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2));
           color: #fff7ee;
           font-size: 21px;
           font-weight: 900;

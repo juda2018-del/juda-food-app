@@ -261,14 +261,16 @@ body {
   color: var(--ref-green) !important;
 }
 
-/* Cart, favorites, orders */
+/* Cart, favorites, orders, profile satellites */
 main.app,
+main.page.fuse-satellite,
 .page > .phone {
   background: transparent !important;
   color: var(--ref-ink) !important;
 }
 
 main.app .top,
+main.page.fuse-satellite .top,
 .page > .phone > .top {
   background: var(--ref-glass-strong) !important;
   border: 1px solid rgba(255, 255, 255, 0.95) !important;
@@ -279,6 +281,7 @@ main.app .top,
 }
 
 main.app .back,
+main.page.fuse-satellite .back,
 .page > .phone > .top .back {
   width: 46px !important;
   height: 46px !important;
@@ -294,6 +297,7 @@ main.app .back,
 }
 
 main.app .support,
+main.page.fuse-satellite .support,
 .page > .phone > .top .support {
   border-radius: var(--ref-radius-md) !important;
   background: var(--ref-green-soft) !important;
@@ -308,6 +312,13 @@ main.app .summary,
 main.app .form,
 main.app .notice,
 main.app .hero,
+main.app .form-card,
+main.app .feature-list,
+main.app .warn-banner,
+main.app .support-tile,
+main.page.fuse-satellite .card,
+main.page.fuse-satellite .note,
+main.page.fuse-satellite .links,
 .page > .phone .hero,
 .page > .phone .picker,
 .page > .phone .orderCard,
@@ -320,6 +331,7 @@ main.app .hero,
   backdrop-filter: var(--ref-blur) !important;
 }
 
+main.app .hero,
 .page > .phone .hero {
   background:
     radial-gradient(circle at 18% 40%, rgba(255, 255, 255, 0.14), transparent 38%),

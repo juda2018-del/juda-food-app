@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import FuseIcon from "@/components/FuseIcon";
 import { auth, db } from "../firebase";
 import { parseFuseRole, roleHome } from "@/lib/fuse-auth";
 
@@ -134,9 +135,11 @@ export default function JoinApplicationForm({ kind }: Props) {
   }
 
   return (
-    <main dir="rtl" className="page">
-      <section className="card">
-        <Link href="/profile" className="back">‹ الرجوع للحساب</Link>
+    <main dir="rtl" className="app">
+      <section className="form-card" style={{ maxWidth: 560, margin: "0 auto" }}>
+        <Link href="/profile" className="back fuse-back-btn" aria-label="الرجوع للحساب" style={{ marginBottom: 12, display: "inline-grid" }}>
+          <FuseIcon name="chevron-back" />
+        </Link>
         <p className="eyebrow">{config.eyebrow}</p>
         <h1>{config.title}</h1>
         <p className="sub">{config.description}</p>
@@ -170,7 +173,21 @@ export default function JoinApplicationForm({ kind }: Props) {
       </section>
 
       <style jsx>{`
-        :global(*){box-sizing:border-box}:global(body){margin:0;background:#efe8df;font-family:Cairo,Arial,sans-serif}.page{min-height:100dvh;display:grid;place-items:center;padding:20px;background:linear-gradient(180deg,#fff7ef,#fff)}.card{width:min(100%,560px);background:#fff;border-radius:30px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.1)}.back{display:inline-flex;color:#e65300;text-decoration:none;font-weight:900}.eyebrow{margin:24px 0 4px;color:#ff5a00;font-weight:900}.card h1{margin:0;font-size:36px}.sub{color:#777;line-height:1.8;margin:8px 0 20px}.notice,.success,.error,.application-status{padding:13px;border-radius:16px;margin:12px 0;font-weight:800}.notice{background:#fff5e8;color:#8a4b00}.success{background:#eafaf0;color:#08783d}.error{background:#fff0f1;color:#b4232c}.application-status{display:grid;gap:6px;background:#fff5e8;color:#8a4b00}.application-status span{font-size:12px;line-height:1.7}.application-status.approved{background:#eafaf0;color:#08783d}.application-status.rejected{background:#fff0f1;color:#b4232c}form,label{display:grid;gap:8px}form{gap:14px}label{font-size:13px;font-weight:900}input,textarea,select{width:100%;border:1px solid #e7ddd4;border-radius:16px;padding:14px;background:#fff;color:#171717;font:inherit;outline:none}input:focus,textarea:focus,select:focus{border-color:#ff6a00;box-shadow:0 0 0 3px rgba(255,106,0,.12)}textarea{resize:vertical}button{border:0;border-radius:17px;padding:15px;background:#ff5a00;color:#fff;font:inherit;font-weight:950;cursor:pointer}button:disabled{opacity:.55;cursor:not-allowed}
+        .eyebrow{margin:12px 0 4px;color:var(--ref-green);font-weight:900}
+        h1{margin:0;font-size:28px;font-family:var(--fuse-title-font)}
+        .sub{color:var(--ref-muted);line-height:1.8;margin:8px 0 20px;font-weight:700}
+        .notice,.success,.error,.application-status{padding:13px;border-radius:16px;margin:12px 0;font-weight:800}
+        .notice{background:rgba(255,252,247,.88);color:#7b5700}
+        .success{background:#edfff2;color:#08783d}
+        .error{background:#fff0f1;color:#b4232c}
+        .application-status{display:grid;gap:6px;background:rgba(255,252,247,.88);color:#7b5700}
+        .application-status span{font-size:12px;line-height:1.7}
+        .application-status.approved{background:#edfff2;color:#08783d}
+        .application-status.rejected{background:#fff0f1;color:#b4232c}
+        form{display:grid;gap:14px}
+        label{display:grid;gap:8px;font-size:13px;font-weight:900}
+        button{border:0;border-radius:17px;padding:15px;background:linear-gradient(135deg,var(--ref-green),var(--ref-green-2));color:#fff;font:inherit;font-weight:950;cursor:pointer}
+        button:disabled{opacity:.55;cursor:not-allowed}
       `}</style>
     </main>
   );

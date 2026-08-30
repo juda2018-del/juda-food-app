@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import FuseIcon from "@/components/FuseIcon";
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
 
@@ -125,32 +126,44 @@ export default function NotificationCenterPage() {
 
   if (session && !staffMode) {
     return (
-      <main dir="rtl" className="page customer-page">
-        <header className="topbar">
-          <Link href="/" className="back">‹</Link>
-          <div><h1>التحديثات</h1><p>تابع طلباتك من مكان واحد</p></div>
-          <Link href="/profile" className="profile">حسابي</Link>
+      <main dir="rtl" className="app">
+        <header className="top customer-header">
+          <Link href="/" className="back fuse-back-btn" aria-label="الرئيسية">
+            <FuseIcon name="chevron-back" />
+          </Link>
+          <div className="title">
+            <h1>التحديثات</h1>
+            <p>تابع طلباتك من مكان واحد</p>
+          </div>
+          <Link href="/profile" className="support" aria-label="حسابي">حسابي</Link>
         </header>
 
-        <section className="hero customer-hero">
-          <span>FUSE</span>
-          <h2>وين وصل طلبك؟</h2>
+        <section className="hero">
+          <span style={{ display: "inline-flex", padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.15)", fontWeight: 900 }}>FUSE</span>
+          <h2 style={{ fontSize: 28, margin: "16px 0 8px" }}>وين وصل طلبك؟</h2>
           <p>ادخل رقم الطلب الكامل أو رقم الهاتف داخل صفحة طلباتي وشوف آخر حالة مباشرة.</p>
-          <Link href="/order-status" className="primary">فتح طلباتي</Link>
+          <Link href="/order-status" className="btn-primary" style={{ display: "block", marginTop: 18, textAlign: "center" }}>فتح طلباتي</Link>
         </section>
 
-        <section className="cards">
-          <Link href="/order-status" className="card"><b>تتبع الطلب</b><small>الحالة، المطعم، المبلغ والمراحل</small></Link>
-          <Link href="/restaurants" className="card"><b>اطلب من جديد</b><small>اختار مطعماً وأضف الوجبات للسلة</small></Link>
-          <Link href="/support" className="card"><b>مشكلة بالطلب؟</b><small>تواصل مع دعم FUSE</small></Link>
+        <section className="support-grid">
+          <Link href="/order-status" className="form-card support-tile" style={{ textDecoration: "none", color: "inherit" }}>
+            <b style={{ fontSize: 18 }}>تتبع الطلب</b>
+            <small style={{ color: "var(--ref-muted)", lineHeight: 1.6, fontWeight: 700 }}>الحالة، المطعم، المبلغ والمراحل</small>
+          </Link>
+          <Link href="/restaurants" className="form-card support-tile" style={{ textDecoration: "none", color: "inherit" }}>
+            <b style={{ fontSize: 18 }}>اطلب من جديد</b>
+            <small style={{ color: "var(--ref-muted)", lineHeight: 1.6, fontWeight: 700 }}>اختار مطعماً وأضف الوجبات للسلة</small>
+          </Link>
+          <Link href="/support" className="form-card support-tile" style={{ textDecoration: "none", color: "inherit" }}>
+            <b style={{ fontSize: 18 }}>مشكلة بالطلب؟</b>
+            <small style={{ color: "var(--ref-muted)", lineHeight: 1.6, fontWeight: 700 }}>تواصل مع دعم FUSE</small>
+          </Link>
         </section>
 
-        <section className="empty-note">
-          <b>ما نعرض إشعارات وهمية</b>
-          <p>أي تحديث حقيقي للطلب يظهر داخل صفحة طلباتي حسب البيانات المحفوظة في النظام.</p>
+        <section className="notice form-card" style={{ textAlign: "center" }}>
+          <b style={{ fontSize: 18 }}>ما نعرض إشعارات وهمية</b>
+          <p style={{ margin: "8px 0 0", color: "var(--ref-muted)", lineHeight: 1.7 }}>أي تحديث حقيقي للطلب يظهر داخل صفحة طلباتي حسب البيانات المحفوظة في النظام.</p>
         </section>
-
-        <style jsx>{styles}</style>
       </main>
     );
   }
@@ -166,8 +179,10 @@ export default function NotificationCenterPage() {
 
   return (
     <main dir="rtl" className="page staff-page">
-      <header className="topbar">
-        <Link href={roleHome[session.role] || "/"} className="back">‹</Link>
+      <header className="top customer-header">
+        <Link href={roleHome[session.role] || "/"} className="back fuse-back-btn" aria-label="الرجوع">
+          <FuseIcon name="chevron-back" />
+        </Link>
         <div><h1>مركز الإشعارات</h1><p>طلبات وتنبيهات النظام</p></div>
         <span className="count">{visibleItems.filter((item) => !item.read).length}</span>
       </header>
