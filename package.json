@@ -9,6 +9,7 @@
     "lint": "eslint",
     "check:catalog": "node scripts/check-firestore-catalog.mjs",
     "seed:catalog": "node scripts/seed-fuse-catalog.mjs",
+    "provision:e2e-customer": "node scripts/provision-e2e-customer.mjs",
     "firebase:deploy": "firebase deploy --only firestore:rules,firestore:indexes"
   },
   "dependencies": {

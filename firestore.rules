@@ -6,10 +6,22 @@ service cloud.firestore {
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function role() {
       return !signedIn() ? ''
-        : request.auth.token.role is string ? request.auth.token.role
-        : request.auth.token.fuseRole is string ? request.auth.token.fuseRole
-        : hasProfile() && profile().role is string ? profile().role
-        : hasProfile() && profile().fuseRole is string ? profile().fuseRole
+        : request.auth.token.role == 'admin' ? 'admin'
+        : request.auth.token.role == 'restaurant' ? 'restaurant'
+        : request.auth.token.role == 'driver' ? 'driver'
+        : request.auth.token.role == 'customer' ? 'customer'
+        : request.auth.token.fuseRole == 'admin' ? 'admin'
+        : request.auth.token.fuseRole == 'restaurant' ? 'restaurant'
+        : request.auth.token.fuseRole == 'driver' ? 'driver'
+        : request.auth.token.fuseRole == 'customer' ? 'customer'
+        : hasProfile() && profile().role == 'admin' ? 'admin'
+        : hasProfile() && profile().role == 'restaurant' ? 'restaurant'
+        : hasProfile() && profile().role == 'driver' ? 'driver'
+        : hasProfile() && profile().role == 'customer' ? 'customer'
+        : hasProfile() && profile().fuseRole == 'admin' ? 'admin'
+        : hasProfile() && profile().fuseRole == 'restaurant' ? 'restaurant'
+        : hasProfile() && profile().fuseRole == 'driver' ? 'driver'
+        : hasProfile() && profile().fuseRole == 'customer' ? 'customer'
         : '';
     }
     function isAdmin() { return role() == 'admin'; }
@@ -19,7 +31,7 @@ service cloud.firestore {
     function restaurantId() {
       return !signedIn() ? ''
         : request.auth.token.restaurantId is string ? request.auth.token.restaurantId
-        : hasProfile() && profile().restaurantId is string ? profile().restaurantId
+        : hasProfile() && profile().keys().hasAny(['restaurantId']) ? profile().restaurantId
         : '';
     }
     function customerOwns(data) { return signedIn() && data.customerUid == request.auth.uid; }

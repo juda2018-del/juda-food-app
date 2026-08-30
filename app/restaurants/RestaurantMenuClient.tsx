@@ -89,6 +89,7 @@ export default function RestaurantMenuClient({
   const [cart, setCart] = useState<FuseCartItem[]>([]);
   const [notice, setNotice] = useState("");
   const [connectionWarning, setConnectionWarning] = useState(false);
+  const [menuLoaded, setMenuLoaded] = useState(false);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setConnectionWarning(true), 3500);
@@ -97,6 +98,7 @@ export default function RestaurantMenuClient({
       (snapshot) => {
         window.clearTimeout(timeout);
         setConnectionWarning(false);
+        setMenuLoaded(true);
         setMenu(
           snapshot.docs.map((doc) => ({
             ...(doc.data() as Omit<MenuDoc, "documentId">),
@@ -107,6 +109,7 @@ export default function RestaurantMenuClient({
       () => {
         window.clearTimeout(timeout);
         setConnectionWarning(true);
+        setMenuLoaded(true);
         setMenu([]);
       }
     );
@@ -170,8 +173,9 @@ export default function RestaurantMenuClient({
     );
     if (remote.length) return remote;
     if (menuLive) return remote;
+    if (!menuLoaded) return [];
     return fallbackMenu.filter((item) => sameRestaurant(item, restaurant, restaurantId));
-  }, [menu, menuLive, restaurant, restaurantId]);
+  }, [menu, menuLive, menuLoaded, restaurant, restaurantId]);
 
   const categories = useMemo(
     () => ["الكل", ...Array.from(new Set(source.map((item) => item.category || "عام")))],
@@ -254,8 +258,9 @@ export default function RestaurantMenuClient({
         </section>
       ) : null}
 
+      {!menuLoaded ? <p className="warning">جاري تحميل المنيو من Firebase…</p> : null}
       {connectionWarning ? <p className="warning">تعذر تحديث المنيو الآن. الطلب يتطلب منيوً متصلاً بـ Firebase.</p> : null}
-      {!menuLive && !connectionWarning ? <p className="warning">المنيو قيد التجهيز. الإضافة للسلة متاحة بعد ربط المنيو في Firebase.</p> : null}
+      {menuLoaded && !menuLive && !connectionWarning ? <p className="warning">المنيو قيد التجهيز. الإضافة للسلة متاحة بعد ربط المنيو في Firebase.</p> : null}
 
       <section className="hero">
         <div>
