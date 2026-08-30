@@ -15,7 +15,7 @@ export default function LoginPage() {
             placeItems: "center",
             background: "#050505",
             color: "#fff",
-            fontFamily: "Cairo, system-ui, sans-serif"
+            fontFamily: 'var(--fuse-body-font), system-ui, sans-serif'
           }}>
             جاري تحميل دخول فيوز...
           </main>
@@ -36,7 +36,7 @@ export default function LoginPage() {
           background: "#fff",
           color: "#111",
           textDecoration: "none",
-          fontFamily: "Cairo, system-ui, sans-serif",
+          fontFamily: 'var(--fuse-body-font), system-ui, sans-serif',
           fontWeight: 900,
           boxShadow: "0 12px 32px rgba(0,0,0,.28)",
           whiteSpace: "nowrap"

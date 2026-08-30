@@ -1,0 +1,115 @@
+/* FUSE customer shell — single source for spacing, nav clearance, typography helpers */
+
+:root {
+  --fuse-nav-height: 72px;
+  --fuse-nav-gap: 8px;
+  --fuse-page-gutter: 14px;
+  --fuse-page-top: calc(14px + env(safe-area-inset-top, 0px));
+  --fuse-page-bottom: calc(var(--fuse-nav-height) + var(--fuse-nav-gap) + env(safe-area-inset-bottom, 0px) + 10px);
+  --fuse-toast-bottom: calc(var(--fuse-nav-height) + var(--fuse-nav-gap) + env(safe-area-inset-bottom, 0px) + 14px);
+  --fuse-brand-label: "FUSE Iraq";
+}
+
+html[dir="rtl"] body {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Avoid stacking body + page bottom padding */
+body {
+  padding-bottom: 0 !important;
+}
+
+.page.home-page,
+.page.restaurants-page,
+.page.restaurant-detail-page,
+main.page,
+.profile-shell,
+main.app {
+  padding-top: var(--fuse-page-top) !important;
+  padding-left: var(--fuse-page-gutter) !important;
+  padding-right: var(--fuse-page-gutter) !important;
+  padding-bottom: var(--fuse-page-bottom) !important;
+}
+
+.page.home-page > .phone,
+.page.restaurants-page > .phone,
+.page.restaurant-detail-page > .phone {
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.page.home-page,
+.page.restaurants-page,
+.page.restaurant-detail-page,
+main.page,
+.profile-shell,
+main.app {
+  width: min(100%, 430px) !important;
+  margin-inline: auto !important;
+  min-height: 100dvh !important;
+  font-family: var(--fuse-body-font) !important;
+  color: #15171a !important;
+}
+
+main.page > .phone {
+  padding: 0 !important;
+}
+
+.page.home-page h1,
+.page.home-page h2,
+.page.restaurants-page h1,
+.page.restaurants-page h2,
+.page.restaurant-detail-page h1,
+.page.restaurant-detail-page h2,
+.profile-shell h1,
+.profile-shell h2,
+main.app h1,
+main.app h2 {
+  font-family: var(--fuse-title-font) !important;
+  line-height: 1.35 !important;
+}
+
+.page.home-page p,
+.page.home-page small,
+.page.restaurants-page p,
+.page.restaurant-detail-page p,
+.profile-shell p,
+main.app p {
+  line-height: 1.65 !important;
+}
+
+.fuse-customer-nav {
+  height: var(--fuse-nav-height) !important;
+  bottom: max(var(--fuse-nav-gap), env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.reels-page .feed {
+  height: calc(100dvh - var(--fuse-nav-height) - var(--fuse-nav-gap) - env(safe-area-inset-bottom, 0px)) !important;
+}
+
+.home-page .toast,
+.reels-page .toast,
+.dynamic-restaurant-page .toast {
+  bottom: var(--fuse-toast-bottom) !important;
+}
+
+@media (min-width: 521px) {
+  body {
+    padding-bottom: 24px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  :root {
+    --fuse-page-gutter: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  :root {
+    --fuse-page-gutter: 12px;
+  }
+}

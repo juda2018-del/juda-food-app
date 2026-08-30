@@ -15,19 +15,13 @@ body {
 img, video, svg { max-width: 100%; }
 
 @media (max-width: 768px) {
-  body { padding-bottom: calc(88px + var(--fuse-safe-bottom)); }
-
   .page,
   .phone,
-  .profile-shell {
+  .profile-shell,
+  main.app {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: clip !important;
-  }
-
-  .phone,
-  .profile-shell {
-    padding-bottom: calc(104px + var(--fuse-safe-bottom)) !important;
   }
 
   .home-page .topbar,

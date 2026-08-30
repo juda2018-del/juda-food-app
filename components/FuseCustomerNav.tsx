@@ -15,6 +15,7 @@ const items: Array<{ href: string; label: string; icon: IconName }> = [
 
 const hiddenPrefixes = [
   "/login",
+  "/signup",
   "/auth",
   "/privacy",
   "/restaurant-admin",

@@ -207,7 +207,7 @@ export default function LoginClient() {
       <style jsx>{`
         :global(*){box-sizing:border-box}
         :global(body){margin:0;background:#050505}
-        .page{min-height:100dvh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at top right,rgba(255,122,0,.2),transparent 38%),#050505;color:#fff;font-family:Cairo,system-ui,sans-serif}
+        .page{min-height:100dvh;display:grid;place-items:center;padding:22px;background:radial-gradient(circle at top right,rgba(255,122,0,.2),transparent 38%),#050505;color:#fff;font-family:var(--fuse-body-font)}
         .card{width:min(100%,520px);border:1px solid rgba(255,255,255,.12);border-radius:32px;padding:28px;background:linear-gradient(145deg,rgba(255,255,255,.075),rgba(255,122,0,.08));box-shadow:0 28px 80px rgba(0,0,0,.5)}
         .brand{display:inline-flex;border-radius:999px;padding:10px 16px;background:#ff7a00;color:#111;font-weight:950}
         .eyebrow{margin:24px 0 0;color:#ff9f43;font-weight:900}

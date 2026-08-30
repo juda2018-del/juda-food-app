@@ -13,6 +13,12 @@
   --fuse-coral: #ff5964;
   --fuse-green: #1f7a4f;
   --fuse-green-2: #2f915f;
+  --fuse-nav-height: 72px;
+  --fuse-nav-gap: 8px;
+  --fuse-page-gutter: 14px;
+  --fuse-page-top: calc(14px + env(safe-area-inset-top, 0px));
+  --fuse-page-bottom: calc(var(--fuse-nav-height) + var(--fuse-nav-gap) + env(safe-area-inset-bottom, 0px) + 10px);
+  --fuse-toast-bottom: calc(var(--fuse-nav-height) + var(--fuse-nav-gap) + env(safe-area-inset-bottom, 0px) + 14px);
   --fuse-title-font: "Noto Kufi Arabic Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --fuse-body-font: "Tajawal", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --fuse-surface: rgba(255,255,255,.78);
@@ -163,136 +169,11 @@ textarea { direction: rtl; }
   overflow: visible;
 }
 
-/* FUSE customer design system: one visual language across Home / Restaurants / Profile. */
+/* FUSE customer design system: layout helpers only (visual rules live in fuse-reference-theme.css). */
 @media (max-width: 520px) {
   html,
   body { background: #f7f1e8; }
 
-  body {
-    padding-bottom: calc(92px + env(safe-area-inset-bottom));
-  }
-
-  .page.home-page,
-  .page.restaurants-page,
-  .profile-shell {
-    width: 100% !important;
-    max-width: 430px !important;
-    margin: 0 auto !important;
-    min-height: 100dvh !important;
-    background:
-      radial-gradient(circle at 100% 0, rgba(255, 154, 67, .12), transparent 28%),
-      linear-gradient(180deg, #fffaf2 0%, #f8f3eb 100%) !important;
-    color: #17191d !important;
-  }
-
-  .page.home-page,
-  .page.restaurants-page { padding: max(12px, env(safe-area-inset-top)) 14px calc(112px + env(safe-area-inset-bottom)) !important; display: block !important; }
-
-  .page.home-page > .phone,
-  .page.restaurants-page > .phone {
-    width: 100% !important;
-    min-height: calc(100dvh - env(safe-area-inset-top)) !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    padding: 0 0 calc(112px + env(safe-area-inset-bottom)) !important;
-    background: transparent !important;
-    overflow: visible !important;
-  }
-
-  .profile-shell {
-    padding: max(12px, env(safe-area-inset-top)) 14px calc(112px + env(safe-area-inset-bottom)) !important;
-  }
-
-  /* Shared page headers */
-  .home-page .topbar,
-  .restaurants-page .customer-header,
-  .profile-shell .profile-header {
-    min-height: 64px !important;
-    margin: 0 0 14px !important;
-    padding: 7px !important;
-    border: 1px solid rgba(255,255,255,.85) !important;
-    border-radius: 22px !important;
-    background: rgba(255,252,247,.72) !important;
-    color: #17191d !important;
-    box-shadow: 0 8px 26px rgba(22,24,28,.055) !important;
-    -webkit-backdrop-filter: blur(18px) !important;
-    backdrop-filter: blur(18px) !important;
-  }
-
-  .home-page .topbar { margin-top: 0 !important; }
-  .home-page .menu-btn,
-  .home-page .icon-btn,
-  .home-page .profile,
-  .restaurants-page .back,
-  .restaurants-page .cart,
-  .profile-shell .icon-btn {
-    width: 46px !important;
-    height: 46px !important;
-    border-radius: 15px !important;
-    background: rgba(255,255,255,.82) !important;
-    color: #17191d !important;
-    box-shadow: none !important;
-    border: 1px solid rgba(11,18,32,.06) !important;
-  }
-
-  .home-page .brand-location strong,
-  .restaurants-page .customer-header h1,
-  .profile-shell .brand {
-    font-family: var(--fuse-title-font) !important;
-    font-weight: 950 !important;
-  }
-
-  .restaurants-page .customer-header > div p { margin: 0 !important; color: var(--fuse-orange) !important; font-weight: 900 !important; }
-  .restaurants-page .customer-header > div h1 { margin: 1px 0 0 !important; font-size: 25px !important; }
-  .profile-shell .brand { color: #17191d !important; background: transparent !important; border: 0 !important; padding: 0 !important; font-size: 22px !important; }
-
-  /* Home */
-  .home-page .search-row { gap: 8px !important; margin: 4px 0 14px !important; }
-  .home-page .search-box { min-height: 52px !important; border-radius: 18px !important; background: rgba(255,255,255,.72) !important; border: 1px solid rgba(11,18,32,.08) !important; box-shadow: none !important; }
-  .home-page .filter-btn { width: 52px !important; height: 52px !important; border-radius: 18px !important; background: var(--fuse-orange) !important; box-shadow: none !important; }
-  .home-page .categories { gap: 8px !important; margin-bottom: 14px !important; }
-  .home-page .category { min-width: 64px !important; height: 76px !important; border-radius: 18px !important; background: rgba(255,255,255,.72) !important; border: 1px solid rgba(11,18,32,.06) !important; box-shadow: none !important; }
-  .home-page .category.active { background: var(--fuse-orange) !important; color: #fff !important; }
-  .home-page .hero { border-radius: 26px !important; margin-bottom: 14px !important; box-shadow: 0 12px 28px rgba(11,18,32,.12) !important; }
-  .home-page .benefits { border-radius: 22px !important; background: rgba(255,255,255,.72) !important; border: 1px solid rgba(11,18,32,.06) !important; box-shadow: none !important; margin-bottom: 18px !important; }
-  .home-page .section-head { margin: 0 2px 10px !important; align-items: end !important; }
-  .home-page .section-head h2 { font-size: 21px !important; line-height: 1.3 !important; margin: 3px 0 0 !important; }
-  .home-page .restaurants { gap: 9px !important; }
-  .home-page .rest-card { border-radius: 20px !important; overflow: hidden !important; background: rgba(255,255,255,.82) !important; border: 1px solid rgba(11,18,32,.07) !important; box-shadow: 0 8px 22px rgba(11,18,32,.06) !important; }
-  .home-page .rest-img-wrap { aspect-ratio: 1.15 !important; }
-  .home-page .rest-body { padding: 10px 11px 12px !important; }
-  .home-page .rest-body h3 { font-size: 15px !important; margin: 3px 0 !important; }
-  .home-page .products { gap: 10px !important; }
-  .home-page .product { border-radius: 18px !important; background: rgba(255,255,255,.82) !important; border: 1px solid rgba(11,18,32,.07) !important; box-shadow: 0 8px 22px rgba(11,18,32,.055) !important; overflow: hidden !important; }
-
-  /* Restaurants */
-  .restaurants-page .hero { margin-bottom: 12px !important; border-radius: 22px !important; padding: 17px !important; background: linear-gradient(135deg,#17191d,#292b2e) !important; box-shadow: 0 12px 28px rgba(11,18,32,.11) !important; }
-  .restaurants-page .hero h2 { font-size: 21px !important; margin: 7px 0 !important; }
-  .restaurants-page .search input { height: 52px !important; border-radius: 18px !important; background: rgba(255,255,255,.78) !important; border: 1px solid rgba(11,18,32,.07) !important; box-shadow: none !important; }
-  .restaurants-page .grid { gap: 10px !important; }
-  .restaurants-page .card { min-height: 102px !important; grid-template-columns: 82px minmax(0,1fr) !important; gap: 12px !important; padding: 9px !important; border-radius: 20px !important; background: rgba(255,255,255,.82) !important; border: 1px solid rgba(11,18,32,.07) !important; box-shadow: 0 8px 22px rgba(11,18,32,.055) !important; }
-  .restaurants-page .icon { width: 82px !important; height: 82px !important; border-radius: 17px !important; }
-  .restaurants-page .card h3 { font-size: 16px !important; }
-  .restaurants-page .card p { font-size: 11px !important; margin: 5px 0 !important; }
-
-  /* Profile */
-  .profile-shell .profile-card,
-  .profile-shell .notice,
-  .profile-shell .menu,
-  .profile-shell .danger { border-radius: 22px !important; box-shadow: 0 8px 24px rgba(11,18,32,.055) !important; border: 1px solid rgba(11,18,32,.06) !important; }
-  .profile-shell .profile-card { padding: 15px !important; background: rgba(255,255,255,.82) !important; }
-  .profile-shell .avatar { width: 58px !important; height: 58px !important; flex-basis: 58px !important; font-size: 23px !important; box-shadow: none !important; }
-  .profile-shell .user h1 { font-size: 18px !important; }
-  .profile-shell .notice { margin-top: 12px !important; padding: 15px !important; background: linear-gradient(135deg,#1a1b1f,#2b2d31) !important; }
-  .profile-shell .section-title { margin: 18px 3px 9px !important; font-size: 17px !important; }
-  .profile-shell .menu { padding: 4px !important; background: rgba(255,255,255,.82) !important; }
-  .profile-shell .item { min-height: 62px !important; padding: 8px 9px !important; }
-  .profile-shell .emoji { width: 42px !important; height: 42px !important; border-radius: 14px !important; }
-  .profile-shell .item h3 { font-size: 13px !important; }
-  .profile-shell .item p { font-size: 10px !important; }
-  .profile-shell .session-actions a { background: var(--fuse-orange) !important; }
-
-  /* Shared bottom navigation: never cover the last content block. */
   .fuse-customer-nav {
     left: 10px !important;
     right: 10px !important;
@@ -307,6 +188,4 @@ textarea { direction: rtl; }
   .fuse-customer-nav { left: 8px !important; right: 8px !important; padding-inline: 4px !important; }
   .fuse-customer-nav > a b { font-size: 9px !important; }
   .fuse-customer-nav svg { width: 22px !important; height: 22px !important; }
-  .restaurants-page .card { grid-template-columns: 74px minmax(0,1fr) !important; }
-  .restaurants-page .icon { width: 74px !important; height: 74px !important; }
 }

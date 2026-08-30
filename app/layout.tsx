@@ -13,11 +13,8 @@ import "@fontsource/tajawal/700.css";
 import "@fontsource/tajawal/800.css";
 import "./globals.css";
 import "./mobile-responsive.css";
-import "./glass-theme.css";
-import "./fuse-final-ui.css";
-import "./fuse-design-v2.css";
-import "./fuse-ui-final.css";
 import "./fuse-reference-theme.css";
+import "./fuse-customer-shell.css";
 
 export const viewport: Viewport = {
   width: "device-width",

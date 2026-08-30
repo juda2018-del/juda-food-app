@@ -315,7 +315,6 @@ export default function HomePage() {
   const [category, setCategory] = useState("الكل");
   const [cartCount, setCartCount] = useState(0);
   const [notice, setNotice] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [locationNotice, setLocationNotice] = useState("بغداد - المنصور");
 
   useEffect(() => {
@@ -439,7 +438,7 @@ export default function HomePage() {
           </Link>
 
           <div className="brand-location">
-            <strong>FUSE IRAQ</strong>
+            <strong>FUSE Iraq</strong>
             <button className="location" type="button" onClick={() => {
               setLocationNotice((current) => current === "بغداد - المنصور" ? "بغداد - زيونة" : "بغداد - المنصور");
               showNotice("تم تحديث موقع العرض التجريبي");
@@ -470,10 +469,7 @@ export default function HomePage() {
             />
           </div>
 
-          <button className="filter-btn" type="button" onClick={() => {
-            setFiltersOpen((current) => !current);
-            showNotice("الفلاتر جاهزة للاستخدام");
-          }}>
+          <button className="filter-btn" type="button" onClick={() => showNotice("استخدم التصنيفات للتصفية")}>
             <Icon name="sliders" />
           </button>
         </section>
@@ -492,15 +488,6 @@ export default function HomePage() {
             </button>
           ))}
         </section>
-
-        {filtersOpen ? (
-          <section className="filter-panel">
-            <button type="button" onClick={() => setCategory("الكل")}>الكل</button>
-            <button type="button" onClick={() => setCategory("فطور")}>فطور</button>
-            <button type="button" onClick={() => setCategory("مشاوي")}>مشاوي</button>
-            <button type="button" onClick={() => setCategory("بيتزا")}>بيتزا</button>
-          </section>
-        ) : null}
 
         <section className="hero">
           <div className="hero-copy">
@@ -537,7 +524,7 @@ export default function HomePage() {
 
         <section className="section-head">
           <div>
-            <small>قريب منك</small>
+            <small>مختارات لك</small>
             <h2>المطاعم المميزة</h2>
           </div>
 
@@ -647,7 +634,7 @@ export default function HomePage() {
           min-height: 100vh;
           background: transparent;
           display: block;
-          padding: calc(12px + env(safe-area-inset-top)) 14px calc(104px + env(safe-area-inset-bottom));
+          padding: 0;
           font-family: var(--fuse-body-font);
         }
 
@@ -1258,55 +1245,20 @@ export default function HomePage() {
           cursor: pointer;
         }
 
-        .home-nav {
-          position: absolute;
-          left: 14px;
-          right: 14px;
-          bottom: 12px;
-          height: 72px;
-          border: 1px solid rgba(255, 255, 255, 0.62);
-          border-radius: 24px;
-          background: rgba(255, 250, 244, 0.96);
-          backdrop-filter: blur(22px) saturate(145%);
-          -webkit-backdrop-filter: blur(22px) saturate(145%);
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          padding: 5px 8px;
-          box-shadow: 0 10px 28px rgba(11, 18, 32, 0.2);
-        }
-
-        .home-nav a {
-          color: #0b1220;
-          text-decoration: none;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 3px;
-          width: 100%;
-          height: 58px;
-          margin: auto;
-          border-radius: 18px;
-        }
-
-        .home-nav a.active {
-          color: #ff5a00;
-          background: rgba(255, 90, 0, 0.10);
-          box-shadow: none;
-        }
-
-        .home-nav b {
-          display: block;
-          font-size: 11px;
-          line-height: 1.15;
+        .toast {
+          position: fixed;
+          left: 50%;
+          bottom: var(--fuse-toast-bottom, 96px);
+          transform: translateX(-50%);
+          z-index: 90;
+          width: min(360px, calc(100% - 34px));
+          border-radius: 20px;
+          background: #0b1220;
+          color: #fff7ee;
+          padding: 14px 18px;
+          text-align: center;
           font-weight: 900;
-          white-space: nowrap;
-        }
-
-        .home-nav svg {
-          width: 22px;
-          height: 22px;
-          flex: 0 0 auto;
+          box-shadow: 0 18px 45px rgba(11,18,32,0.28);
         }
 
         .image-fallback {
@@ -1343,56 +1295,18 @@ export default function HomePage() {
           cursor: pointer;
         }
 
-        .toast {
-          position: fixed;
-          left: 50%;
-          bottom: 98px;
-          transform: translateX(-50%);
-          z-index: 90;
-          width: min(360px, calc(100% - 34px));
-          border-radius: 20px;
-          background: #0b1220;
-          color: #fff7ee;
-          padding: 14px 18px;
-          text-align: center;
-          font-weight: 900;
-          box-shadow: 0 18px 45px rgba(11,18,32,0.28);
-        }
-
-        .filter-panel {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 8px;
-          margin: 0 0 14px;
-        }
-
-        .filter-panel button {
-          border: 0;
-          border-radius: 16px;
-          background: #0b1220;
-          color: #fff7ee;
-          padding: 11px 8px;
-          font-family: inherit;
-          font-weight: 900;
-          cursor: pointer;
-        }
-
         @media (max-width: 520px) {
           .page {
-            padding: 0;
             display: block;
-            background: #fff7ee;
+            background: transparent;
           }
 
           .phone {
             width: 100%;
-            min-height: 100dvh;
+            min-height: 0;
             border-radius: 0;
             box-shadow: none;
-            padding-top: max(18px, env(safe-area-inset-top));
-            padding-left: max(12px, env(safe-area-inset-left));
-            padding-right: max(12px, env(safe-area-inset-right));
-            padding-bottom: calc(128px + env(safe-area-inset-bottom));
+            padding: 0;
           }
 
           .categories {
@@ -1413,18 +1327,6 @@ export default function HomePage() {
           .categories b {
             font-size: clamp(9px, 2.6vw, 11px);
             white-space: nowrap;
-          }
-
-          .home-nav {
-            position: fixed;
-            left: 12px;
-            right: 12px;
-            bottom: max(5px, env(safe-area-inset-bottom));
-            width: auto;
-            max-width: none;
-            margin: 0;
-            transform: none;
-            z-index: 9999;
           }
         }
 

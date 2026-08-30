@@ -388,7 +388,8 @@ main.app .heart {
 }
 
 @media (max-width: 520px) {
-  body {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  .fuse-customer-nav {
+    left: 10px !important;
+    right: 10px !important;
   }
 }

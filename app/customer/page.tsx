@@ -11,7 +11,7 @@ export default function CustomerPage() {
           placeItems: "center",
           background: "#050505",
           color: "#fff",
-          fontFamily: "Cairo, system-ui, sans-serif"
+          fontFamily: 'var(--fuse-body-font), system-ui, sans-serif'
         }}>
           جاري تحميل صفحة الزبون...
         </main>
