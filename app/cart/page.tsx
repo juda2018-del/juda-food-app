@@ -14,6 +14,7 @@ import {
   updateFuseCartQty,
   type FuseCartItem,
 } from "@/lib/fuse-cart";
+import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 function formatIQD(value: number) {
   return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
@@ -51,6 +52,12 @@ async function validateCart(items: FuseCartItem[]) {
     restaurantData.status !== "مغلق";
 
   if (!restaurantOpen) throw new Error("المطعم مغلق حالياً ولا يستقبل طلبات.");
+
+  const minOrder = Number(restaurantData.minOrder || 0);
+  const subtotalPreview = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  if (minOrder > 0 && subtotalPreview < minOrder) {
+    throw new Error(`الحد الأدنى للطلب ${Number(minOrder).toLocaleString("ar-IQ")} د.ع`);
+  }
 
   const restaurantName = String(
     restaurantData.name || restaurantData.title || restaurantData.restaurantName || "مطعم"
@@ -207,7 +214,10 @@ export default function CartPage() {
         total: verifiedTotals.total,
         amount: verifiedTotals.total,
         currency: "IQD",
-        status: "جديد",
+        paymentMethod: "cod",
+        paymentStatus: "awaiting_delivery",
+        paymentNote: "بوابة الدفع الإلكتروني غير متصلة — الدفع عند الاستلام فقط",
+        status: normalizeFuseOrderStatus("جديد"),
         source: "customer-cart-page",
         pricingVerifiedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
@@ -270,6 +280,7 @@ export default function CartPage() {
           </section>
 
           <section className="summary"><h2>ملخص الطلب</h2><div><span>المجموع الفرعي</span><b>{formatIQD(totals.subtotal)}</b></div><div><span>التوصيل</span><b>{formatIQD(totals.deliveryFee)}</b></div><div className="total"><span>الإجمالي</span><b>{formatIQD(totals.total)}</b></div><small>يُراجع السعر والتوفر من Firestore عند تأكيد الطلب.</small></section>
+          <section className="payment"><h2>طريقة الدفع</h2><div className="payment-row"><span>الدفع عند الاستلام</span><b>COD</b></div><small>بوابة الدفع الإلكتروني غير متصلة بعد. الطلب يُؤكَّد بالدفع نقداً عند التسليم.</small></section>
           <section className="form"><h2>بيانات التوصيل</h2><input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="الاسم الكامل" autoComplete="name" maxLength={80}/><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07701234567" inputMode="tel" autoComplete="tel" dir="ltr" maxLength={14}/><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="المنطقة، الشارع، أقرب نقطة دالة" autoComplete="street-address" maxLength={220}/><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظة اختيارية للمطعم أو السائق" maxLength={300}/></section>
           <button className="checkout" type="button" onClick={submitOrder} disabled={saving || !authReady}>{saving ? "جاري فحص الأسعار وتثبيت الطلب..." : user ? `تأكيد الطلب · ${formatIQD(totals.total)}` : "سجّل دخولك لتأكيد الطلب"}</button>
           <button className="clear" type="button" onClick={clearCart} disabled={saving}>تفريغ السلة</button>
@@ -283,7 +294,7 @@ export default function CartPage() {
         :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;background:#f4efe6}
         .app{width:100%;max-width:430px;min-height:100dvh;margin:auto;padding:0;background:transparent;color:#15171a;font-family:var(--fuse-body-font)}
         .top{display:grid;grid-template-columns:46px 1fr 46px;align-items:center;gap:8px;margin-bottom:16px;padding:8px 10px;border-radius:28px;background:rgba(255,252,247,.82);border:1px solid rgba(255,255,255,.95);box-shadow:0 10px 28px rgba(21,23,26,.08);backdrop-filter:blur(22px) saturate(145%)}.back,.support{height:46px;border:0;border-radius:50%;background:rgba(255,252,247,.92);color:#1f7a4f;display:grid;place-items:center;text-decoration:none;box-shadow:0 8px 22px rgba(21,23,26,.06);font-family:inherit;font-weight:900}.back{font-size:26px;border:1px solid rgba(21,23,26,.08)}.support{font-size:11px;border-radius:18px;background:rgba(31,122,79,.12)}.title{text-align:center}.title h1{margin:0;font-size:24px;font-family:var(--fuse-title-font)}.title p{margin:3px 0 0;color:#6f7175;font-size:11px;font-weight:800}
-        .empty,.group,.summary,.form,.notice{background:rgba(255,252,247,.82);border:1px solid rgba(255,255,255,.92);border-radius:22px;padding:17px;margin-bottom:13px;box-shadow:0 10px 28px rgba(21,23,26,.08);backdrop-filter:blur(22px) saturate(145%)}.empty{text-align:center;padding:30px 18px}.empty>div{font-size:42px}.empty h2{margin:8px 0}.empty p,.notice p{color:#6f7175}.empty a,.notice a{display:block;padding:14px;border-radius:18px;background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;text-align:center;text-decoration:none;font-weight:900;box-shadow:0 12px 28px rgba(31,122,79,.22)}.notice{text-align:center;background:rgba(31,122,79,.08)}
+        .empty,.group,.summary,.form,.notice,.payment{background:rgba(255,252,247,.82);border:1px solid rgba(255,255,255,.92);border-radius:22px;padding:17px;margin-bottom:13px;box-shadow:0 10px 28px rgba(21,23,26,.08);backdrop-filter:blur(22px) saturate(145%)}.empty{text-align:center;padding:30px 18px}.empty>div{font-size:42px}.empty h2{margin:8px 0}.empty p,.notice p{color:#6f7175}.empty a,.notice a{display:block;padding:14px;border-radius:18px;background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;text-align:center;text-decoration:none;font-weight:900;box-shadow:0 12px 28px rgba(31,122,79,.22)}.notice{text-align:center;background:rgba(31,122,79,.08)}.payment h2{margin:0 0 10px}.payment-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:900}.payment-row b{color:#1f7a4f}.payment small{display:block;margin-top:8px;color:#6f7175;line-height:1.6}
         .groupHead,.row,.summary>div{display:flex;justify-content:space-between;align-items:center;gap:8px}.groupHead h2{margin:0}.groupHead small,.row strong,.total b{color:#1f7a4f;font-weight:900}.item{display:grid;grid-template-columns:68px 1fr;gap:11px;padding:13px 0;border-top:1px solid rgba(21,23,26,.08)}.thumb{width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,#1a2235,#263759);color:#fff;display:grid;place-items:center;font-size:29px;font-weight:900}.info h3{margin:0;font-size:16px}.info p{margin:3px 0 9px;color:#6f7175;font-size:11px;font-weight:700}.qty{display:flex;align-items:center;gap:9px;padding:4px;border-radius:14px;background:rgba(31,122,79,.1)}.qty button{width:30px;height:30px;border:0;border-radius:10px;background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;font-size:18px;font-weight:900}.qty b{min-width:18px;text-align:center}
         .summary h2,.form h2{margin:0 0 13px}.summary>div{margin:9px 0;color:#6f7175;font-weight:800}.summary .total{padding-top:13px;border-top:1px solid rgba(21,23,26,.08);color:#15171a;font-size:19px}.summary small{display:block;color:#6f7175;line-height:1.6}.form{display:grid;gap:10px}.form input{width:100%;border:1px solid rgba(21,23,26,.08);border-radius:16px;padding:14px;font:inherit;font-size:13px;outline:none;background:rgba(255,255,255,.72)}
         .checkout,.clear{width:100%;border:0;border-radius:19px;padding:16px;font:inherit;font-weight:900;margin-top:9px}.checkout{background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;box-shadow:0 12px 28px rgba(31,122,79,.22)}.checkout:disabled,.clear:disabled{opacity:.55}.clear{background:#1a2235;color:#fff}.message{margin-top:12px;border-radius:18px;padding:13px;font-weight:900}.ok{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}

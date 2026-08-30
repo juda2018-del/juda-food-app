@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { getIdTokenResult, onAuthStateChanged, type User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../app/firebase";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { auth } from "../app/firebase";
 import { saveFuseSession } from "../lib/fuse-auth";
+import { resolveFuseSession } from "../lib/fuse-session-resolve";
 
 type FuseRole = "admin" | "restaurant" | "driver" | "customer" | "guest";
 
@@ -93,29 +93,9 @@ function normalizeRole(value?: string | null): FuseRole {
 }
 
 async function verifiedSession(user: User): Promise<FuseRole> {
-  const token = await getIdTokenResult(user);
-  const profileSnapshot = await getDoc(doc(db, "users", user.uid));
-  const profile = profileSnapshot.exists()
-    ? (profileSnapshot.data() as Record<string, unknown>)
-    : {};
-  const role = normalizeRole(
-    String(token.claims.role || token.claims.fuseRole || profile.role || profile.fuseRole || "")
-  );
-  const email = user.email || "";
-  if (role === "guest") return role;
-
-  saveFuseSession({
-    uid: user.uid,
-    email,
-    role,
-    name: String(profile.name || user.displayName || ""),
-    phone: String(profile.phone || ""),
-    restaurant: String(profile.restaurantName || profile.restaurant || profile.restaurantId || ""),
-    restaurantId: String(profile.restaurantId || ""),
-    restaurantName: String(profile.restaurantName || profile.restaurant || ""),
-    source: "firebase-auth",
-  });
-  return role;
+  const session = await resolveFuseSession(user);
+  saveFuseSession(session);
+  return session.role;
 }
 
 function getRule(pathname: string): AccessRule | null {

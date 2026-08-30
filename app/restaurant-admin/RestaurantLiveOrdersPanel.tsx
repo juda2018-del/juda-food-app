@@ -12,6 +12,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { firebaseApp } from "@/lib/firebase/client";
+import { fuseOrderStatusLabel, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 type AnyOrder = {
   id: string;
@@ -42,13 +43,7 @@ function formatIQD(value: number) {
 }
 
 function label(status?: string, statusAr?: string) {
-  if (statusAr) return statusAr;
-  if (status === "preparing") return "قيد التحضير";
-  if (status === "ready") return "جاهز للتوصيل";
-  if (status === "delivering") return "قيد التوصيل";
-  if (status === "done") return "تم التسليم";
-  if (status === "rejected") return "مرفوض";
-  return "جديد";
+  return fuseOrderStatusLabel(status, statusAr);
 }
 
 export default function RestaurantLiveOrdersPanel() {
@@ -125,14 +120,15 @@ export default function RestaurantLiveOrdersPanel() {
     };
   }, []);
 
-  async function changeStatus(orderId: string, status: string, statusAr: string) {
+  async function changeStatus(orderId: string, status: string) {
     setUpdating(orderId);
 
     try {
       const db = getFirestore(firebaseApp);
+      const canonical = normalizeFuseOrderStatus(status);
       await updateDoc(doc(db, "orders", orderId), {
-        status,
-        statusAr,
+        status: canonical,
+        statusAr: canonical,
         updatedAtText: new Date().toISOString(),
       });
     } catch (error) {
@@ -291,7 +287,7 @@ export default function RestaurantLiveOrdersPanel() {
                     <div style={{ display: "grid", gap: 9 }}>
                       <button
                         disabled={updating === order.id}
-                        onClick={() => changeStatus(order.id, "preparing", "قيد التحضير")}
+                        onClick={() => changeStatus(order.id, "قيد التحضير")}
                         style={buttonStyle}
                       >
                         قيد التحضير
@@ -299,10 +295,18 @@ export default function RestaurantLiveOrdersPanel() {
 
                       <button
                         disabled={updating === order.id}
-                        onClick={() => changeStatus(order.id, "ready", "جاهز للتوصيل")}
+                        onClick={() => changeStatus(order.id, "جاهز للتوصيل")}
                         style={buttonStyle}
                       >
                         جاهز للتوصيل
+                      </button>
+
+                      <button
+                        disabled={updating === order.id}
+                        onClick={() => changeStatus(order.id, "مرفوض")}
+                        style={{ ...buttonStyle, background: "#401313", color: "#ffaaaa" }}
+                      >
+                        رفض الطلب
                       </button>
                     </div>
                   </div>

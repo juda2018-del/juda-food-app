@@ -7,6 +7,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { parseFuseRole, roleHome } from "@/lib/fuse-auth";
+import { fuseCustomerProgressIndex, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 type OrderItem = { name?: string; title?: string; qty?: number; quantity?: number; price?: number };
 type OrderDoc = {
@@ -38,11 +39,11 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 function normalizeStatus(status?: string) {
-  if (!status) return "جديد";
-  if (status === "جاهز" || status === "ready" || status === "ready_for_delivery") return "جاهز للتوصيل";
-  if (status === "السائق استلم") return "قيد التوصيل";
-  if (status === "Delivered" || status === "delivered") return "تم التسليم";
-  return status;
+  return normalizeFuseOrderStatus(status);
+}
+
+function statusIndex(status?: string) {
+  return fuseCustomerProgressIndex(status);
 }
 
 function toDate(value: unknown): Date | null {
@@ -73,11 +74,6 @@ function formatDate(value: unknown) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function statusIndex(status?: string) {
-  const index = steps.indexOf(normalizeStatus(status));
-  return index < 0 ? 0 : index;
 }
 
 export default function OrderStatusPage() {

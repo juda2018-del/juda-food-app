@@ -62,7 +62,7 @@ export default function RestaurantAdminGate({
         const session = await resolveFuseSession(user);
         saveFuseSession(session);
 
-        if (session.role === "restaurant") {
+        if (session.role === "restaurant" || session.role === "admin") {
           setState("allowed");
           return;
         }
@@ -89,7 +89,7 @@ export default function RestaurantAdminGate({
         placeItems: "center",
         background: "#050505",
         color: "#fff",
-        fontFamily: "Cairo, system-ui, sans-serif",
+        fontFamily: 'var(--fuse-body-font), system-ui, sans-serif',
         padding: 24
       }}>
         <section style={{

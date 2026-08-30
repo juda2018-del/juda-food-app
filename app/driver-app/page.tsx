@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   doc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -18,6 +19,7 @@ import {
   roleHome,
   type FuseSession,
 } from "@/lib/fuse-auth";
+import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 type OrderItem = {
   name?: string;
@@ -72,15 +74,6 @@ function readSession(): FuseSession | null {
   } catch {
     return null;
   }
-}
-
-function normalizeStatus(status?: string) {
-  if (!status) return "جديد";
-  if (status === "جاهز") return "جاهز للتوصيل";
-  if (status === "السائق استلم") return "قيد التوصيل";
-  if (status === "Delivered") return "تم التسليم";
-  if (status === "Cancelled") return "ملغي";
-  return status;
 }
 
 function toDate(value: unknown): Date | null {
@@ -230,19 +223,43 @@ export default function DriverAppPage() {
   }, [driver]);
 
   const activeOrders = useMemo(
-    () => orders.filter((order) => activeStatuses.includes(normalizeStatus(order.status))),
+    () => orders.filter((order) => activeStatuses.includes(normalizeFuseOrderStatus(order.status))),
     [orders]
   );
 
   const deliveredOrders = useMemo(
-    () => orders.filter((order) => normalizeStatus(order.status) === "تم التسليم"),
+    () => orders.filter((order) => normalizeFuseOrderStatus(order.status) === "تم التسليم"),
     [orders]
   );
 
-  function toggleOnline() {
+  async function toggleOnline() {
+    if (!driver) return;
     const next = !online;
     setOnline(next);
     localStorage.setItem("fuse_driver_online", next ? "1" : "0");
+    setError("");
+    try {
+      const snapshot = await getDocs(
+        query(collection(db, "drivers"), where("email", "==", driver.email))
+      );
+      if (snapshot.empty) {
+        setError("حساب السائق غير مسجل في النظام. راجع إدارة FUSE.");
+        return;
+      }
+      await Promise.all(
+        snapshot.docs.map((item) =>
+          updateDoc(item.ref, {
+            online: next,
+            isOnline: next,
+            status: next ? "متصل" : "غير متصل",
+            updatedAt: serverTimestamp(),
+          })
+        )
+      );
+      setMessage(next ? "تم تفعيل حالة الاتصال." : "تم إيقاف حالة الاتصال.");
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : "تعذر تحديث حالة الاتصال في Firebase.");
+    }
   }
 
   async function updateOrder(order: OrderDoc, status: "قيد التوصيل" | "تم التسليم") {
@@ -251,7 +268,7 @@ export default function DriverAppPage() {
       return;
     }
 
-    const currentStatus = normalizeStatus(order.status);
+    const currentStatus = normalizeFuseOrderStatus(order.status);
     if (status === "قيد التوصيل" && currentStatus !== "جاهز للتوصيل") {
       setError("لا يمكن استلام الطلب قبل أن يصبح جاهزاً للتوصيل.");
       return;
@@ -322,7 +339,7 @@ export default function DriverAppPage() {
           <div className="panel-head"><div><small>My Orders</small><h2>طلباتي الحالية</h2></div><b>{activeOrders.length}</b></div>
 
           {loading ? <div className="empty">جاري تحميل طلباتك...</div> : activeOrders.length ? activeOrders.map((order) => {
-            const status = normalizeStatus(order.status);
+            const status = normalizeFuseOrderStatus(order.status);
             const phone = getPhone(order);
             return (
               <article className="order" key={order.documentId}>

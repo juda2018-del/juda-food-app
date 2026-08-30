@@ -140,7 +140,26 @@ export default function ReelsPage() {
 
   function flash(message: string) { setNotice(message); window.setTimeout(() => setNotice(""), 1800); }
   function addToCart(reel: ReelDoc) {
-    addFuseCartItem({ id: reel.menuItemId || reel.documentId, name: reel.menuItem || reel.title || "وجبة FUSE", restaurant: restaurantName(reel), restaurantId: restaurantSlug(reel), category: reel.category || "عام", price: Number(reel.price || 0), qty: 1, image: reel.thumbnail || reel.image });
+    const slug = restaurantSlug(reel);
+    const restaurant = restaurants.find((item) => item.documentId === slug);
+    const restaurantId = restaurant?.documentId || slug;
+    const menuItemId = clean(reel.menuItemId);
+
+    if (!menuItemId) {
+      flash("الصنف غير مربوط بالمنيو. افتح المطعم وأضف من المنيو.");
+      return;
+    }
+
+    addFuseCartItem({
+      id: menuItemId,
+      name: reel.menuItem || reel.title || "وجبة FUSE",
+      restaurant: restaurantName(reel),
+      restaurantId,
+      category: reel.category || "عام",
+      price: Number(reel.price || 0),
+      qty: 1,
+      image: reel.thumbnail || reel.image,
+    });
     if (navigator.vibrate) navigator.vibrate(40);
     flash("تمت إضافة الوجبة للسلة");
   }

@@ -157,7 +157,12 @@ export default function RestaurantReelsPage() {
       setProgress(0);
       setMessage("تم إرسال الريل للإدارة. ما راح يظهر للزبائن إلا بعد الموافقة.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "تعذر إرسال الريل.");
+      const message = error instanceof Error ? error.message : "تعذر إرسال الريل.";
+      if (/storage|permission|unauthorized|403/i.test(message)) {
+        setMessage("Video upload not connected — استخدم رابط فيديو مباشر أو راجع إعدادات Firebase Storage.");
+      } else {
+        setMessage(message);
+      }
     } finally {
       setBusy(false);
     }

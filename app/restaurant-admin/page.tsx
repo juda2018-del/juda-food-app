@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
+import { FUSE_ORDER_STATUSES, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 type RestaurantDoc = {
   documentId: string;
@@ -112,6 +113,7 @@ export default function RestaurantAdminPage() {
   const [selectedId, setSelectedId] = useState("");
   const [restaurantForm, setRestaurantForm] = useState(emptyRestaurant);
   const [menuForm, setMenuForm] = useState(emptyMenu);
+  const [editingMenuId, setEditingMenuId] = useState("");
   const [editingRestaurantId, setEditingRestaurantId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -286,14 +288,14 @@ export default function RestaurantAdminPage() {
     }
   }
 
-  async function addMenuItem() {
+  async function saveMenuItem() {
     if (!assertManage() || !selectedRestaurant) return;
     if (!menuForm.name.trim()) return flash("اكتب اسم الصنف.", true);
     const price = Number(menuForm.price || 0);
     if (!Number.isFinite(price) || price <= 0) return flash("اكتب سعراً صحيحاً.", true);
     setSaving(true);
     try {
-      await addDoc(collection(db, "menu"), {
+      const payload = {
         name: menuForm.name.trim(),
         title: menuForm.name.trim(),
         category: menuForm.category.trim() || "عام",
@@ -304,15 +306,57 @@ export default function RestaurantAdminPage() {
         restaurantName: selectedName,
         available: true,
         isAvailable: true,
-        createdAt: serverTimestamp(),
-      });
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editingMenuId) {
+        await updateDoc(doc(db, "menu", editingMenuId), payload);
+        flash("تم تحديث الصنف.");
+      } else {
+        await addDoc(collection(db, "menu"), { ...payload, createdAt: serverTimestamp() });
+        flash("تمت إضافة الصنف.");
+      }
+
       setMenuForm(emptyMenu);
-      flash("تمت إضافة الصنف.");
+      setEditingMenuId("");
     } catch (e) {
-      flash(e instanceof Error ? e.message : "تعذر إضافة الصنف.", true);
+      flash(e instanceof Error ? e.message : "تعذر حفظ الصنف.", true);
     } finally {
       setSaving(false);
     }
+  }
+
+  function editMenuItem(item: MenuDoc) {
+    if (!assertManage()) return;
+    setEditingMenuId(item.documentId);
+    setMenuForm({
+      name: item.name || item.title || "",
+      category: item.category || "",
+      price: String(item.price || ""),
+      image: item.image || "",
+    });
+  }
+
+  async function deleteMenuItem(item: MenuDoc) {
+    if (!assertManage() || item.restaurantId !== selectedId) return;
+    if (!window.confirm(`حذف "${item.name || item.title || "الصنف"}" من المنيو؟`)) return;
+    setSaving(true);
+    try {
+      await deleteDoc(doc(db, "menu", item.documentId));
+      if (editingMenuId === item.documentId) {
+        setEditingMenuId("");
+        setMenuForm(emptyMenu);
+      }
+      flash("تم حذف الصنف.");
+    } catch (e) {
+      flash(e instanceof Error ? e.message : "تعذر حذف الصنف.", true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addMenuItem() {
+    return saveMenuItem();
   }
 
   async function toggleMenu(item: MenuDoc) {
@@ -328,8 +372,14 @@ export default function RestaurantAdminPage() {
   async function updateOrder(order: OrderDoc, status: string) {
     if (!assertManage() || order.restaurantId !== selectedId) return;
     try {
-      await updateDoc(doc(db, "orders", order.documentId), { status, restaurantUpdatedAt: serverTimestamp(), updatedAt: serverTimestamp() });
-      flash(`تم تحديث الطلب إلى ${status}.`);
+      const canonical = normalizeFuseOrderStatus(status);
+      await updateDoc(doc(db, "orders", order.documentId), {
+        status: canonical,
+        statusAr: canonical,
+        restaurantUpdatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      flash(`تم تحديث الطلب إلى ${canonical}.`);
     } catch (e) {
       flash(e instanceof Error ? e.message : "تعذر تحديث الطلب.", true);
     }
@@ -375,19 +425,19 @@ export default function RestaurantAdminPage() {
         <section className="layout">
           <section className="panel">
             <div className="panel-head"><div><small>Live Orders</small><h2>طلبات المطعم</h2></div><b>{sortedOrders.length}</b></div>
-            {sortedOrders.length ? sortedOrders.slice(0, 40).map((order) => <article className="card" key={order.documentId}><div><h3>{order.customerName || order.customer || "زبون"}</h3><p>#{order.orderId || order.documentId} — {order.address || "بدون عنوان"} — {order.phone || order.customerPhone || "بدون هاتف"}</p></div><strong>{money(order.total || order.amount)}</strong><select value={order.status || "جديد"} onChange={(e) => updateOrder(order, e.target.value)}>{["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم", "مرفوض"].map((status) => <option key={status}>{status}</option>)}</select></article>) : <div className="empty">ماكو طلبات حالياً.</div>}
+            {sortedOrders.length ? sortedOrders.slice(0, 40).map((order) => <article className="card" key={order.documentId}><div><h3>{order.customerName || order.customer || "زبون"}</h3><p>#{order.orderId || order.documentId} — {order.address || "بدون عنوان"} — {order.phone || order.customerPhone || "بدون هاتف"}</p></div><strong>{money(order.total || order.amount)}</strong><select value={normalizeFuseOrderStatus(order.status)} onChange={(e) => updateOrder(order, e.target.value)}>{FUSE_ORDER_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select></article>) : <div className="empty">ماكو طلبات حالياً.</div>}
           </section>
 
           <aside className="panel">
             <div className="panel-head"><div><small>Menu Control</small><h2>منيو {selectedName || "المطعم"}</h2></div><b>{menu.length}</b></div>
-            <div className="menu-form"><input placeholder="اسم الصنف" value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} /><input placeholder="السعر" inputMode="numeric" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} /><input placeholder="القسم" value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} /><input placeholder="رابط الصورة" dir="ltr" value={menuForm.image} onChange={(e) => setMenuForm({ ...menuForm, image: e.target.value })} /><button className="primary" onClick={addMenuItem} disabled={saving || !selectedRestaurant}>إضافة صنف</button></div>
-            <div>{menu.map((item) => { const available = item.available !== false && item.isAvailable !== false; return <article className="menu-card" key={item.documentId}><div><h3>{item.name || item.title || "صنف"}</h3><p>{item.category || "عام"}</p></div><strong>{money(item.price)}</strong><button onClick={() => toggleMenu(item)}>{available ? "إيقاف" : "تفعيل"}</button></article>; })}{!menu.length ? <div className="empty">ماكو أصناف حالياً.</div> : null}</div>
+            <div className="menu-form"><input placeholder="اسم الصنف" value={menuForm.name} onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })} /><input placeholder="السعر" inputMode="numeric" value={menuForm.price} onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })} /><input placeholder="القسم" value={menuForm.category} onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })} /><input placeholder="رابط الصورة" dir="ltr" value={menuForm.image} onChange={(e) => setMenuForm({ ...menuForm, image: e.target.value })} /><small>رفع الصور عبر Storage غير متصل بعد — استخدم رابط صورة مؤقتاً.</small><button className="primary" onClick={saveMenuItem} disabled={saving || !selectedRestaurant}>{editingMenuId ? "حفظ التعديل" : "إضافة صنف"}</button>{editingMenuId ? <button type="button" onClick={() => { setEditingMenuId(""); setMenuForm(emptyMenu); }}>إلغاء التعديل</button> : null}</div>
+            <div>{menu.map((item) => { const available = item.available !== false && item.isAvailable !== false; return <article className="menu-card" key={item.documentId}><div><h3>{item.name || item.title || "صنف"}</h3><p>{item.category || "عام"}</p></div><strong>{money(item.price)}</strong><div className="menu-actions"><button onClick={() => toggleMenu(item)}>{available ? "إيقاف" : "تفعيل"}</button><button onClick={() => editMenuItem(item)}>تعديل</button><button onClick={() => deleteMenuItem(item)}>حذف</button></div></article>; })}{!menu.length ? <div className="empty">ماكو أصناف حالياً.</div> : null}</div>
           </aside>
         </section>
       </section>
 
       <style jsx>{`
-        *{box-sizing:border-box}.page{min-height:100vh;background:#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1180px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px}.topbar small,.panel-head small{color:#ff7a00;font-weight:900}.topbar h1,.panel-head h2{margin:5px 0 0}.topbar nav{display:flex;gap:8px;flex-wrap:wrap}.topbar a,.tabs button,.summary button{color:#fff;text-decoration:none;border:1px solid #333;background:#151515;border-radius:14px;padding:11px 14px;font-weight:900}.panel{background:#181412;border:1px solid #34302e;border-radius:28px;padding:18px;margin-bottom:16px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.panel-head>b{background:#ff7a00;color:#050505;padding:10px 13px;border-radius:14px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.wide{grid-column:1/-1}input,textarea,select{width:100%;border:1px solid #31363a;background:#030303;color:#fff;border-radius:16px;padding:15px;font-size:16px;font-weight:800}textarea{min-height:90px}.switch{display:flex;gap:10px;align-items:center}.switch input{width:22px}.primary{background:#ff7a00!important;color:#050505!important;border:0!important;font-weight:950}.wide-btn{width:100%;border-radius:16px;padding:16px;margin-top:12px}.tabs{display:flex;gap:8px;overflow:auto}.tabs button.active{background:#ff7a00;color:#050505}.summary{margin-top:14px;background:#080808;border:1px solid #333;border-radius:20px;padding:15px;display:grid;gap:12px}.summary h3{font-size:26px;margin:0}.summary p{color:#aaa}.stats,.actions{display:flex;gap:8px;flex-wrap:wrap}.stats span{background:#1a1a1a;border-radius:12px;padding:9px 11px}.layout{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.card,.menu-card{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;background:#090909;border:1px solid #303030;border-radius:18px;padding:13px;margin-bottom:9px}.card h3,.menu-card h3{margin:0}.card p,.menu-card p{margin:5px 0 0;color:#999}.card select{min-width:150px;padding:10px}.menu-form{display:grid;gap:9px;margin-bottom:14px}.menu-card button{border:0;border-radius:12px;padding:10px 12px;font-weight:900}.empty{text-align:center;background:#090909;border:1px dashed #333;border-radius:20px;padding:24px;color:#aaa}.alert{position:sticky;top:8px;z-index:5;border-radius:16px;padding:13px;margin-bottom:12px;font-weight:900}.ok{background:#12351d;color:#9cffb8}.bad{background:#401313;color:#ffaaaa}@media(max-width:760px){.page{padding:12px 8px}.topbar{align-items:flex-start}.layout,.form-grid{grid-template-columns:1fr}.wide{grid-column:auto}.panel{border-radius:22px;padding:14px}.card,.menu-card{grid-template-columns:1fr}.card select{min-width:0}.summary{display:block}.summary button{margin-top:10px;width:100%}}
+        *{box-sizing:border-box}.page{min-height:100vh;background:#050505;color:#fff;padding:22px 14px;font-family:Arial,sans-serif}.shell{max-width:1180px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px}.topbar small,.panel-head small{color:#ff7a00;font-weight:900}.topbar h1,.panel-head h2{margin:5px 0 0}.topbar nav{display:flex;gap:8px;flex-wrap:wrap}.topbar a,.tabs button,.summary button{color:#fff;text-decoration:none;border:1px solid #333;background:#151515;border-radius:14px;padding:11px 14px;font-weight:900}.panel{background:#181412;border:1px solid #34302e;border-radius:28px;padding:18px;margin-bottom:16px}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.panel-head>b{background:#ff7a00;color:#050505;padding:10px 13px;border-radius:14px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.wide{grid-column:1/-1}input,textarea,select{width:100%;border:1px solid #31363a;background:#030303;color:#fff;border-radius:16px;padding:15px;font-size:16px;font-weight:800}textarea{min-height:90px}.switch{display:flex;gap:10px;align-items:center}.switch input{width:22px}.primary{background:#ff7a00!important;color:#050505!important;border:0!important;font-weight:950}.wide-btn{width:100%;border-radius:16px;padding:16px;margin-top:12px}.tabs{display:flex;gap:8px;overflow:auto}.tabs button.active{background:#ff7a00;color:#050505}.summary{margin-top:14px;background:#080808;border:1px solid #333;border-radius:20px;padding:15px;display:grid;gap:12px}.summary h3{font-size:26px;margin:0}.summary p{color:#aaa}.stats,.actions{display:flex;gap:8px;flex-wrap:wrap}.stats span{background:#1a1a1a;border-radius:12px;padding:9px 11px}.layout{display:grid;grid-template-columns:1.15fr .85fr;gap:16px}.card,.menu-card{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;background:#090909;border:1px solid #303030;border-radius:18px;padding:13px;margin-bottom:9px}.card h3,.menu-card h3{margin:0}.card p,.menu-card p{margin:5px 0 0;color:#999}.card select{min-width:150px;padding:10px}.menu-form{display:grid;gap:9px;margin-bottom:14px}.menu-form small{color:#999;line-height:1.6}.menu-actions{display:flex;gap:6px;flex-wrap:wrap}.menu-card button{border:0;border-radius:12px;padding:10px 12px;font-weight:900}.empty{text-align:center;background:#090909;border:1px dashed #333;border-radius:20px;padding:24px;color:#aaa}.alert{position:sticky;top:8px;z-index:5;border-radius:16px;padding:13px;margin-bottom:12px;font-weight:900}.ok{background:#12351d;color:#9cffb8}.bad{background:#401313;color:#ffaaaa}@media(max-width:760px){.page{padding:12px 8px}.topbar{align-items:flex-start}.layout,.form-grid{grid-template-columns:1fr}.wide{grid-column:auto}.panel{border-radius:22px;padding:14px}.card,.menu-card{grid-template-columns:1fr}.card select{min-width:0}.summary{display:block}.summary button{margin-top:10px;width:100%}}
       `}</style>
     </main>
   );

@@ -70,6 +70,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [connectionWarning, setConnectionWarning] = useState(false);
+  const [menuLive, setMenuLive] = useState(false);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -95,6 +96,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         setRestaurants(fallbackRestaurants);
         setLoading(false);
         setConnectionWarning(true);
+        setMenuLive(false);
       }
     );
     const unsubscribeMenu = onSnapshot(
@@ -105,8 +107,9 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         documentId: item.id,
         }));
         setMenu(remote.length ? remote : fallbackMenu);
+        setMenuLive(remote.length > 0);
       },
-      () => { setMenu(fallbackMenu); setConnectionWarning(true); }
+      () => { setMenu(fallbackMenu); setConnectionWarning(true); setMenuLive(false); }
     );
     return () => {
       window.clearTimeout(timeout);
@@ -136,6 +139,11 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   }), [menu, restaurant, restaurantId, restaurantName]);
 
   function addItem(item: MenuDoc) {
+    if (!menuLive) {
+      setNotice("المنيو غير متصل بقاعدة البيانات. لا يمكن إضافة هذا الصنف للسلة الآن.");
+      window.setTimeout(() => setNotice(""), 2600);
+      return;
+    }
     const next = addFuseCartItem({
       id: item.documentId,
       name: item.name || item.title || "صنف",
@@ -168,7 +176,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         </header>
 
         {loading ? <div className="state-card">جاري تحميل المطعم…</div> : null}
-        {connectionWarning ? <div className="state-card">تعذر تحديث المطعم الآن. ارجع لقائمة المطاعم وحاول مرة ثانية.</div> : null}
+        {connectionWarning ? <div className="state-card">تعذر تحديث المطعم الآن. الطلب يتطلب منيوً متصلاً بـ Firebase.</div> : null}
 
         <section className="hero" style={image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.78)),url(${image})` } : undefined}>
           <span className="emoji">{restaurant?.emoji || "🍽️"}</span>
@@ -193,7 +201,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
             <article key={item.documentId}>
               <div className="item-image">{item.image ? <img src={item.image} alt={item.name || "صنف"} /> : <span>🍴</span>}</div>
               <div className="copy"><small>{item.category || "عام"}</small><h3>{item.name || item.title || "صنف"}</h3><b>{formatIQD(item.price)}</b></div>
-              <button disabled={!isOpen} onClick={() => addItem(item)}>+</button>
+              <button disabled={!isOpen || !menuLive} onClick={() => addItem(item)} title={menuLive ? "إضافة للسلة" : "المنيو غير متصل"}>+</button>
             </article>
           ))}
         </section>
