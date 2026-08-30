@@ -15,6 +15,7 @@ import "./globals.css";
 import "./mobile-responsive.css";
 import "./fuse-reference-theme.css";
 import "./fuse-customer-shell.css";
+import "./fuse-design-system.css";
 
 export const viewport: Viewport = {
   width: "device-width",

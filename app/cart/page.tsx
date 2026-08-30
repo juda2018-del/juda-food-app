@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -15,6 +15,7 @@ import {
   type FuseCartItem,
 } from "@/lib/fuse-cart";
 import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import FuseIcon from "@/components/FuseIcon";
 
 function formatIQD(value: number) {
   return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
@@ -255,7 +256,7 @@ export default function CartPage() {
   return (
     <main dir="rtl" className="app">
       <header className="top">
-        <button className="back" type="button" onClick={() => history.length > 1 ? history.back() : router.push("/restaurants")}>‹</button>
+        <button className="back fuse-back-btn" type="button" aria-label="رجوع" onClick={() => history.length > 1 ? history.back() : router.push("/restaurants")}><FuseIcon name="chevron-back" /></button>
         <div className="title"><h1>السلة</h1><p>{items.length ? `${items.reduce((sum, item) => sum + item.qty, 0)} قطعة` : "ابدأ بإضافة وجبات"}</p></div>
         <Link className="support" href="/support">دعم</Link>
       </header>
@@ -266,7 +267,7 @@ export default function CartPage() {
       ) : null}
 
       {!items.length ? (
-        <section className="empty"><div>🛒</div><h2>السلة فارغة</h2><p>اختار مطعماً وأضف وجبتك.</p><Link href="/restaurants">تصفح المطاعم</Link></section>
+        <section className="empty"><div className="empty-icon"><FuseIcon name="cart" size="lg" /></div><h2>السلة فارغة</h2><p>اختار مطعماً وأضف وجبتك.</p><Link href="/restaurants">تصفح المطاعم</Link></section>
       ) : (
         <>
           <section className="group">
@@ -294,7 +295,7 @@ export default function CartPage() {
         :global(*){box-sizing:border-box}:global(html),:global(body){margin:0;background:#f4efe6}
         .app{width:100%;max-width:430px;min-height:100dvh;margin:auto;padding:0;background:transparent;color:#15171a;font-family:var(--fuse-body-font)}
         .top{display:grid;grid-template-columns:46px 1fr 46px;align-items:center;gap:8px;margin-bottom:16px;padding:8px 10px;border-radius:28px;background:rgba(255,252,247,.82);border:1px solid rgba(255,255,255,.95);box-shadow:0 10px 28px rgba(21,23,26,.08);backdrop-filter:blur(22px) saturate(145%)}.back,.support{height:46px;border:0;border-radius:50%;background:rgba(255,252,247,.92);color:#1f7a4f;display:grid;place-items:center;text-decoration:none;box-shadow:0 8px 22px rgba(21,23,26,.06);font-family:inherit;font-weight:900}.back{font-size:26px;border:1px solid rgba(21,23,26,.08)}.support{font-size:11px;border-radius:18px;background:rgba(31,122,79,.12)}.title{text-align:center}.title h1{margin:0;font-size:24px;font-family:var(--fuse-title-font)}.title p{margin:3px 0 0;color:#6f7175;font-size:11px;font-weight:800}
-        .empty,.group,.summary,.form,.notice,.payment{background:rgba(255,252,247,.82);border:1px solid rgba(255,255,255,.92);border-radius:22px;padding:17px;margin-bottom:13px;box-shadow:0 10px 28px rgba(21,23,26,.08);backdrop-filter:blur(22px) saturate(145%)}.empty{text-align:center;padding:30px 18px}.empty>div{font-size:42px}.empty h2{margin:8px 0}.empty p,.notice p{color:#6f7175}.empty a,.notice a{display:block;padding:14px;border-radius:18px;background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;text-align:center;text-decoration:none;font-weight:900;box-shadow:0 12px 28px rgba(31,122,79,.22)}.notice{text-align:center;background:rgba(31,122,79,.08)}.payment h2{margin:0 0 10px}.payment-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:900}.payment-row b{color:#1f7a4f}.payment small{display:block;margin-top:8px;color:#6f7175;line-height:1.6}
+        .empty,.group,.summary,.form,.notice,.payment{background:rgba(255,252,247,.82);border:1px solid rgba(255,255,255,.92);border-radius:22px;padding:17px;margin-bottom:13px;box-shadow:0 10px 28px rgba(21,23,26,.08);backdrop-filter:blur(22px) saturate(145%)}.empty{text-align:center;padding:30px 18px}.empty-icon{width:64px;height:64px;margin:0 auto 8px;border-radius:20px;background:rgba(31,122,79,.1);color:#1f7a4f;display:grid;place-items:center}.empty h2{margin:8px 0}.empty p,.notice p{color:#6f7175}.empty a,.notice a{display:block;padding:14px;border-radius:18px;background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;text-align:center;text-decoration:none;font-weight:900;box-shadow:0 12px 28px rgba(31,122,79,.22)}.notice{text-align:center;background:rgba(31,122,79,.08)}.payment h2{margin:0 0 10px}.payment-row{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:900}.payment-row b{color:#1f7a4f}.payment small{display:block;margin-top:8px;color:#6f7175;line-height:1.6}
         .groupHead,.row,.summary>div{display:flex;justify-content:space-between;align-items:center;gap:8px}.groupHead h2{margin:0}.groupHead small,.row strong,.total b{color:#1f7a4f;font-weight:900}.item{display:grid;grid-template-columns:68px 1fr;gap:11px;padding:13px 0;border-top:1px solid rgba(21,23,26,.08)}.thumb{width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,#1a2235,#263759);color:#fff;display:grid;place-items:center;font-size:29px;font-weight:900}.info h3{margin:0;font-size:16px}.info p{margin:3px 0 9px;color:#6f7175;font-size:11px;font-weight:700}.qty{display:flex;align-items:center;gap:9px;padding:4px;border-radius:14px;background:rgba(31,122,79,.1)}.qty button{width:30px;height:30px;border:0;border-radius:10px;background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;font-size:18px;font-weight:900}.qty b{min-width:18px;text-align:center}
         .summary h2,.form h2{margin:0 0 13px}.summary>div{margin:9px 0;color:#6f7175;font-weight:800}.summary .total{padding-top:13px;border-top:1px solid rgba(21,23,26,.08);color:#15171a;font-size:19px}.summary small{display:block;color:#6f7175;line-height:1.6}.form{display:grid;gap:10px}.form input{width:100%;border:1px solid rgba(21,23,26,.08);border-radius:16px;padding:14px;font:inherit;font-size:13px;outline:none;background:rgba(255,255,255,.72)}
         .checkout,.clear{width:100%;border:0;border-radius:19px;padding:16px;font:inherit;font-weight:900;margin-top:9px}.checkout{background:linear-gradient(135deg,#1f7a4f,#2f915f);color:#fff;box-shadow:0 12px 28px rgba(31,122,79,.22)}.checkout:disabled,.clear:disabled{opacity:.55}.clear{background:#1a2235;color:#fff}.message{margin-top:12px;border-radius:18px;padding:13px;font-weight:900}.ok{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}

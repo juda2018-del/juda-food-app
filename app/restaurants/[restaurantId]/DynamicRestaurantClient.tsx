@@ -6,6 +6,7 @@ import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { addFuseCartItem, readFuseCart } from "@/lib/fuse-cart";
 import { isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
+import FuseIcon from "@/components/FuseIcon";
 
 type RestaurantDoc = {
   documentId: string;
@@ -171,7 +172,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
     <main dir="rtl" className="page restaurant-detail-page dynamic-restaurant-page">
       <section className="phone">
         <header className="customer-header">
-          <Link href="/restaurants/" className="back" aria-label="العودة إلى المطاعم">‹</Link>
+          <Link href="/restaurants/" className="back fuse-back-btn" aria-label="العودة إلى المطاعم"><FuseIcon name="chevron-back" /></Link>
           <div><small>FUSE Iraq</small><b>تفاصيل المطعم</b></div>
           <Link href="/cart" className="cart">السلة {cartCount ? `(${cartCount})` : ""}</Link>
         </header>
@@ -180,7 +181,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         {connectionWarning ? <div className="state-card">تعذر تحديث المطعم الآن. الطلب يتطلب منيوً متصلاً بـ Firebase.</div> : null}
 
         <section className="hero" style={image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.78)),url(${image})` } : undefined}>
-          <span className="emoji">{restaurant?.emoji || "🍽️"}</span>
+          <span className="emoji"><FuseIcon name="store" size="lg" /></span>
           <div>
             <p>{restaurant?.category || restaurant?.cuisine || "مطعم"} · {restaurant?.area || "بغداد"}</p>
             <h1>{restaurantName}</h1>

@@ -9,6 +9,7 @@ import { firebaseAuth } from "@/lib/firebase/client";
 import { addFuseCartItem, FUSE_CART_EVENT, readFuseCart } from "@/lib/fuse-cart";
 import { catalogIsLive, FUSE_RESTAURANT_IDS, isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
 import { performFuseLogout } from "@/lib/fuse-logout";
+import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
 import {
   FUSE_COOKIE_EMAIL,
   FUSE_COOKIE_NAME,
@@ -173,7 +174,7 @@ const fallbackMenu: MenuDoc[] = [
   },
 ];
 
-const categories = [
+const categories: Array<{ key: string; label: string; icon: FuseIconName }> = [
   { key: "الكل", label: "الكل", icon: "grid" },
   { key: "بركر", label: "بركر", icon: "burger" },
   { key: "بيتزا", label: "بيتزا", icon: "pizza" },
@@ -245,42 +246,6 @@ function FuseMark() {
       <span className="stem" />
     </div>
   );
-}
-
-function Icon({ name }: { name: string }) {
-  const p = {
-    width: 22,
-    height: 22,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-
-  if (name === "menu") return <svg {...p}><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></svg>;
-  if (name === "search") return <svg {...p}><circle cx="11" cy="11" r="6" /><path d="M20 20l-4-4" /></svg>;
-  if (name === "pin") return <svg {...p}><path d="M12 21s6-5 6-11a6 6 0 10-12 0c0 6 6 11 6 11z" /><circle cx="12" cy="10" r="2" /></svg>;
-  if (name === "bell") return <svg {...p}><path d="M18 9a6 6 0 10-12 0c0 7-2 7-2 9h16c0-2-2-2-2-9z" /><path d="M10 21h4" /></svg>;
-  if (name === "sliders") return <svg {...p}><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" /><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none" /><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none" /><circle cx="11" cy="18" r="2" fill="currentColor" stroke="none" /></svg>;
-  if (name === "heart") return <svg {...p}><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.6-7 10-7 10z" /></svg>;
-  if (name === "star") return <svg {...p}><path d="M12 3l2.7 5.4 6 .9-4.4 4.3 1 6-5.3-2.8-5.3 2.8 1-6L3.3 9.3l6-.9L12 3z" /></svg>;
-  if (name === "clock") return <svg {...p}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>;
-  if (name === "home") return <svg {...p}><path d="M4 11.5L12 5l8 6.5" /><path d="M6.5 10.5V19h11v-8.5" /></svg>;
-  if (name === "explore") return <svg {...p}><circle cx="12" cy="12" r="8" /><path d="M9 15l2-6 4-2-2 4-6 2z" /></svg>;
-  if (name === "reels") return <svg {...p}><rect x="5" y="4" width="14" height="16" rx="3" /><path d="M9 4l2 5" /><path d="M14 4l2 5" /><path d="M5 9h14" /><path d="M10 13l5 3-5 3v-6z" fill="currentColor" stroke="none" /></svg>;
-  if (name === "cart") return <svg {...p}><path d="M4 6h2l1.5 8h8l2-6H8" /><circle cx="10" cy="18" r="1.4" /><circle cx="16" cy="18" r="1.4" /></svg>;
-  if (name === "orders") return <svg {...p}><rect x="6" y="4" width="12" height="16" rx="2" /><path d="M9 9h6" /><path d="M9 13h6" /></svg>;
-  if (name === "user") return <svg {...p}><circle cx="12" cy="8" r="3" /><path d="M5 19c2-3 4-4.5 7-4.5s5 1.5 7 4.5" /></svg>;
-  if (name === "grid") return <svg {...p}><rect x="4" y="4" width="6" height="6" rx="1.5" /><rect x="14" y="4" width="6" height="6" rx="1.5" /><rect x="4" y="14" width="6" height="6" rx="1.5" /><rect x="14" y="14" width="6" height="6" rx="1.5" /></svg>;
-  if (name === "burger") return <svg {...p}><path d="M5 10a7 7 0 0114 0H5z" /><path d="M4.5 13h15" /><path d="M5.5 16h13" /><path d="M7 19h10" /></svg>;
-  if (name === "pizza") return <svg {...p}><path d="M4 8c4-2 12-2 16 0L12 20 4 8z" /><circle cx="10" cy="10.5" r="1" fill="currentColor" stroke="none" /><circle cx="14" cy="12" r="1" fill="currentColor" stroke="none" /></svg>;
-  if (name === "grill") return <svg {...p}><path d="M6 6c2-2 4-2 6 0s4 2 6 0" /><path d="M8 8l8 8" /><path d="M16 8l-8 8" /></svg>;
-  if (name === "breakfast") return <svg {...p}><path d="M7 6v6a4 4 0 004 4h1a4 4 0 004-4V6" /><path d="M7 10h10" /><path d="M9 4v2" /><path d="M12 4v2" /><path d="M15 4v2" /></svg>;
-  if (name === "drink") return <svg {...p}><path d="M8 4h8" /><path d="M10 4l1 16h2l1-16" /><path d="M12 4l4-2" /></svg>;
-
-  return <svg {...p}><circle cx="12" cy="12" r="8" /></svg>;
 }
 
 function SafeImage({
@@ -471,7 +436,7 @@ export default function HomePage() {
       <section className="phone">
         <header className="topbar">
           <Link className="menu-btn" aria-label="القائمة" href="/profile">
-            <Icon name="menu" />
+            <FuseIcon name="menu" />
           </Link>
 
           <div className="brand-location">
@@ -480,14 +445,14 @@ export default function HomePage() {
               setLocationNotice((current) => current === "بغداد - المنصور" ? "بغداد - زيونة" : "بغداد - المنصور");
               showNotice("تم تحديث منطقة التوصيل");
             }}>
-              <Icon name="pin" />
+              <FuseIcon name="pin" />
               <b>{locationNotice}</b>
             </button>
           </div>
 
           <div className="top-actions">
             <Link href="/notification-center" className="icon-btn">
-              <Icon name="bell" />
+              <FuseIcon name="bell" />
             </Link>
 
             <Link href={session && role ? roleHomeSafe(role) : "/login"} className="profile">
@@ -498,7 +463,7 @@ export default function HomePage() {
 
         <section className="search-row">
           <div className="search-box">
-            <Icon name="search" />
+            <FuseIcon name="search" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -507,7 +472,7 @@ export default function HomePage() {
           </div>
 
           <button className="filter-btn" type="button" onClick={() => showNotice("استخدم التصنيفات للتصفية")}>
-            <Icon name="sliders" />
+            <FuseIcon name="sliders" />
           </button>
         </section>
 
@@ -519,7 +484,7 @@ export default function HomePage() {
               className={category === item.key ? "active" : ""}
             >
               <span>
-                <Icon name={item.icon} />
+                <FuseIcon name={item.icon} />
               </span>
               <b>{item.label}</b>
             </button>
@@ -541,19 +506,19 @@ export default function HomePage() {
 
         <section className="benefits">
           <div>
-            <Icon name="clock" />
+            <FuseIcon name="clock" />
             <b>توصيل سريع</b>
             <small>30-45 دقيقة</small>
           </div>
 
           <div>
-            <Icon name="star" />
+            <FuseIcon name="star" />
             <b>جودة مضمونة</b>
             <small>أفضل المطاعم</small>
           </div>
 
           <div>
-            <Icon name="pin" />
+            <FuseIcon name="pin" />
             <b>قريب منك</b>
             <small>داخل بغداد</small>
           </div>
@@ -580,7 +545,7 @@ export default function HomePage() {
                   <SafeImage src={image} alt={name} className="rest-img" label={name} />
 
                   <button type="button" className="heart">
-                    <Icon name="heart" />
+                    <FuseIcon name="heart" />
                   </button>
 
                   <span className="time">{restaurant.deliveryTime || "25-35 د"}</span>
@@ -588,7 +553,7 @@ export default function HomePage() {
 
                 <div className="rest-body">
                   <div className="rest-rating">
-                    <Icon name="star" />
+                    <FuseIcon name="star" />
                     <b>{Number(restaurant.rating || 4.8).toFixed(1)}</b>
                   </div>
 

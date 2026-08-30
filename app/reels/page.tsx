@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
+import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
 import { addFuseCartItem } from "@/lib/fuse-cart";
 import { isCatalogMenuItemId } from "@/lib/fuse-catalog";
 
@@ -70,16 +71,8 @@ function isVisible(reel: ReelDoc) {
 function mediaFor(reel: ReelDoc, index: number) { return reel.thumbnail || reel.image || `/images/m${(index % 9) + 1}.jpg`; }
 function formatIQD(value?: number) { return `${Number(value || 0).toLocaleString("ar-IQ")} د.ع`; }
 
-function Icon({ name }: { name: string }) {
-  const p = { width: 24, height: 24, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  if (name === "heart") return <svg {...p}><path d="M12 20s-7-4.4-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.6-7 10-7 10z" /></svg>;
-  if (name === "comment") return <svg {...p}><path d="M21 12a8 8 0 01-8 8 8.5 8.5 0 01-4-.9L3 21l1.8-5A8 8 0 1121 12z" /></svg>;
-  if (name === "share") return <svg {...p}><circle cx="18" cy="5" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="19" r="2"/><path d="M8 11l8-5M8 13l8 5"/></svg>;
-  if (name === "save") return <svg {...p}><path d="M6 4h12v17l-6-4-6 4V4z" /></svg>;
-  if (name === "volume") return <svg {...p}><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M18 9a4 4 0 010 6"/></svg>;
-  if (name === "mute") return <svg {...p}><path d="M5 9v6h4l5 4V5L9 9H5z"/><path d="M18 9l4 4M22 9l-4 4"/></svg>;
-  if (name === "cart") return <svg {...p}><path d="M4 6h2l1.5 8h8l2-6H8"/><circle cx="10" cy="18" r="1.3"/><circle cx="16" cy="18" r="1.3"/></svg>;
-  return <svg {...p}><circle cx="12" cy="12" r="9" /></svg>;
+function Icon({ name }: { name: FuseIconName }) {
+  return <FuseIcon name={name} size="md" />;
 }
 
 export default function ReelsPage() {

@@ -7,6 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { db } from "../firebase";
 import { performFuseLogout } from "@/lib/fuse-logout";
+import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
 import { parseFuseRole, roleHome, type FuseRole } from "@/lib/fuse-auth";
 
 type Profile = {
@@ -27,15 +28,15 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   ]);
 }
 
-const menu = [
-  ["📦", "طلباتي", "تابع الطلبات الحالية والسابقة", "/order-status"],
-  ["❤️", "المفضلة", "مطاعمك ووجباتك المحفوظة", "/favorites"],
-  ["📍", "عناوين التوصيل", "إدارة عناوينك المحفوظة", "/addresses"],
-  ["🎁", "العروض", "الخصومات المتاحة داخل FUSE", "/offers"],
-  ["🚴", "انضم كسائق", "قدّم طلب انضمام لفريق التوصيل", "/driver-register"],
-  ["🍔", "سجّل مطعمك", "أضف مطعمك إلى منصة FUSE", "/restaurant-register"],
-  ["💬", "المساعدة والدعم", "تواصل ويا فريق FUSE", "/support"],
-  ["ℹ️", "حول FUSE", "تعرف على التطبيق والخدمات", "/about"],
+const menu: Array<[FuseIconName, string, string, string]> = [
+  ["orders", "طلباتي", "تابع الطلبات الحالية والسابقة", "/order-status"],
+  ["heart", "المفضلة", "مطاعمك ووجباتك المحفوظة", "/favorites"],
+  ["map-pin", "عناوين التوصيل", "إدارة عناوينك المحفوظة", "/addresses"],
+  ["gift", "العروض", "الخصومات المتاحة داخل FUSE", "/offers"],
+  ["truck", "انضم كسائق", "قدّم طلب انضمام لفريق التوصيل", "/driver-register"],
+  ["store", "سجّل مطعمك", "أضف مطعمك إلى منصة FUSE", "/restaurant-register"],
+  ["help", "المساعدة والدعم", "تواصل ويا فريق FUSE", "/support"],
+  ["info", "حول FUSE", "تعرف على التطبيق والخدمات", "/about"],
 ];
 
 async function readProfile(uid: string) {
@@ -52,12 +53,6 @@ async function readProfile(uid: string) {
 
 function roleFrom(user: User, profile: Profile | null, claimRole: unknown): FuseRole | null {
   return parseFuseRole(claimRole || profile?.role || profile?.fuseRole);
-}
-
-function HeaderIcon({ name }: { name: "bell" | "settings" }) {
-  const common = { width: 21, height: 21, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
-  if (name === "bell") return <svg {...common}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>;
-  return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.15.38.37.73.66 1 .3.28.68.42 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.76.6Z" /></svg>;
 }
 
 export default function ProfilePage() {
@@ -132,9 +127,9 @@ export default function ProfilePage() {
   return (
     <main className="profile-shell" dir="rtl">
       <header className="top customer-header profile-header">
-        <Link className="icon-btn" href="/notification-center" aria-label="الإشعارات"><HeaderIcon name="bell" /></Link>
+        <Link className="icon-btn" href="/notification-center" aria-label="الإشعارات"><FuseIcon name="bell" /></Link>
         <span className="brand">حسابي</span>
-        <Link className="icon-btn" href="/settings" aria-label="الإعدادات"><HeaderIcon name="settings" /></Link>
+        <Link className="icon-btn" href="/settings" aria-label="الإعدادات"><FuseIcon name="settings" /></Link>
       </header>
 
       <section className="profile-card">
@@ -160,7 +155,7 @@ export default function ProfilePage() {
       <section className="notice">
         <h2>متابعة الطلبات بحسابك</h2>
         <p>طلباتك تظهر تلقائياً بعد تسجيل الدخول، وما تحتاج تبحث برقم الهاتف.</p>
-        <small>📍 {address}</small>
+        <small className="notice-pin"><FuseIcon name="map-pin" size="sm" /> {address}</small>
         <Link href="/order-status">عرض الطلبات</Link>
       </section>
 
@@ -168,8 +163,8 @@ export default function ProfilePage() {
       <section className="menu">
         {menu.map(([icon, title, desc, href]) => (
           <Link key={title} href={href} className="item">
-            <div className="item-main"><div className="emoji">{icon}</div><div><h3>{title}</h3><p>{desc}</p></div></div>
-            <span className="arrow">‹</span>
+            <div className="item-main"><div className="emoji"><FuseIcon name={icon} /></div><div><h3>{title}</h3><p>{desc}</p></div></div>
+            <span className="arrow"><FuseIcon name="chevron-forward" size="sm" /></span>
           </Link>
         ))}
       </section>

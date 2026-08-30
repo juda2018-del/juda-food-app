@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
+import FuseIcon from "@/components/FuseIcon";
 
 type RestaurantDoc = {
   documentId: string;
@@ -40,11 +41,15 @@ function mergeRestaurants(remote: RestaurantDoc[]) {
   return Array.from(map.values());
 }
 
-function RestaurantImage({ src, name, fallback }: { src?: string; name: string; fallback?: string }) {
+function RestaurantImage({ src, name }: { src?: string; name: string; fallback?: string }) {
   const [failed, setFailed] = useState(false);
 
   if (!src || failed) {
-    return <span className="image-fallback" aria-label={name}>{fallback || name.slice(0, 1) || "🍽️"}</span>;
+    return (
+      <span className="image-fallback" aria-label={name}>
+        <FuseIcon name="store" size="lg" />
+      </span>
+    );
   }
 
   return <img src={src} alt={name} onError={() => setFailed(true)} />;
@@ -103,8 +108,8 @@ export default function RestaurantsPage() {
     <main dir="rtl" className="page restaurants-page">
       <section className="phone">
         <header className="top customer-header">
-          <Link href="/" className="back" aria-label="الرئيسية">
-            <span aria-hidden="true">‹</span>
+          <Link href="/" className="back fuse-back-btn" aria-label="الرئيسية">
+            <FuseIcon name="chevron-back" />
           </Link>
           <div><p>FUSE Iraq</p><h1>المطاعم</h1></div>
           <Link href="/cart" className="cart">السلة</Link>

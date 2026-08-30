@@ -8,6 +8,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { parseFuseRole, roleHome } from "@/lib/fuse-auth";
 import { fuseCustomerProgressIndex, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import FuseIcon from "@/components/FuseIcon";
 
 type OrderItem = { name?: string; title?: string; qty?: number; quantity?: number; price?: number };
 type OrderDoc = {
@@ -166,7 +167,7 @@ export default function OrderStatusPage() {
     <main dir="rtl" className="page">
       <section className="phone">
         <header className="top">
-          <Link href="/" className="back">‹</Link>
+          <Link href="/" className="back fuse-back-btn" aria-label="الرئيسية"><FuseIcon name="chevron-back" /></Link>
           <div className="heading"><span>FUSE Iraq</span><h1>طلباتي</h1></div>
           <Link href="/support" className="support">دعم</Link>
         </header>

@@ -1,0 +1,272 @@
+/* FUSE unified design system — icons, buttons, touch targets, auth, desktop */
+
+:root {
+  --fuse-icon-sm: 20px;
+  --fuse-icon-md: 22px;
+  --fuse-icon-lg: 24px;
+  --fuse-touch: 46px;
+  --fuse-radius-btn: 16px;
+  --fuse-radius-card: 22px;
+  --fuse-radius-shell: 28px;
+}
+
+.fuse-icon {
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.fuse-icon-btn,
+.icon-btn {
+  width: var(--fuse-touch) !important;
+  height: var(--fuse-touch) !important;
+  min-width: var(--fuse-touch) !important;
+  min-height: var(--fuse-touch) !important;
+  padding: 0 !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border-radius: var(--fuse-radius-btn) !important;
+}
+
+.fuse-back-btn,
+.back,
+.home-page .menu-btn,
+.restaurant-detail-page .back-btn,
+.dynamic-restaurant-page .back-link {
+  width: var(--fuse-touch) !important;
+  height: var(--fuse-touch) !important;
+  min-width: var(--fuse-touch) !important;
+  min-height: var(--fuse-touch) !important;
+  padding: 0 !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+}
+
+.fuse-back-btn svg,
+.back svg,
+.home-page .menu-btn svg {
+  width: var(--fuse-icon-md) !important;
+  height: var(--fuse-icon-md) !important;
+}
+
+.fuse-customer-nav svg,
+.fuse-nav-icon svg {
+  width: var(--fuse-icon-lg) !important;
+  height: var(--fuse-icon-lg) !important;
+}
+
+.home-page .icon-btn,
+.home-page .filter-btn,
+.home-page .heart,
+.restaurants-page .icon-btn,
+.reels-page .side button span,
+.profile-shell .emoji {
+  display: grid !important;
+  place-items: center !important;
+}
+
+.home-page .categories button span,
+.home-page .categories button svg {
+  width: var(--fuse-icon-md) !important;
+  height: var(--fuse-icon-md) !important;
+}
+
+.reels-page .side button span {
+  width: var(--fuse-touch) !important;
+  height: var(--fuse-touch) !important;
+  border-radius: 50% !important;
+}
+
+.profile-shell .emoji {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: var(--fuse-radius-btn) !important;
+  background: rgba(31, 122, 79, 0.08) !important;
+  color: var(--ref-green, #1f7a4f) !important;
+}
+
+.profile-shell .arrow {
+  display: grid !important;
+  place-items: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  color: #bbb !important;
+}
+
+/* Auth — align with FUSE cream/orange identity */
+.fuse-auth-page {
+  min-height: 100dvh;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: transparent;
+  color: var(--ref-ink, #15171a);
+  font-family: var(--fuse-body-font);
+}
+
+.fuse-auth-page .fuse-auth-card {
+  width: min(100%, 430px);
+  margin-inline: auto;
+}
+
+.fuse-auth-page .fuse-auth-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  object-fit: contain;
+}
+
+.fuse-auth-page .fuse-auth-head h1 {
+  margin: 12px 0 4px;
+  font-family: var(--fuse-title-font);
+  font-size: 28px;
+  color: var(--ref-orange, #ff6a0a);
+}
+
+.fuse-auth-page .fuse-auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 6px;
+  border-radius: var(--fuse-radius-shell);
+  background: rgba(255, 252, 247, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: var(--ref-shadow-soft);
+}
+
+.fuse-auth-page .fuse-auth-tabs button {
+  min-height: var(--fuse-touch);
+  border: 0;
+  border-radius: var(--fuse-radius-btn);
+  font-family: inherit;
+  font-weight: 900;
+  background: transparent;
+  color: var(--ref-muted);
+}
+
+.fuse-auth-page .fuse-auth-tabs button.is-active {
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2));
+  color: #fff;
+}
+
+.fuse-auth-page .fuse-auth-form,
+.fuse-auth-page .fuse-auth-roles {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: var(--fuse-radius-shell);
+  background: rgba(255, 252, 247, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: var(--ref-shadow-soft);
+}
+
+.fuse-auth-page .fuse-auth-form input {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: var(--fuse-radius-btn);
+  border: 1px solid rgba(21, 23, 26, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  outline: none;
+}
+
+.fuse-auth-page .fuse-role-btn {
+  width: 100%;
+  text-align: right;
+  padding: 14px;
+  border-radius: var(--fuse-radius-shell);
+  border: 1px solid rgba(21, 23, 26, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fuse-auth-page .fuse-role-btn.is-active {
+  border-color: var(--ref-green);
+  background: rgba(31, 122, 79, 0.08);
+}
+
+.fuse-auth-page .fuse-role-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--fuse-radius-btn);
+  display: grid;
+  place-items: center;
+  background: rgba(31, 122, 79, 0.1);
+  color: var(--ref-green);
+  flex: 0 0 auto;
+}
+
+.fuse-auth-page .fuse-auth-submit {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: var(--fuse-radius-shell);
+  background: linear-gradient(135deg, var(--ref-green), var(--ref-green-2));
+  color: #fff;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(31, 122, 79, 0.22);
+}
+
+.fuse-auth-page .fuse-auth-submit:disabled {
+  opacity: 0.55;
+}
+
+/* Desktop canvas */
+@media (min-width: 900px) {
+  body {
+    background:
+      radial-gradient(circle at 8% 4%, rgba(255, 224, 117, 0.35), transparent 28%),
+      radial-gradient(circle at 92% 8%, rgba(84, 185, 255, 0.18), transparent 32%),
+      linear-gradient(155deg, var(--ref-bg-2, #fdf6ec) 0%, var(--ref-bg, #f4efe6) 52%, #faf4ee 100%) !important;
+  }
+
+  .page.home-page,
+  .page.restaurants-page,
+  .page.restaurant-detail-page,
+  main.page,
+  .profile-shell,
+  main.app,
+  .fuse-auth-page .fuse-auth-card,
+  .reels-page {
+    max-width: 430px !important;
+    margin-inline: auto !important;
+  }
+}
+
+.profile-shell .notice-pin {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.app .empty-icon {
+  width: 64px !important;
+  height: 64px !important;
+  border-radius: var(--fuse-radius-btn) !important;
+  background: rgba(31, 122, 79, 0.1) !important;
+  color: var(--ref-green, #1f7a4f) !important;
+}
+
+.restaurants-page .image-fallback {
+  color: #8fd6a8 !important;
+}
+
+.dynamic-restaurant-page .hero .emoji {
+  display: grid !important;
+  place-items: center !important;
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #fff !important;
+}
+
+@media (min-width: 1440px) {
+  .fuse-customer-nav {
+    max-width: 430px !important;
+  }
+}

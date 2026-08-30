@@ -11,12 +11,13 @@ import {
 } from "firebase/auth";
 import { app, db } from "../firebase";
 
+import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
+
 type Role = {
   title: string;
   desc: string;
-  icon: string;
+  icon: FuseIconName;
   href: string;
-  color: string;
   value: string;
 };
 
@@ -26,33 +27,29 @@ const roles: Role[] = [
   {
     title: "زبون",
     desc: "طلب الطعام وتتبع الطلب وتقييم الخدمة",
-    icon: "👤",
+    icon: "user",
     href: "/",
-    color: "bg-[#FF7A00]",
     value: "customer",
   },
   {
     title: "سائق",
     desc: "استلام الطلبات وتحديث حالة التوصيل",
-    icon: "🛵",
+    icon: "truck",
     href: "/driver-app",
-    color: "bg-yellow-400",
     value: "driver",
   },
   {
     title: "مطعم",
     desc: "إدارة الطلبات وتحضيرها وتسليمها للسائق",
-    icon: "🍽️",
+    icon: "store",
     href: "/restaurant-admin",
-    color: "bg-blue-400",
     value: "restaurant",
   },
   {
     title: "مدير",
     desc: "غرفة القيادة والتحليلات والذكاء الاصطناعي",
-    icon: "👑",
+    icon: "shield",
     href: "/uber-dashboard",
-    color: "bg-purple-400",
     value: "admin",
   },
 ];
@@ -152,86 +149,76 @@ export default function AuthPage() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#050505] px-4 py-8 text-white">
-      <section className="mx-auto max-w-md">
-        <div className="text-center">
+    <main dir="rtl" className="fuse-auth-page">
+      <section className="fuse-auth-card">
+        <div className="fuse-auth-head text-center">
           <img
             src="/images/fuse-logo.png"
             alt="FUSE"
-            className="mx-auto h-28 w-28 rounded-3xl object-contain"
+            className="fuse-auth-logo mx-auto"
           />
 
-          <h1 className="mt-4 text-4xl font-black text-[#FF7A00]">
-            دخول FUSE
-          </h1>
+          <h1>دخول FUSE</h1>
 
-          <p className="mt-2 text-zinc-400">
-            سجل دخولك أو أنشئ حساب جديد
-          </p>
+          <p className="text-muted">سجل دخولك أو أنشئ حساب جديد</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 rounded-3xl bg-[#121217] p-2">
+        <div className="fuse-auth-tabs">
           <button
+            type="button"
             onClick={() => setMode("login")}
-            className={`rounded-2xl py-3 font-black ${
-              mode === "login" ? "bg-[#FF7A00] text-black" : "text-white"
-            }`}
+            className={mode === "login" ? "is-active" : undefined}
           >
             تسجيل دخول
           </button>
 
           <button
+            type="button"
             onClick={() => setMode("register")}
-            className={`rounded-2xl py-3 font-black ${
-              mode === "register" ? "bg-[#FF7A00] text-black" : "text-white"
-            }`}
+            className={mode === "register" ? "is-active" : undefined}
           >
             إنشاء حساب
           </button>
         </div>
 
-        <div className="mt-5 rounded-[2rem] border border-white/10 bg-[#111116] p-5">
-          <label className="mb-2 block font-black text-zinc-300">الإيميل</label>
+        <div className="fuse-auth-form">
+          <label>الإيميل</label>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="example@gmail.com"
-            className="mb-4 w-full rounded-2xl border border-white/10 bg-[#1A1A20] p-4 text-white outline-none placeholder:text-zinc-600"
+            dir="ltr"
           />
 
-          <label className="mb-2 block font-black text-zinc-300">
-            كلمة السر
-          </label>
+          <label>كلمة السر</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="اكتب كلمة السر"
-            className="mb-4 w-full rounded-2xl border border-white/10 bg-[#1A1A20] p-4 text-white outline-none placeholder:text-zinc-600"
           />
 
-          <label className="mb-2 block font-black text-zinc-300">
-            رقم الهاتف
-          </label>
+          <label>رقم الهاتف</label>
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="07701234567"
-            className="w-full rounded-2xl border border-white/10 bg-[#1A1A20] p-4 text-white outline-none placeholder:text-zinc-600"
+            dir="ltr"
           />
 
           <button
+            type="button"
             onClick={resetPassword}
             disabled={loading}
-            className="mt-4 text-sm font-black text-[#FF7A00]"
+            className="fuse-auth-reset"
           >
             نسيت كلمة السر؟
           </button>
         </div>
 
-        <h2 className="mt-6 mb-3 text-xl font-black">اختار نوع الحساب</h2>
+        <h2 className="fuse-auth-section-title">اختار نوع الحساب</h2>
 
-        <div className="grid gap-3">
+        <div className="fuse-auth-roles">
           {roles.map((role) => {
             const active = selectedRole?.title === role.title;
 
@@ -240,23 +227,15 @@ export default function AuthPage() {
                 key={role.title}
                 type="button"
                 onClick={() => setSelectedRole(role)}
-                className={`rounded-3xl border p-4 text-right transition active:scale-95 ${
-                  active
-                    ? "border-[#FF7A00] bg-[#FF7A00]/10"
-                    : "border-white/10 bg-[#111116]"
-                }`}
+                className={`fuse-role-btn${active ? " is-active" : ""}`}
               >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`flex h-14 w-14 items-center justify-center rounded-2xl text-3xl ${role.color}`}
-                  >
-                    {role.icon}
-                  </div>
+                <div className="fuse-role-icon">
+                  <FuseIcon name={role.icon} size="lg" />
+                </div>
 
-                  <div>
-                    <h3 className="text-xl font-black">{role.title}</h3>
-                    <p className="text-sm text-zinc-400">{role.desc}</p>
-                  </div>
+                <div>
+                  <h3>{role.title}</h3>
+                  <p>{role.desc}</p>
                 </div>
               </button>
             );
@@ -264,9 +243,10 @@ export default function AuthPage() {
         </div>
 
         <button
+          type="button"
           onClick={handleAuth}
           disabled={loading}
-          className="mt-6 w-full rounded-3xl bg-[#FF7A00] py-4 text-xl font-black text-black disabled:bg-zinc-700 disabled:text-zinc-400"
+          className="fuse-auth-submit"
         >
           {loading
             ? "انتظر..."
@@ -275,13 +255,22 @@ export default function AuthPage() {
             : "إنشاء حساب"}
         </button>
 
-        <Link
-          href="/"
-          className="mt-4 block rounded-3xl border border-white/10 bg-[#111116] py-4 text-center font-black"
-        >
+        <Link href="/" className="fuse-auth-back">
           رجوع للرئيسية
         </Link>
       </section>
+
+      <style jsx>{`
+        .text-center { text-align: center; }
+        .text-muted { margin: 0; color: var(--ref-muted, #6f7175); font-weight: 700; font-size: 13px; }
+        label { display: block; margin-bottom: 6px; font-weight: 900; font-size: 12px; color: var(--ref-muted, #6f7175); }
+        .fuse-auth-reset { margin-top: 4px; border: 0; background: transparent; color: var(--ref-orange, #ff6a0a); font-family: inherit; font-weight: 900; font-size: 12px; cursor: pointer; }
+        .fuse-auth-section-title { margin: 18px 0 10px; font-size: 16px; font-weight: 900; }
+        .fuse-auth-roles { display: grid; gap: 10px; }
+        .fuse-role-btn h3 { margin: 0 0 4px; font-size: 16px; font-weight: 900; }
+        .fuse-role-btn p { margin: 0; color: var(--ref-muted, #6f7175); font-size: 12px; line-height: 1.5; }
+        .fuse-auth-back { display: block; margin-top: 12px; min-height: 52px; border-radius: var(--fuse-radius-shell, 28px); border: 1px solid rgba(21, 23, 26, 0.08); background: rgba(255, 252, 247, 0.86); text-align: center; line-height: 52px; text-decoration: none; color: var(--ref-ink, #15171a); font-weight: 900; }
+      `}</style>
     </main>
   );
 }
