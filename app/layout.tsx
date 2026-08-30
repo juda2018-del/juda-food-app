@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import ClientRouteGuard from "../components/ClientRouteGuard";
 import FuseCustomerNav from "../components/FuseCustomerNav";
 import "@fontsource/ibm-plex-sans-arabic/400.css";
@@ -13,9 +14,7 @@ import "@fontsource/tajawal/700.css";
 import "@fontsource/tajawal/800.css";
 import "./globals.css";
 import "./mobile-responsive.css";
-import "./fuse-reference-theme.css";
-import "./fuse-customer-shell.css";
-import "./fuse-design-system.css";
+import "./fuse-customer-ui.css";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -53,7 +52,9 @@ export default function RootLayout({
       <body>
         <ClientRouteGuard />
         {children}
-        <FuseCustomerNav />
+        <Suspense fallback={null}>
+          <FuseCustomerNav />
+        </Suspense>
       </body>
     </html>
   );

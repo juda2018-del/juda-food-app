@@ -1,63 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import FuseIcon, { type FuseIconName } from "./FuseIcon";
-
-const items: Array<{ href: string; label: string; icon: FuseIconName }> = [
-  { href: "/", label: "الرئيسية", icon: "home" },
-  { href: "/restaurants", label: "المطاعم", icon: "search" },
-  { href: "/reels", label: "ريلز", icon: "reels" },
-  { href: "/order-status", label: "طلباتي", icon: "orders" },
-  { href: "/profile", label: "حسابي", icon: "user" },
-];
-
-const hiddenPrefixes = [
-  "/login",
-  "/signup",
-  "/auth",
-  "/privacy",
-  "/restaurant-admin",
-  "/restaurant-dashboard",
-  "/restaurant-orders",
-  "/restaurant-live",
-  "/restaurant-reels",
-  "/fuse-admin",
-  "/admin",
-  "/driver",
-  "/vendor",
-  "/ceo-",
-  "/system-",
-  "/operations-",
-  "/mission-",
-  "/control-",
-  "/fleet-",
-  "/dispatch",
-  "/smart-",
-  "/live-map",
-];
-
-function isItemActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  if (href === "/restaurants") {
-    return pathname === "/restaurants" || pathname.startsWith("/restaurants/");
-  }
-  if (href === "/order-status") {
-    return pathname === "/order-status" || pathname === "/orders";
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+import { usePathname, useSearchParams } from "next/navigation";
+import FuseIcon from "./FuseIcon";
+import {
+  FUSE_CUSTOMER_NAV_HIDDEN_PREFIXES,
+  FUSE_CUSTOMER_NAV_ITEMS,
+  isFuseCustomerNavItemActive,
+} from "@/lib/fuse-customer-nav";
 
 export default function FuseCustomerNav() {
   const pathname = usePathname() || "/";
-  const hidden = hiddenPrefixes.some((prefix) => pathname.startsWith(prefix));
+  const search = useSearchParams()?.toString() || "";
+  const hidden = FUSE_CUSTOMER_NAV_HIDDEN_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
 
   if (hidden) return null;
 
   return (
     <nav className="fuse-customer-nav" aria-label="التنقل الرئيسي">
-      {items.map((item) => {
-        const active = isItemActive(pathname, item.href);
+      {FUSE_CUSTOMER_NAV_ITEMS.map((item) => {
+        const active = isFuseCustomerNavItemActive(pathname, item.href, search);
 
         return (
           <Link

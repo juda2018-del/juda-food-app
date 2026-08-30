@@ -1,4 +1,4 @@
-/* FUSE Reference Theme — glass premium food delivery (loaded last) */
+/* FUSE Reference Theme �?� glass premium food delivery (loaded last) */
 :root {
   --ref-bg: #f4efe6;
   --ref-bg-2: #fdf6ec;
@@ -32,7 +32,7 @@ body {
   color: var(--ref-ink) !important;
 }
 
-/* ── Bottom navigation (reference: floating glass + green active) ── */
+/* ٤?٤? Bottom navigation (reference: floating glass + green active) ٤?٤? */
 .fuse-customer-nav {
   height: 72px !important;
   padding: 6px 8px !important;
@@ -59,7 +59,7 @@ body {
   border-radius: 14px;
 }
 
-/* ── Shared customer canvas ── */
+/* ٤?٤? Shared customer canvas ٤?٤? */
 .page.home-page,
 .page.restaurants-page,
 .profile-shell,

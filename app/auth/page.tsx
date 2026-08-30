@@ -260,17 +260,6 @@ export default function AuthPage() {
         </Link>
       </section>
 
-      <style jsx>{`
-        .text-center { text-align: center; }
-        .text-muted { margin: 0; color: var(--ref-muted, #6f7175); font-weight: 700; font-size: 13px; }
-        label { display: block; margin-bottom: 6px; font-weight: 900; font-size: 12px; color: var(--ref-muted, #6f7175); }
-        .fuse-auth-reset { margin-top: 4px; border: 0; background: transparent; color: var(--ref-orange, #ff6a0a); font-family: inherit; font-weight: 900; font-size: 12px; cursor: pointer; }
-        .fuse-auth-section-title { margin: 18px 0 10px; font-size: 16px; font-weight: 900; }
-        .fuse-auth-roles { display: grid; gap: 10px; }
-        .fuse-role-btn h3 { margin: 0 0 4px; font-size: 16px; font-weight: 900; }
-        .fuse-role-btn p { margin: 0; color: var(--ref-muted, #6f7175); font-size: 12px; line-height: 1.5; }
-        .fuse-auth-back { display: block; margin-top: 12px; min-height: 52px; border-radius: var(--fuse-radius-shell, 28px); border: 1px solid rgba(21, 23, 26, 0.08); background: rgba(255, 252, 247, 0.86); text-align: center; line-height: 52px; text-decoration: none; color: var(--ref-ink, #15171a); font-weight: 900; }
-      `}</style>
     </main>
   );
 }

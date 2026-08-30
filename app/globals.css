@@ -1,34 +1,11 @@
 :root {
-  --fuse-orange: #ff6a0a;
-  --fuse-orange-2: #ff8a24;
-  --fuse-orange-3: #ff3d00;
-  --fuse-blue: #123fbd;
-  --fuse-blue-2: #082d8f;
-  --fuse-blue-3: #071f67;
-  --fuse-black: #15171a;
-  --fuse-black-2: #0b1220;
-  --fuse-cream: #fdf6ec;
-  --fuse-cream-2: #f4efe6;
-  --fuse-sky: #54b9ff;
-  --fuse-coral: #ff5964;
-  --fuse-green: #1f7a4f;
-  --fuse-green-2: #2f915f;
-  --fuse-nav-height: 72px;
-  --fuse-nav-gap: 8px;
-  --fuse-page-gutter: 14px;
-  --fuse-page-top: calc(14px + env(safe-area-inset-top, 0px));
-  --fuse-page-bottom: calc(var(--fuse-nav-height) + var(--fuse-nav-gap) + env(safe-area-inset-bottom, 0px) + 10px);
-  --fuse-toast-bottom: calc(var(--fuse-nav-height) + var(--fuse-nav-gap) + env(safe-area-inset-bottom, 0px) + 14px);
   --fuse-title-font: "Noto Kufi Arabic Variable", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --fuse-body-font: "Tajawal", "IBM Plex Sans Arabic", system-ui, sans-serif;
-  --fuse-surface: rgba(255,255,255,.78);
-  --fuse-border: rgba(11,18,32,.09);
-  --fuse-radius-lg: 24px;
-  --fuse-radius-md: 18px;
-  --fuse-shadow: 0 12px 34px rgba(11,18,32,.075);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 html,
 body {
@@ -36,8 +13,10 @@ body {
   padding: 0;
   max-width: 100vw;
   overflow-x: hidden;
-  background: var(--fuse-cream);
-  color: var(--fuse-black);
+}
+
+body {
+  min-height: 100vh;
   font-family: var(--fuse-body-font);
   font-feature-settings: "kern";
   text-rendering: optimizeLegibility;
@@ -45,14 +24,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-body { min-height: 100vh; }
-a { color: inherit; text-decoration: none; }
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 button,
 input,
 textarea,
-select { font-family: var(--fuse-body-font); }
-button { cursor: pointer; }
-img { max-width: 100%; }
+select {
+  font-family: var(--fuse-body-font);
+}
+
+button {
+  cursor: pointer;
+}
+
+img {
+  max-width: 100%;
+}
 
 h1,
 h2,
@@ -73,119 +63,16 @@ input,
 button,
 a,
 b,
-strong { font-family: var(--fuse-body-font); }
+strong {
+  font-family: var(--fuse-body-font);
+}
 
 input,
-textarea { direction: rtl; }
+textarea {
+  direction: rtl;
+}
 
 ::selection {
-  background: rgba(255, 90, 0, 0.25);
-  color: var(--fuse-black);
-}
-
-.fuse-title {
-  font-family: var(--fuse-title-font);
-  font-weight: 900;
-  letter-spacing: -0.7px;
-}
-
-.fuse-text {
-  font-family: var(--fuse-body-font);
-  font-weight: 500;
-}
-
-.fuse-price {
-  font-family: var(--fuse-body-font);
-  font-weight: 700;
-  letter-spacing: -0.2px;
-}
-
-.fuse-customer-nav {
-  direction: rtl;
-  position: fixed;
-  z-index: 10000;
-  left: 50%;
-  bottom: max(8px, env(safe-area-inset-bottom));
-  width: min(414px, calc(100% - 20px));
-  height: 70px;
-  padding: 5px 6px;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: center;
-  border: 1px solid rgba(11, 18, 32, 0.08);
-  border-radius: 24px;
-  background: rgba(255, 252, 248, 0.94);
-  box-shadow: 0 14px 36px rgba(11, 18, 32, 0.15);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  backdrop-filter: blur(22px) saturate(150%);
-  isolation: isolate;
-}
-
-.fuse-customer-nav > a {
-  width: 100%;
-  min-width: 0;
-  height: 58px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  color: #646a72;
-  border-radius: 18px;
-  -webkit-tap-highlight-color: transparent;
-  transition: background .18s ease, color .18s ease, transform .18s ease;
-}
-
-.fuse-customer-nav > a.is-active {
-  color: var(--fuse-orange);
-  background: rgba(255, 90, 0, .085);
-}
-
-.fuse-customer-nav > a:active { transform: scale(.96); }
-
-.fuse-customer-nav > a b {
-  max-width: 100%;
-  overflow: hidden;
-  color: inherit;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fuse-nav-icon {
-  width: 32px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-}
-
-.fuse-customer-nav svg {
-  width: 23px;
-  height: 23px;
-  overflow: visible;
-}
-
-/* FUSE customer design system: layout helpers only (visual rules live in fuse-reference-theme.css). */
-@media (max-width: 520px) {
-  html,
-  body { background: #f7f1e8; }
-
-  .fuse-customer-nav {
-    left: 10px !important;
-    right: 10px !important;
-    bottom: max(8px, env(safe-area-inset-bottom)) !important;
-    width: auto !important;
-    height: 68px !important;
-    border-radius: 24px !important;
-  }
-}
-
-@media (max-width: 360px) {
-  .fuse-customer-nav { left: 8px !important; right: 8px !important; padding-inline: 4px !important; }
-  .fuse-customer-nav > a b { font-size: 9px !important; }
-  .fuse-customer-nav svg { width: 22px !important; height: 22px !important; }
+  background: rgba(255, 106, 10, 0.25);
+  color: #15171a;
 }

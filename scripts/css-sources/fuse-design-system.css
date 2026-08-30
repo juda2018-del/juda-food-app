@@ -1,4 +1,4 @@
-/* FUSE unified design system â€” icons, buttons, touch targets, auth, desktop */
+/* FUSE unified design system Ù?¤ icons, buttons, touch targets, auth, desktop */
 
 :root {
   --fuse-icon-sm: 20px;
@@ -94,7 +94,7 @@
   color: #bbb !important;
 }
 
-/* Auth â€” align with FUSE cream/orange identity */
+/* Auth Ù?¤ align with FUSE cream/orange identity */
 .fuse-auth-page {
   min-height: 100dvh;
   padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
@@ -405,7 +405,7 @@
   }
 }
 
-/* Satellite customer pages â€” shared layout, forms, states */
+/* Satellite customer pages Ù?¤ shared layout, forms, states */
 main.app .top,
 main.page.fuse-satellite .top {
   display: flex;

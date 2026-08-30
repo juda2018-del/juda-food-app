@@ -216,10 +216,6 @@ export default function LoginClient() {
         </Link>
       </section>
 
-      <style jsx>{`
-        .text-center { text-align: center; }
-        .mx-auto { margin-inline: auto; display: block; }
-      `}</style>
     </main>
   );
 }

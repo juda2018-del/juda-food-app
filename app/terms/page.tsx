@@ -1,4 +1,7 @@
 import Link from "next/link";
+import CustomerHeader from "@/components/customer/CustomerHeader";
+import CustomerPageShell from "@/components/customer/CustomerPageShell";
+import { FuseCard, FuseSecondaryButton } from "@/components/customer/FuseCards";
 
 export const metadata = {
   title: "شروط استخدام FUSE Iraq",
@@ -7,17 +10,16 @@ export const metadata = {
 
 export default function TermsPage() {
   return (
-    <main dir="rtl" style={{ minHeight: "100vh", background: "#050505", color: "#fff", fontFamily: "Cairo, system-ui, sans-serif", padding: "24px 14px" }}>
-      <section style={{ maxWidth: 920, margin: "0 auto", border: "1px solid rgba(255,255,255,.12)", borderRadius: 28, padding: 24, background: "linear-gradient(145deg,#151515,#090909)", lineHeight: 1.9 }}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 18 }}>
-          <Link href="/" style={linkStyle}>الرئيسية</Link>
-          <Link href="/privacy" style={linkStyle}>الخصوصية</Link>
-          <Link href="/data-deletion" style={linkStyle}>حذف الحساب</Link>
-          <Link href="/support" style={linkStyle}>الدعم</Link>
+    <CustomerPageShell variant="legal">
+      <CustomerHeader title="شروط الاستخدام" subtitle="FUSE Iraq" backHref="/profile" />
+      <FuseCard className="legal-card">
+        <div className="links-row">
+          <FuseSecondaryButton href="/">الرئيسية</FuseSecondaryButton>
+          <FuseSecondaryButton href="/privacy">الخصوصية</FuseSecondaryButton>
+          <FuseSecondaryButton href="/data-deletion">حذف الحساب</FuseSecondaryButton>
+          <Link href="/support" className="btn-primary">الدعم</Link>
         </div>
 
-        <p style={{ color: "#ff7a00", fontWeight: 900, margin: 0 }}>FUSE Iraq</p>
-        <h1 style={{ fontSize: 36, margin: "8px 0 18px" }}>شروط الاستخدام</h1>
         <p>باستخدامك تطبيق FUSE Iraq فإنك توافق على هذه الشروط. إذا لم توافق عليها، يرجى عدم استخدام الخدمة.</p>
 
         <h2>1. طبيعة الخدمة</h2>
@@ -42,25 +44,16 @@ export default function TermsPage() {
         <p>يُمنع إساءة الاستخدام، الاحتيال، نشر معلومات مضللة، محاولة اختراق الخدمة، التلاعب بالطلبات أو الأسعار، أو استخدام بيانات الآخرين دون إذن.</p>
 
         <h2>8. الخصوصية وحذف الحساب</h2>
-        <p>تعالج البيانات وفق <Link href="/privacy" style={{ color: "#ff9b43" }}>سياسة الخصوصية</Link>. يمكن تقديم طلب حذف الحساب من صفحة حذف الحساب، وتتم مراجعته وتنفيذه إدارياً بعد التحقق من الطلب والالتزامات المرتبطة به.</p>
+        <p>
+          تعالج البيانات وفق <Link href="/privacy">سياسة الخصوصية</Link>. يمكن تقديم طلب حذف الحساب من صفحة حذف الحساب، وتتم مراجعته وتنفيذه إدارياً بعد التحقق من الطلب والالتزامات المرتبطة به.
+        </p>
 
         <h2>9. حدود المسؤولية</h2>
         <p>نسعى لتوفير خدمة مستقرة، لكن لا نضمن عدم الانقطاع أو خلو النظام من الأخطاء دائماً. لا يتحمل FUSE مسؤولية الأضرار الناتجة عن معلومات غير صحيحة أدخلها المستخدم أو تصرفات مستقلة من مطعم أو سائق خارج نطاق المنصة.</p>
 
         <h2>10. التعديلات والتواصل</h2>
-        <p>قد تتغير هذه الشروط عند تحديث الخدمة. استمرار الاستخدام بعد نشر التحديث يعني قبول النسخة الجديدة. للاستفسارات راسل الدعم على <b dir="ltr">fuseiraq@gmail.com</b>.</p>
-
-        <p style={{ color: "#999", marginTop: 28 }}>آخر تحديث: يوليو 2026</p>
-      </section>
-    </main>
+        <p>قد نحدّث هذه الشروط. استمرارك في استخدام التطبيق بعد التحديث يعني موافقتك على النسخة المحدّثة. للاستفسارات: <b dir="ltr">fuseiraq@gmail.com</b></p>
+      </FuseCard>
+    </CustomerPageShell>
   );
 }
-
-const linkStyle = {
-  color: "#fff",
-  textDecoration: "none",
-  border: "1px solid rgba(255,255,255,.14)",
-  borderRadius: 12,
-  padding: "8px 12px",
-  fontWeight: 800,
-};

@@ -203,19 +203,6 @@ export default function SettingsPage() {
         <p>لا يمكن من هذه الصفحة تغيير البريد أو الدور أو صلاحيات الإدارة والمطعم والسائق.</p>
       </section>
 
-      <style jsx>{`
-        .identity{display:flex;align-items:center;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--ref-line)}
-        .avatar{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,var(--ref-green),#54b9ff);color:#fff;font-size:24px;font-weight:950}
-        .identity div:last-child{display:grid;gap:4px;min-width:0}
-        .identity b{font-size:13px;overflow-wrap:anywhere}
-        .identity span{font-size:11px;color:var(--ref-muted);font-weight:800}
-        form{display:grid;gap:14px;margin-top:18px}
-        .links{padding:10px}
-        .links h2{font-size:15px;margin:7px 8px 9px}
-        .links button{width:100%;margin-top:8px}
-        .notice b{display:block;margin-bottom:6px}
-        .notice p{margin:0;color:var(--ref-muted);font-size:12px;line-height:1.7}
-      `}</style>
     </main>
   );
 }

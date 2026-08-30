@@ -30,6 +30,7 @@ export type FuseIconName =
   | "chevron-back"
   | "chevron-forward"
   | "plus"
+  | "minus"
   | "store"
   | "truck"
   | "shield"
@@ -280,6 +281,12 @@ export default function FuseIcon({ name, size = "md", className }: FuseIconProps
       return (
         <svg {...p}>
           <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+      );
+    case "minus":
+      return (
+        <svg {...p}>
           <path d="M5 12h14" />
         </svg>
       );
