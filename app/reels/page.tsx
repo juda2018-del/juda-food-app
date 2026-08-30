@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { addFuseCartItem } from "@/lib/fuse-cart";
+import { isCatalogMenuItemId } from "@/lib/fuse-catalog";
 
 type RestaurantState = {
   documentId: string;
@@ -145,8 +146,8 @@ export default function ReelsPage() {
     const restaurantId = restaurant?.documentId || slug;
     const menuItemId = clean(reel.menuItemId);
 
-    if (!menuItemId) {
-      flash("الصنف غير مربوط بالمنيو. افتح المطعم وأضف من المنيو.");
+    if (!menuItemId || !isCatalogMenuItemId(menuItemId)) {
+      flash("الصنف غير مربوط بالمنيو الحي. افتح المطعم بعد تفعيل المنيو في Firebase.");
       return;
     }
 

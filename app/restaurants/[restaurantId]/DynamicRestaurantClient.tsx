@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { addFuseCartItem, readFuseCart } from "@/lib/fuse-cart";
+import { isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
 
 type RestaurantDoc = {
   documentId: string;
@@ -107,7 +108,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         documentId: item.id,
         }));
         setMenu(remote.length ? remote : fallbackMenu);
-        setMenuLive(remote.length > 0);
+        setMenuLive(restaurantHasLiveCatalog(remote, restaurantId));
       },
       () => { setMenu(fallbackMenu); setConnectionWarning(true); setMenuLive(false); }
     );
@@ -139,7 +140,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   }), [menu, restaurant, restaurantId, restaurantName]);
 
   function addItem(item: MenuDoc) {
-    if (!menuLive) {
+    if (!menuLive || !isCatalogMenuItemId(item.documentId)) {
       setNotice("المنيو غير متصل بقاعدة البيانات. لا يمكن إضافة هذا الصنف للسلة الآن.");
       window.setTimeout(() => setNotice(""), 2600);
       return;

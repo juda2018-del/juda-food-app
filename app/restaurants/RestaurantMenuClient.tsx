@@ -10,6 +10,7 @@ import {
   readFuseCart,
   type FuseCartItem,
 } from "@/lib/fuse-cart";
+import { isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
 
 type MenuDoc = {
   documentId: string;
@@ -155,14 +156,22 @@ export default function RestaurantMenuClient({
     );
   }, [restaurant, restaurantId, restaurants]);
 
+  const menuLive = useMemo(
+    () => restaurantHasLiveCatalog(menu, restaurantId),
+    [menu, restaurantId]
+  );
+
   const source = useMemo(() => {
     const remote = menu.filter(
-      (item) => sameRestaurant(item, restaurant, restaurantId) && isAvailable(item)
+      (item) =>
+        sameRestaurant(item, restaurant, restaurantId) &&
+        isAvailable(item) &&
+        isCatalogMenuItemId(item.documentId)
     );
-    return remote.length
-      ? remote
-      : fallbackMenu.filter((item) => sameRestaurant(item, restaurant, restaurantId));
-  }, [menu, restaurant, restaurantId]);
+    if (remote.length) return remote;
+    if (menuLive) return remote;
+    return fallbackMenu.filter((item) => sameRestaurant(item, restaurant, restaurantId));
+  }, [menu, menuLive, restaurant, restaurantId]);
 
   const categories = useMemo(
     () => ["الكل", ...Array.from(new Set(source.map((item) => item.category || "عام")))],
@@ -187,6 +196,12 @@ export default function RestaurantMenuClient({
   const cartTotal = restaurantCart.reduce((sum, item) => sum + item.price * item.qty, 0);
 
   function addItem(item: MenuDoc) {
+    if (!menuLive || !isCatalogMenuItemId(item.documentId)) {
+      setNotice("المنيو غير متصل بقاعدة البيانات. لا يمكن إضافة هذا الصنف للسلة الآن.");
+      window.setTimeout(() => setNotice(""), 2600);
+      return;
+    }
+
     if (!restaurantOpen) {
       setNotice("المطعم مغلق حالياً ولا يستقبل طلبات.");
       return;
@@ -239,7 +254,8 @@ export default function RestaurantMenuClient({
         </section>
       ) : null}
 
-      {connectionWarning ? <p className="warning">تعذر تحديث المنيو الآن؛ عرضنا الأصناف المتاحة داخل التطبيق.</p> : null}
+      {connectionWarning ? <p className="warning">تعذر تحديث المنيو الآن. الطلب يتطلب منيوً متصلاً بـ Firebase.</p> : null}
+      {!menuLive && !connectionWarning ? <p className="warning">المنيو قيد التجهيز. الإضافة للسلة متاحة بعد ربط المنيو في Firebase.</p> : null}
 
       <section className="hero">
         <div>
@@ -268,7 +284,7 @@ export default function RestaurantMenuClient({
               <h3>{itemName(item)}</h3>
               <strong>{formatIQD(Number(item.price || 0))}</strong>
             </div>
-            <button type="button" disabled={!restaurantOpen} onClick={() => addItem(item)} aria-label={`إضافة ${itemName(item)}`}>+</button>
+            <button type="button" disabled={!restaurantOpen || !menuLive} onClick={() => addItem(item)} aria-label={`إضافة ${itemName(item)}`}>+</button>
           </article>
         ))}
       </section>

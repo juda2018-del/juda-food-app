@@ -7,6 +7,7 @@ import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "./firebase";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { addFuseCartItem, FUSE_CART_EVENT, readFuseCart } from "@/lib/fuse-cart";
+import { catalogIsLive } from "@/lib/fuse-catalog";
 import { performFuseLogout } from "@/lib/fuse-logout";
 import {
   FUSE_COOKIE_EMAIL,
@@ -381,6 +382,8 @@ export default function HomePage() {
       }))
     : fallbackMenu;
 
+  const menuLive = useMemo(() => catalogIsLive(menu), [menu]);
+
   const role = session?.role || null;
   const availableRestaurants = useMemo(() => sourceRestaurants.filter(isOpen), [sourceRestaurants]);
 
@@ -407,6 +410,11 @@ export default function HomePage() {
   }
 
   function addPopularToCart(item: MenuDoc) {
+    if (!menuLive) {
+      showNotice("المنيو غير متصل بقاعدة البيانات. افتح المطعم بعد تفعيل المنيو.");
+      return;
+    }
+
     const restaurantName = item.restaurantName || item.restaurant || "FUSE";
     const slug = restaurantSlug(restaurantName, item.restaurantId);
 
@@ -441,7 +449,7 @@ export default function HomePage() {
             <strong>FUSE Iraq</strong>
             <button className="location" type="button" onClick={() => {
               setLocationNotice((current) => current === "بغداد - المنصور" ? "بغداد - زيونة" : "بغداد - المنصور");
-              showNotice("تم تحديث موقع العرض التجريبي");
+              showNotice("تم تحديث منطقة التوصيل");
             }}>
               <Icon name="pin" />
               <b>{locationNotice}</b>
@@ -601,7 +609,7 @@ export default function HomePage() {
 
                   <div>
                     <strong>{formatIQD(item.price)}</strong>
-                    <button type="button" onClick={() => addPopularToCart(item)} aria-label="إضافة للسلة">+</button>
+                    <button type="button" disabled={!menuLive} onClick={() => addPopularToCart(item)} aria-label="إضافة للسلة">+</button>
                   </div>
                 </div>
               </article>
