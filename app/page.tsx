@@ -7,7 +7,7 @@ import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "./firebase";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { addFuseCartItem, FUSE_CART_EVENT, readFuseCart } from "@/lib/fuse-cart";
-import { catalogIsLive } from "@/lib/fuse-catalog";
+import { catalogIsLive, FUSE_RESTAURANT_IDS, isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
 import { performFuseLogout } from "@/lib/fuse-logout";
 import {
   FUSE_COOKIE_EMAIL,
@@ -384,6 +384,17 @@ export default function HomePage() {
 
   const menuLive = useMemo(() => catalogIsLive(menu), [menu]);
 
+  const liveCatalogMenu = useMemo(
+    () =>
+      menu.filter(
+        (item) =>
+          menuAvailable(item) &&
+          isCatalogMenuItemId(item.documentId) &&
+          FUSE_RESTAURANT_IDS.includes(String(item.restaurantId || "").trim().toLowerCase() as (typeof FUSE_RESTAURANT_IDS)[number])
+      ),
+    [menu]
+  );
+
   const role = session?.role || null;
   const availableRestaurants = useMemo(() => sourceRestaurants.filter(isOpen), [sourceRestaurants]);
 
@@ -402,7 +413,25 @@ export default function HomePage() {
   }, [availableRestaurants, category, search]);
 
   const featuredRestaurants = visibleRestaurants.slice(0, 3);
-  const popularMenu = sourceMenu.filter((item) => menuAvailable(item) && availableRestaurants.some((restaurant) => menuBelongsToRestaurant(item, restaurant))).slice(0, 6);
+  const popularMenu = useMemo(
+    () =>
+      liveCatalogMenu
+        .filter((item) =>
+          availableRestaurants.some(
+            (restaurant) =>
+              menuBelongsToRestaurant(item, restaurant) &&
+              restaurantHasLiveCatalog(menu, restaurant.documentId)
+          )
+        )
+        .slice(0, 6),
+    [liveCatalogMenu, menu, availableRestaurants]
+  );
+
+  function canQuickAdd(item: MenuDoc) {
+    if (!menuLive || !isCatalogMenuItemId(item.documentId)) return false;
+    const restaurantId = String(item.restaurantId || "").trim().toLowerCase();
+    return restaurantHasLiveCatalog(menu, restaurantId);
+  }
 
   function showNotice(text: string) {
     setNotice(text);
@@ -410,19 +439,19 @@ export default function HomePage() {
   }
 
   function addPopularToCart(item: MenuDoc) {
-    if (!menuLive) {
+    if (!canQuickAdd(item)) {
       showNotice("المنيو غير متصل بقاعدة البيانات. افتح المطعم بعد تفعيل المنيو.");
       return;
     }
 
     const restaurantName = item.restaurantName || item.restaurant || "FUSE";
-    const slug = restaurantSlug(restaurantName, item.restaurantId);
+    const canonicalRestaurantId = String(item.restaurantId || "").trim().toLowerCase();
 
     const next = addFuseCartItem({
       id: item.documentId,
       name: item.name || item.title || "صنف",
       restaurant: restaurantName,
-      restaurantId: slug,
+      restaurantId: canonicalRestaurantId,
       category: item.category || "عام",
       price: Number(item.price || 0),
       qty: 1,
@@ -609,7 +638,7 @@ export default function HomePage() {
 
                   <div>
                     <strong>{formatIQD(item.price)}</strong>
-                    <button type="button" disabled={!menuLive} onClick={() => addPopularToCart(item)} aria-label="إضافة للسلة">+</button>
+                    <button type="button" disabled={!canQuickAdd(item)} onClick={() => addPopularToCart(item)} aria-label="إضافة للسلة">+</button>
                   </div>
                 </div>
               </article>

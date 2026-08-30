@@ -73,6 +73,9 @@ workflows:
     environment:
       node: 20
       java: 21
+      vars:
+        FUSE_KEYSTORE_FILE: upload-keystore.jks
+        FUSE_KEY_ALIAS: upload
 
     scripts:
       - name: Install dependencies
@@ -102,6 +105,19 @@ workflows:
           EOF
 
           test -f android/app/src/main/assets/public/index.html
+
+      - name: Configure Android signing secrets
+        script: |
+          if [ -z "$FUSE_KEYSTORE_PASSWORD" ] || [ -z "$FUSE_KEY_PASSWORD" ]; then
+            echo "Set FUSE_KEYSTORE_PASSWORD and FUSE_KEY_PASSWORD in Codemagic environment."
+            exit 1
+          fi
+          cat > android/app/keystore.properties <<EOF
+          storeFile=${FUSE_KEYSTORE_FILE:-upload-keystore.jks}
+          storePassword=${FUSE_KEYSTORE_PASSWORD}
+          keyAlias=${FUSE_KEY_ALIAS:-upload}
+          keyPassword=${FUSE_KEY_PASSWORD}
+          EOF
 
       - name: Build signed Android App Bundle
         script: |

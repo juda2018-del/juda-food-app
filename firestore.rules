@@ -218,7 +218,15 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason','status','requestedAt','updatedAt']));
       allow delete: if isAdmin();
     }
-    match /drivers/{id} { allow read: if isAdmin() || (isDriver() && request.auth.uid == id); allow write: if isAdmin(); }
+    match /drivers/{id} {
+      allow read: if isAdmin() || (isDriver() && request.auth.uid == id);
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        || (isDriver()
+          && request.auth.uid == id
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['online','isOnline','status','updatedAt','lastSeenAt']));
+      allow delete: if isAdmin();
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }
