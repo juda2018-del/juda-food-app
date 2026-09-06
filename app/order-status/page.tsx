@@ -23,13 +23,17 @@ type OrderDoc = {
   total?: number;
   amount?: number;
   status?: string;
+  statusAr?: string;
   driverName?: string;
   assignedDriverName?: string;
   createdAt?: unknown;
+  pickedUpAt?: unknown;
+  outForDeliveryAt?: unknown;
+  deliveredAt?: unknown;
   items?: OrderItem[];
 };
 
-const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
+const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "السائق استلم الطلب", "قيد التوصيل", "تم التسليم"];
 const LOAD_TIMEOUT_MS = 9000;
 
 async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
@@ -211,7 +215,7 @@ export default function OrderStatusPage() {
           <article className="orderCard">
             <div className="orderHead">
               <div><span>رقم الطلب</span><b>{current.orderId || current.documentId}</b></div>
-              <strong>{normalizeStatus(current.status)}</strong>
+              <strong>{current.statusAr || normalizeStatus(current.status)}</strong>
             </div>
 
             <div className="infoGrid">

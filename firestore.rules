@@ -40,13 +40,14 @@ service cloud.firestore {
       return isDriver() && ((data.driverUid is string && data.driverUid == request.auth.uid) || (data.driverId is string && data.driverId == request.auth.uid));
     }
     function restaurantTransition(from, to) {
-      return (from in ['جديد','new'] && to in ['قيد التحضير','preparing','مرفوض','rejected'])
-        || (from in ['قيد التحضير','preparing'] && to in ['جاهز للتوصيل','جاهز','ready','مرفوض','rejected'])
+      return (from in ['جديد','new','تم استلام الطلب'] && to in ['قيد التحضير','preparing','مرفوض','rejected'])
+        || (from in ['قيد التحضير','preparing'] && to in ['جاهز للتوصيل','جاهز للاستلام','جاهز','ready','مرفوض','rejected'])
         || from == to;
     }
     function driverTransition(from, to) {
-      return (from in ['جاهز للتوصيل','جاهز','ready'] && to in ['قيد التوصيل','السائق استلم','out_for_delivery'])
-        || (from in ['قيد التوصيل','السائق استلم','out_for_delivery'] && to in ['تم التسليم','delivered'])
+      return (from in ['جاهز للتوصيل','جاهز للاستلام','جاهز','ready'] && to in ['السائق استلم الطلب','السائق استلم','قيد التوصيل','out_for_delivery','picked_up'])
+        || (from in ['السائق استلم الطلب','السائق استلم','picked_up'] && to in ['قيد التوصيل','out_for_delivery'])
+        || (from in ['قيد التوصيل','out_for_delivery','السائق استلم'] && to in ['تم التسليم','delivered'])
         || from == to;
     }
     function restaurantExists(id) { return id is string && id.size() > 0 && exists(/databases/$(database)/documents/restaurants/$(id)); }
@@ -77,7 +78,6 @@ service cloud.firestore {
         && request.resource.data.city is string && request.resource.data.city.size() >= 2 && request.resource.data.city.size() <= 80
         && request.resource.data.details is string && request.resource.data.details.size() >= 10 && request.resource.data.details.size() <= 1000;
     }
-
     match /restaurants/{id} {
       allow read: if true;
       allow create, delete: if isAdmin();
@@ -98,73 +98,73 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusAr','updatedAt','updatedAtText','restaurantUpdatedAt','acceptedAt','rejectedAt','readyAt','preparingAt','restaurantNote']))
         || (driverOwns(resource.data)
           && driverTransition(resource.data.status, request.resource.data.status)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt','driverUpdatedAt','pickedUpAt','deliveredAt','driverLatitude','driverLongitude','driverLocationUpdatedAt','driverId','driverEmail','driverName','assignedDriverId','assignedDriverEmail','assignedDriverName']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusAr','updatedAt','driverUpdatedAt','pickedUpAt','outForDeliveryAt','deliveredAt','driverLatitude','driverLongitude','driverLocationUpdatedAt','driverId','driverEmail','driverName','driverPhone','assignedDriverId','assignedDriverEmail','assignedDriverName','assignedDriverPhone']));
       allow delete: if isAdmin();
     }
     match /notifications/{id} {
-      allow create: if isAdmin() || (isCustomer()
-        && request.resource.data.keys().hasAll(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
-        && request.resource.data.keys().hasOnly(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
-        && request.resource.data.type == 'order'
-        && request.resource.data.audience == 'restaurant'
-        && request.resource.data.title == 'طلب جديد'
-        && request.resource.data.message is string
-        && request.resource.data.message.size() >= 10
-        && request.resource.data.message.size() <= 220
-        && request.resource.data.customerUid == request.auth.uid
-        && request.resource.data.restaurantId is string
-        && request.resource.data.phone is string
-        && request.resource.data.phone.matches('^07[0-9]{9}$')
-        && request.resource.data.orderId is string
-        && request.resource.data.orderDocumentId is string
-        && request.resource.data.read == false
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.customerUid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.orderId == request.resource.data.orderId
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurantName
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurant
-        && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.phone == request.resource.data.phone);
+      allow create: if isAdmin()
+        || (isCustomer()
+          && request.resource.data.keys().hasAll(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
+          && request.resource.data.keys().hasOnly(['type','audience','title','message','customerUid','restaurant','restaurantName','restaurantId','phone','orderId','orderDocumentId','read','createdAt'])
+          && request.resource.data.type == 'order'
+          && request.resource.data.audience == 'restaurant'
+          && request.resource.data.title == 'طلب جديد'
+          && request.resource.data.message is string
+          && request.resource.data.message.size() >= 10
+          && request.resource.data.message.size() <= 220
+          && request.resource.data.customerUid == request.auth.uid
+          && request.resource.data.restaurantId is string
+          && request.resource.data.phone is string
+          && request.resource.data.phone.matches('^07[0-9]{9}$')
+          && request.resource.data.orderId is string
+          && request.resource.data.orderDocumentId is string
+          && request.resource.data.read == false
+          && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.customerUid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.orderId == request.resource.data.orderId
+          && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == request.resource.data.restaurantId
+          && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurantName
+          && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantName == request.resource.data.restaurant
+          && getAfter(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.phone == request.resource.data.phone)
+        || ((isRestaurant() || isDriver() || isAdmin())
+          && request.resource.data.type == 'order_status'
+          && request.resource.data.audience == 'customer'
+          && request.resource.data.title is string
+          && request.resource.data.title.size() >= 4
+          && request.resource.data.title.size() <= 80
+          && request.resource.data.message is string
+          && request.resource.data.message.size() >= 8
+          && request.resource.data.message.size() <= 220
+          && request.resource.data.customerUid is string
+          && request.resource.data.orderDocumentId is string
+          && request.resource.data.orderId is string
+          && request.resource.data.read == false
+          && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId))
+          && get(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.customerUid == request.resource.data.customerUid
+          && (isAdmin()
+            || (isRestaurant() && restaurantId() != '' && get(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.restaurantId == restaurantId())
+            || (isDriver() && (get(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.driverId == request.auth.uid || get(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.assignedDriverId == request.auth.uid || get(/databases/$(database)/documents/orders/$(request.resource.data.orderDocumentId)).data.driverUid == request.auth.uid))));
       allow read: if isAdmin()
         || (isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId())
         || (isDriver() && (resource.data.driverId == request.auth.uid || resource.data.assignedDriverId == request.auth.uid))
         || (isCustomer() && resource.data.customerUid == request.auth.uid);
       allow update: if isAdmin()
-        || ((isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId())
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
-        || ((isDriver() && (resource.data.driverId == request.auth.uid || resource.data.assignedDriverId == request.auth.uid))
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
-        || ((isCustomer() && resource.data.customerUid == request.auth.uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']));
+        || ((isRestaurant() && restaurantId() != '' && resource.data.restaurantId == restaurantId()) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+        || ((isDriver() && (resource.data.driverId == request.auth.uid || resource.data.assignedDriverId == request.auth.uid)) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']))
+        || ((isCustomer() && resource.data.customerUid == request.auth.uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']));
       allow delete: if isAdmin();
     }
+    match /notificationTokens/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
     match /reels/{id} {
-      allow read: if (resource.data.approved == true && resource.data.active == true)
-        || isAdmin()
-        || (signedIn() && resource.data.submittedByUid == request.auth.uid);
-      allow create: if signedIn()
-        && request.resource.data.submittedByUid == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.approved == false
-        && request.resource.data.active == false
-        && request.resource.data.title is string
-        && request.resource.data.title.size() >= 2
-        && request.resource.data.title.size() <= 120;
-      allow update, delete: if isAdmin()
-        || (signedIn()
-          && resource.data.submittedByUid == request.auth.uid
-          && resource.data.status == 'pending'
-          && request.resource.data.submittedByUid == resource.data.submittedByUid
-          && request.resource.data.status == 'pending'
-          && request.resource.data.approved == false
-          && request.resource.data.active == false);
+      allow read: if (resource.data.approved == true && resource.data.active == true) || isAdmin() || (signedIn() && resource.data.submittedByUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.submittedByUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.approved == false && request.resource.data.active == false && request.resource.data.title is string && request.resource.data.title.size() >= 2 && request.resource.data.title.size() <= 120;
+      allow update, delete: if isAdmin() || (signedIn() && resource.data.submittedByUid == request.auth.uid && resource.data.status == 'pending' && request.resource.data.submittedByUid == resource.data.submittedByUid && request.resource.data.status == 'pending' && request.resource.data.approved == false && request.resource.data.active == false);
     }
     match /reelComments/{id} {
       allow read: if true;
-      allow create: if signedIn()
-        && request.resource.data.userUid == request.auth.uid
-        && request.resource.data.text is string
-        && request.resource.data.text.size() >= 1
-        && request.resource.data.text.size() <= 500;
+      allow create: if signedIn() && request.resource.data.userUid == request.auth.uid && request.resource.data.text is string && request.resource.data.text.size() >= 1 && request.resource.data.text.size() <= 500;
       allow update, delete: if isAdmin() || (signedIn() && resource.data.userUid == request.auth.uid);
     }
     match /ratings/{orderId} {
@@ -198,33 +198,20 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
     match /restaurantApplications/{uid} {
-      allow create: if uid == request.auth.uid && validApplication('restaurant')
-        && request.resource.data.restaurantName is string && request.resource.data.restaurantName.size() >= 2 && request.resource.data.restaurantName.size() <= 120
-        && request.resource.data.restaurantAddress is string && request.resource.data.restaurantAddress.size() >= 8 && request.resource.data.restaurantAddress.size() <= 220;
+      allow create: if uid == request.auth.uid && validApplication('restaurant') && request.resource.data.restaurantName is string && request.resource.data.restaurantName.size() >= 2 && request.resource.data.restaurantName.size() <= 120 && request.resource.data.restaurantAddress is string && request.resource.data.restaurantAddress.size() >= 8 && request.resource.data.restaurantAddress.size() <= 220;
       allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
       allow update, delete: if isAdmin();
     }
     match /accountDeletionRequests/{uid} {
-      allow create: if signedIn() && uid == request.auth.uid
-        && request.resource.data.userUid == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.reason is string && request.resource.data.reason.size() <= 500;
+      allow create: if signedIn() && uid == request.auth.uid && request.resource.data.userUid == request.auth.uid && request.resource.data.status == 'pending' && request.resource.data.reason is string && request.resource.data.reason.size() <= 500;
       allow read: if isAdmin() || (signedIn() && uid == request.auth.uid);
-      allow update: if isAdmin() || (signedIn() && uid == request.auth.uid
-        && resource.data.userUid == request.auth.uid
-        && resource.data.status == 'pending'
-        && request.resource.data.userUid == resource.data.userUid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason','status','requestedAt','updatedAt']));
+      allow update: if isAdmin() || (signedIn() && uid == request.auth.uid && resource.data.userUid == request.auth.uid && resource.data.status == 'pending' && request.resource.data.userUid == resource.data.userUid && request.resource.data.status == 'pending' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reason','status','requestedAt','updatedAt']));
       allow delete: if isAdmin();
     }
     match /drivers/{id} {
       allow read: if isAdmin() || (isDriver() && request.auth.uid == id);
       allow create: if isAdmin();
-      allow update: if isAdmin()
-        || (isDriver()
-          && request.auth.uid == id
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['online','isOnline','status','updatedAt','lastSeenAt']));
+      allow update: if isAdmin() || (isDriver() && request.auth.uid == id && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['online','isOnline','status','updatedAt','lastSeenAt']));
       allow delete: if isAdmin();
     }
     match /{document=**} { allow read, write: if false; }
