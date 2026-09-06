@@ -2,6 +2,7 @@ export const FUSE_ORDER_STATUSES = [
   "جديد",
   "قيد التحضير",
   "جاهز للتوصيل",
+  "السائق استلم الطلب",
   "قيد التوصيل",
   "تم التسليم",
   "مرفوض",
@@ -17,9 +18,9 @@ const STATUS_ALIASES: Record<string, FuseOrderStatus> = {
   ready: "جاهز للتوصيل",
   جاهز: "جاهز للتوصيل",
   delivering: "قيد التوصيل",
-  "out_for_delivery": "قيد التوصيل",
-  "السائق استلم": "قيد التوصيل",
-  picked_up: "قيد التوصيل",
+  out_for_delivery: "قيد التوصيل",
+  "السائق استلم": "السائق استلم الطلب",
+  picked_up: "السائق استلم الطلب",
   done: "تم التسليم",
   delivered: "تم التسليم",
   Delivered: "تم التسليم",
@@ -43,7 +44,26 @@ export function fuseOrderStatusLabel(status?: string | null, statusAr?: string |
 
 export function fuseCustomerProgressIndex(status?: string | null) {
   const normalized = normalizeFuseOrderStatus(status);
-  const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
+  const steps = ["جديد", "قيد التحضير", "جاهز للتوصيل", "السائق استلم الطلب", "قيد التوصيل", "تم التسليم"];
   const index = steps.indexOf(normalized);
   return index >= 0 ? index : 0;
+}
+
+export function canDriverTransition(from: string | null | undefined, to: FuseOrderStatus) {
+  const current = normalizeFuseOrderStatus(from);
+  return (
+    (current === "جاهز للتوصيل" && to === "السائق استلم الطلب") ||
+    (current === "السائق استلم الطلب" && to === "قيد التوصيل") ||
+    (current === "قيد التوصيل" && to === "تم التسليم") ||
+    current === to
+  );
+}
+
+export function fuseStatusTimestampField(status: FuseOrderStatus) {
+  if (status === "السائق استلم الطلب") return "pickedUpAt";
+  if (status === "قيد التوصيل") return "outForDeliveryAt";
+  if (status === "تم التسليم") return "deliveredAt";
+  if (status === "جاهز للتوصيل") return "readyAt";
+  if (status === "قيد التحضير") return "preparingAt";
+  return "updatedAt";
 }
