@@ -6,6 +6,7 @@ import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp,
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
 import { FUSE_ORDER_STATUSES, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import { notifyOrderStatusChange } from "@/lib/fuse-order-notifications";
 
 type RestaurantDoc = {
   documentId: string;
@@ -55,6 +56,7 @@ type OrderDoc = {
   customer?: string;
   phone?: string;
   customerPhone?: string;
+  customerUid?: string;
   address?: string;
   restaurant?: string;
   restaurantName?: string;
@@ -373,12 +375,28 @@ export default function RestaurantAdminPage() {
     if (!assertManage() || order.restaurantId !== selectedId) return;
     try {
       const canonical = normalizeFuseOrderStatus(status);
+      const previous = normalizeFuseOrderStatus(order.status);
       await updateDoc(doc(db, "orders", order.documentId), {
         status: canonical,
         statusAr: canonical,
         restaurantUpdatedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      if (order.customerUid && previous !== canonical) {
+        try {
+          await notifyOrderStatusChange({
+            customerUid: order.customerUid,
+            orderDocumentId: order.documentId,
+            orderId: order.orderId || order.documentId,
+            status: canonical,
+          });
+        } catch {
+          flash(`تم تحديث الطلب إلى ${canonical} لكن تعذر إرسال إشعار للزبون.`, true);
+          return;
+        }
+      }
+
       flash(`تم تحديث الطلب إلى ${canonical}.`);
     } catch (e) {
       flash(e instanceof Error ? e.message : "تعذر تحديث الطلب.", true);
