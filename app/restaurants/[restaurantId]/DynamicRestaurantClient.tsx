@@ -105,8 +105,8 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
       query(collection(db, "menu")),
       (snapshot) => {
         const remote = snapshot.docs.map((item) => ({
-        ...(item.data() as Omit<MenuDoc, "documentId">),
-        documentId: item.id,
+          ...(item.data() as Omit<MenuDoc, "documentId">),
+          documentId: item.id,
         }));
         setMenu(remote.length ? remote : fallbackMenu);
         setMenuLive(restaurantHasLiveCatalog(remote, restaurantId));
@@ -118,7 +118,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
       unsubscribeRestaurants();
       unsubscribeMenu();
     };
-  }, []);
+  }, [restaurantId]);
 
   useEffect(() => {
     setCartCount(readFuseCart().reduce((sum, item) => sum + item.qty, 0));
@@ -137,8 +137,10 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
     const sameRestaurant = item.restaurantId === restaurantId || item.restaurantId === restaurant?.documentId;
     const sameName = item.restaurantName === restaurantName || item.restaurant === restaurantName;
     const available = item.available !== false && item.isAvailable !== false;
-    return available && (sameRestaurant || sameName);
-  }), [menu, restaurant, restaurantId, restaurantName]);
+    // Once the live canonical catalog is detected, never render legacy menu docs.
+    const canonical = isCatalogMenuItemId(item.documentId);
+    return available && (sameRestaurant || sameName) && (!menuLive || canonical);
+  }), [menu, menuLive, restaurant, restaurantId, restaurantName]);
 
   function addItem(item: MenuDoc) {
     if (!menuLive || !isCatalogMenuItemId(item.documentId)) {
