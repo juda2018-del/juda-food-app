@@ -55,32 +55,46 @@ const fallbackRestaurants: RestaurantDoc[] = [
 ];
 
 const fallbackMenu: MenuDoc[] = [
-  { documentId: "fayrouz-makhlema", restaurantId: "fayrouz", name: "مخلمة", category: "فطور", price: 7000, image: "/images/m6.jpg", available: true },
-  { documentId: "fayrouz-kahi", restaurantId: "fayrouz", name: "كاهي وقيمر", category: "كاهي", price: 5000, image: "/images/m6.jpg", available: true },
+  { documentId: "fayrouz-kahi", restaurantId: "fayrouz", name: "كاهي وقيمر", category: "فطور", price: 4500, image: "/images/m6.jpg", available: true },
+  { documentId: "fayrouz-makhlema", restaurantId: "fayrouz", name: "مخلمة عراقية", category: "فطور", price: 5000, image: "/images/m7.jpg", available: true },
+  { documentId: "fayrouz-tea", restaurantId: "fayrouz", name: "شاي عراقي", category: "مشروبات", price: 1500, image: "/images/1.jpg", available: true },
   { documentId: "fayrouz-baqala", restaurantId: "fayrouz", name: "باقلة بالدهن", category: "فطور", price: 6000, image: "/images/m6.jpg", available: true },
+  { documentId: "shalteta-cheese", restaurantId: "shalteta", name: "فطير جبن", category: "فطور", price: 7500, image: "/images/m8.jpg", available: true },
+  { documentId: "shalteta-mix", restaurantId: "shalteta", name: "مشلتت جبن", category: "فطور", price: 7500, image: "/images/m3.jpg", available: true },
+  { documentId: "khan-chicken", restaurantId: "khan", name: "دجاج مشوي", category: "مشاوي", price: 9000, image: "/images/m9.jpg", available: true },
+  { documentId: "khan-rice", restaurantId: "khan", name: "رز ومرگ", category: "مشاوي", price: 8500, image: "/images/m4.jpg", available: true },
+  { documentId: "alforn-pizza", restaurantId: "alforn", name: "بيتزا لحم", category: "بيتزا", price: 8500, image: "/images/m10.jpg", available: true },
+  { documentId: "alforn-manakish", restaurantId: "alforn", name: "مناقيش جبن", category: "بيتزا", price: 6000, image: "/images/m5.jpg", available: true },
 ];
 
 function formatIQD(value?: number) {
   return `${Number(value || 0).toLocaleString("ar-IQ")} د.ع`;
 }
 
+function fallbackMenuFor(restaurantId: string) {
+  return fallbackMenu.filter((item) => item.restaurantId === restaurantId);
+}
+
 export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp }: { restaurantId: string }) {
   const restaurantId = decodeURIComponent(restaurantIdProp || "");
   const [restaurants, setRestaurants] = useState<RestaurantDoc[]>(fallbackRestaurants);
-  const [menu, setMenu] = useState<MenuDoc[]>(fallbackMenu);
+  const [menu, setMenu] = useState<MenuDoc[]>(fallbackMenuFor(restaurantId));
   const [cartCount, setCartCount] = useState(0);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [connectionWarning, setConnectionWarning] = useState(false);
-  const [menuLive, setMenuLive] = useState(false);
+  const [menuLive, setMenuLive] = useState(fallbackMenuFor(restaurantId).length > 0);
 
   useEffect(() => {
+    const fallbackForRestaurant = fallbackMenuFor(restaurantId);
     const timeout = window.setTimeout(() => {
       setRestaurants((current) => current.length ? current : fallbackRestaurants);
-      setMenu((current) => current.length ? current : fallbackMenu);
+      setMenu((current) => current.length ? current : fallbackForRestaurant);
+      setMenuLive(fallbackForRestaurant.length > 0);
       setLoading(false);
       setConnectionWarning(true);
     }, 4500);
+
     const unsubscribeRestaurants = onSnapshot(
       query(collection(db, "restaurants")),
       (snapshot) => {
@@ -98,9 +112,9 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         setRestaurants(fallbackRestaurants);
         setLoading(false);
         setConnectionWarning(true);
-        setMenuLive(false);
       }
     );
+
     const unsubscribeMenu = onSnapshot(
       query(collection(db, "menu")),
       (snapshot) => {
@@ -108,11 +122,18 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
           ...(item.data() as Omit<MenuDoc, "documentId">),
           documentId: item.id,
         }));
-        setMenu(remote.length ? remote : fallbackMenu);
-        setMenuLive(restaurantHasLiveCatalog(remote, restaurantId));
+        const canonicalRemote = remote.filter((item) => isCatalogMenuItemId(item.documentId));
+        const live = restaurantHasLiveCatalog(canonicalRemote, restaurantId);
+        setMenu(live ? canonicalRemote : fallbackForRestaurant);
+        setMenuLive(live || fallbackForRestaurant.length > 0);
       },
-      () => { setMenu(fallbackMenu); setConnectionWarning(true); setMenuLive(false); }
+      () => {
+        setMenu(fallbackForRestaurant);
+        setConnectionWarning(true);
+        setMenuLive(fallbackForRestaurant.length > 0);
+      }
     );
+
     return () => {
       window.clearTimeout(timeout);
       unsubscribeRestaurants();
@@ -137,14 +158,13 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
     const sameRestaurant = item.restaurantId === restaurantId || item.restaurantId === restaurant?.documentId;
     const sameName = item.restaurantName === restaurantName || item.restaurant === restaurantName;
     const available = item.available !== false && item.isAvailable !== false;
-    // Once the live canonical catalog is detected, never render legacy menu docs.
     const canonical = isCatalogMenuItemId(item.documentId);
-    return available && (sameRestaurant || sameName) && (!menuLive || canonical);
-  }), [menu, menuLive, restaurant, restaurantId, restaurantName]);
+    return available && canonical && (sameRestaurant || sameName);
+  }), [menu, restaurant, restaurantId, restaurantName]);
 
   function addItem(item: MenuDoc) {
     if (!menuLive || !isCatalogMenuItemId(item.documentId)) {
-      setNotice("المنيو غير متصل بقاعدة البيانات. لا يمكن إضافة هذا الصنف للسلة الآن.");
+      setNotice("المنيو غير متصل بقاعدة البيانات. حاول مرة ثانية بعد لحظات.");
       window.setTimeout(() => setNotice(""), 2600);
       return;
     }
@@ -164,8 +184,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   }
 
   if (restaurants.length > 0 && !restaurant) {
-    return <main dir="rtl" className="missing"><h1>المطعم غير موجود</h1><Link href="/restaurants">العودة للمطاعم</Link>
-</main>;
+    return <main dir="rtl" className="missing"><h1>المطعم غير موجود</h1><Link href="/restaurants">العودة للمطاعم</Link></main>;
   }
 
   const isOpen = restaurant?.active !== false && restaurant?.open !== false && restaurant?.isOpen !== false;
@@ -181,7 +200,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         </header>
 
         {loading && !restaurant ? <div className="state-card">جاري تحميل المطعم…</div> : null}
-        {connectionWarning && restaurant ? <div className="state-card">تعذر تحديث المطعم الآن. الطلب يتطلب منيوً متصلاً بـ Firebase.</div> : null}
+        {connectionWarning && restaurant ? <div className="state-card">البيانات المباشرة غير متاحة حالياً، نعرض المنيو الأساسي الآمن للطلب.</div> : null}
 
         <section className="hero" style={image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.78)),url(${image})` } : undefined}>
           <span className="emoji"><FuseIcon name="store" size="lg" /></span>
@@ -214,7 +233,6 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         {restaurant?.address || restaurant?.phone ? <section className="contact"><b>معلومات المطعم</b><p>{restaurant.address || restaurant.area}</p>{restaurant.phone ? <a href={`tel:${restaurant.phone}`}>{restaurant.phone}</a> : null}</section> : null}
         {notice ? <div className="toast">{notice}</div> : null}
       </section>
-
     </main>
   );
 }
