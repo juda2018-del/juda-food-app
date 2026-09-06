@@ -83,14 +83,14 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const [connectionWarning, setConnectionWarning] = useState(false);
-  const [menuLive, setMenuLive] = useState(fallbackMenuFor(restaurantId).length > 0);
+  const [menuLive, setMenuLive] = useState(false);
 
   useEffect(() => {
     const fallbackForRestaurant = fallbackMenuFor(restaurantId);
     const timeout = window.setTimeout(() => {
       setRestaurants((current) => current.length ? current : fallbackRestaurants);
       setMenu((current) => current.length ? current : fallbackForRestaurant);
-      setMenuLive(fallbackForRestaurant.length > 0);
+      setMenuLive(false);
       setLoading(false);
       setConnectionWarning(true);
     }, 4500);
@@ -125,12 +125,13 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         const canonicalRemote = remote.filter((item) => isCatalogMenuItemId(item.documentId));
         const live = restaurantHasLiveCatalog(canonicalRemote, restaurantId);
         setMenu(live ? canonicalRemote : fallbackForRestaurant);
-        setMenuLive(live || fallbackForRestaurant.length > 0);
+        setMenuLive(live);
+        if (live) setConnectionWarning(false);
       },
       () => {
         setMenu(fallbackForRestaurant);
         setConnectionWarning(true);
-        setMenuLive(fallbackForRestaurant.length > 0);
+        setMenuLive(false);
       }
     );
 
@@ -200,7 +201,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         </header>
 
         {loading && !restaurant ? <div className="state-card">جاري تحميل المطعم…</div> : null}
-        {connectionWarning && restaurant ? <div className="state-card">البيانات المباشرة غير متاحة حالياً، نعرض المنيو الأساسي الآمن للطلب.</div> : null}
+        {connectionWarning && restaurant ? <div className="state-card">البيانات المباشرة غير متاحة حالياً. عرض الأصناف متاح، لكن الطلب يتطلب منيو متصل بـ Firebase.</div> : null}
 
         <section className="hero" style={image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.78)),url(${image})` } : undefined}>
           <span className="emoji"><FuseIcon name="store" size="lg" /></span>
