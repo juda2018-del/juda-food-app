@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
+import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
 
 type RestaurantDoc = {
@@ -23,6 +24,7 @@ type RestaurantDoc = {
   active?: boolean;
   open?: boolean;
   isOpen?: boolean;
+  status?: string;
   deliveryTime?: string;
   rating?: number;
 };
@@ -130,7 +132,7 @@ export default function RestaurantsPage() {
           {visibleRestaurants.length === 0 ? <div className="empty">ماكو مطاعم مطابقة حالياً.</div> : visibleRestaurants.map((restaurant) => {
             const name = restaurant.name || restaurant.title || restaurant.restaurantName || "مطعم";
             const image = restaurant.image || restaurant.cover || restaurant.logo || "";
-            const open = restaurant.open !== false && restaurant.isOpen !== false;
+            const open = isFuseRestaurantOpen(restaurant);
             return (
               <a href={`/restaurants/${restaurant.documentId}/`} className="card" key={restaurant.documentId}>
                 <div className="icon"><RestaurantImage src={image} name={name} fallback={restaurant.emoji} /></div>

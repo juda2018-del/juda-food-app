@@ -15,6 +15,7 @@ import {
   type FuseCartItem,
 } from "@/lib/fuse-cart";
 import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import { isFuseRestaurantOpen, resolveRestaurantDeliveryFee } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
 
 function formatIQD(value: number) {
@@ -46,14 +47,9 @@ async function validateCart(items: FuseCartItem[]) {
   if (!restaurantSnap.exists()) throw new Error("هذا المطعم غير موجود أو لم يعد متاحاً.");
 
   const restaurantData = restaurantSnap.data();
-  const restaurantOpen =
-    restaurantData.active !== false &&
-    restaurantData.open !== false &&
-    restaurantData.isOpen !== false &&
-    restaurantData.status !== "مغلق";
+  if (!isFuseRestaurantOpen(restaurantData)) throw new Error("المطعم مغلق حالياً ولا يستقبل طلبات.");
 
-  if (!restaurantOpen) throw new Error("المطعم مغلق حالياً ولا يستقبل طلبات.");
-
+  const deliveryFee = resolveRestaurantDeliveryFee(restaurantData);
   const minOrder = Number(restaurantData.minOrder || 0);
   const subtotalPreview = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   if (minOrder > 0 && subtotalPreview < minOrder) {
@@ -92,7 +88,7 @@ async function validateCart(items: FuseCartItem[]) {
     });
   }
 
-  return verified;
+  return { verified, deliveryFee };
 }
 
 export default function CartPage() {
@@ -107,6 +103,7 @@ export default function CartPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(2000);
 
   useEffect(() => {
     const refresh = () => setItems(readFuseCart());
@@ -118,6 +115,30 @@ export default function CartPage() {
       window.removeEventListener("storage", refresh);
     };
   }, []);
+
+  useEffect(() => {
+    const restaurantId = String(items[0]?.restaurantId || "").trim();
+    if (!restaurantId) {
+      setDeliveryFee(2000);
+      return;
+    }
+
+    let cancelled = false;
+    void getDoc(doc(db, "restaurants", restaurantId)).then((snap) => {
+      if (cancelled) return;
+      if (!snap.exists()) {
+        setDeliveryFee(2000);
+        return;
+      }
+      setDeliveryFee(resolveRestaurantDeliveryFee(snap.data()));
+    }).catch(() => {
+      if (!cancelled) setDeliveryFee(2000);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (currentUser) => {
@@ -140,7 +161,7 @@ export default function CartPage() {
     });
   }, []);
 
-  const totals = fuseCartTotals(items);
+  const totals = fuseCartTotals(items, deliveryFee);
   const restaurant = items[0]?.restaurant || "FUSE";
 
   function changeQty(item: FuseCartItem, nextQty: number) {
@@ -178,8 +199,8 @@ export default function CartPage() {
 
     setSaving(true);
     try {
-      const verifiedItems = await validateCart(items);
-      const verifiedTotals = fuseCartTotals(verifiedItems);
+      const { verified: verifiedItems, deliveryFee: verifiedDeliveryFee } = await validateCart(items);
+      const verifiedTotals = fuseCartTotals(verifiedItems, verifiedDeliveryFee);
       const cleanPhone = normalizePhone(phone).replace(/^\+964/, "0");
       const shortOrderId = `FUSE-${Date.now().toString().slice(-8)}`;
       const orderRef = doc(collection(db, "orders"));
@@ -281,7 +302,7 @@ export default function CartPage() {
           </section>
 
           <section className="summary"><h2>ملخص الطلب</h2><div><span>المجموع الفرعي</span><b>{formatIQD(totals.subtotal)}</b></div><div><span>التوصيل</span><b>{formatIQD(totals.deliveryFee)}</b></div><div className="total"><span>الإجمالي</span><b>{formatIQD(totals.total)}</b></div><small>يُراجع السعر والتوفر من Firestore عند تأكيد الطلب.</small></section>
-          <section className="payment"><h2>طريقة الدفع</h2><div className="payment-row"><span>الدفع عند الاستلام</span><b>COD</b></div><small>بوابة الدفع الإلكتروني غير متصلة بعد. الطلب يُؤكَّد بالدفع نقداً عند التسليم.</small></section>
+          <section className="payment"><h2>طريقة الدفع</h2><div className="payment-row"><span>الدفع عند الاستلام (COD)</span><b>نقداً فقط</b></div><small>الإطلاق التجاري الحالي يعتمد الدفع نقداً عند التسليم فقط. لا توجد بوابة دفع إلكتروني متصلة حالياً.</small></section>
           <section className="form"><h2>بيانات التوصيل</h2><input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="الاسم الكامل" autoComplete="name" maxLength={80}/><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07701234567" inputMode="tel" autoComplete="tel" dir="ltr" maxLength={14}/><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="المنطقة، الشارع، أقرب نقطة دالة" autoComplete="street-address" maxLength={220}/><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظة اختيارية للمطعم أو السائق" maxLength={300}/></section>
           <button className="checkout" type="button" onClick={submitOrder} disabled={saving || !authReady}>{saving ? "جاري فحص الأسعار وتثبيت الطلب..." : user ? `تأكيد الطلب · ${formatIQD(totals.total)}` : "سجّل دخولك لتأكيد الطلب"}</button>
           <button className="clear" type="button" onClick={clearCart} disabled={saving}>تفريغ السلة</button>

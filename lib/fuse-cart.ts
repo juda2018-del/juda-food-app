@@ -130,8 +130,9 @@ export function clearFuseCart() {
   writeFuseCart([]);
 }
 
-export function fuseCartTotals(items: FuseCartItem[]) {
+export function fuseCartTotals(items: FuseCartItem[], restaurantDeliveryFee = 2000) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const deliveryFee = items.length ? 2000 : 0;
+  const fee = Math.max(0, Number(restaurantDeliveryFee));
+  const deliveryFee = items.length ? (Number.isFinite(fee) ? fee : 2000) : 0;
   return { subtotal, deliveryFee, total: subtotal + deliveryFee };
 }
