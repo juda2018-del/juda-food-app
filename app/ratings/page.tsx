@@ -138,7 +138,17 @@ export default function RatingsPage() {
     }
 
     let cancelled = false;
-    Promise.all(deliveredIds.map(async (id) => ({ id, exists: (await getDoc(doc(db, "ratings", id))).exists() })))
+    // Current rules deny get on missing ratings docs (resource.data required).
+    // Treat permission-denied as "not rated yet" so delivered orders stay rateable.
+    Promise.all(
+      deliveredIds.map(async (id) => {
+        try {
+          return { id, exists: (await getDoc(doc(db, "ratings", id))).exists() };
+        } catch {
+          return { id, exists: false };
+        }
+      })
+    )
       .then((results) => {
         if (!cancelled) setRatedOrderIds(new Set(results.filter((item) => item.exists).map((item) => item.id)));
       })
@@ -175,7 +185,12 @@ export default function RatingsPage() {
 
     try {
       const ratingRef = doc(db, "ratings", selectedOrder.documentId);
-      if ((await getDoc(ratingRef)).exists()) throw new Error("هذا الطلب مقيّم مسبقاً.");
+      try {
+        if ((await getDoc(ratingRef)).exists()) throw new Error("هذا الطلب مقيّم مسبقاً.");
+      } catch (existsError) {
+        if (existsError instanceof Error && existsError.message === "هذا الطلب مقيّم مسبقاً.") throw existsError;
+        // Missing rating docs currently return permission-denied; continue to create.
+      }
 
       const hasDriver = Boolean(selectedOrder.driverUid || selectedOrder.driverId || selectedOrder.driverName);
       await setDoc(ratingRef, {
