@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
+import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 
 type OrderDoc = {
   documentId: string;
@@ -85,7 +86,7 @@ function isActive(order: OrderDoc) {
 }
 
 function isRestaurantOpen(item: RestaurantDoc) {
-  return item.active !== false && item.open !== false && item.isOpen !== false && item.status !== "مغلق";
+  return isFuseRestaurantOpen(item);
 }
 
 function isDriverOnline(item: DriverDoc) {

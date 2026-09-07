@@ -18,7 +18,12 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { db } from "../firebase";
+import { firebaseAuth } from "@/lib/firebase/client";
+import { saveFuseSession } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 type Order = {
@@ -57,6 +62,8 @@ type Driver = {
   completedOrders?: number;
   lastSeen?: number;
 };
+
+type GateState = "checking" | "allowed" | "blocked";
 
 function isDriverOnline(driver: Driver) {
   return (
@@ -147,6 +154,9 @@ function StatCard({
 }
 
 export default function SmartDispatchPage() {
+  const router = useRouter();
+  const [gate, setGate] = useState<GateState>("checking");
+  const [gateMessage, setGateMessage] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [dispatchLog, setDispatchLog] = useState<string[]>([]);
@@ -155,6 +165,50 @@ export default function SmartDispatchPage() {
   const processingOrders = useRef<string[]>([]);
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setGate("blocked");
+      setGateMessage("تأخر التحقق من صلاحية الأدمن.");
+      router.replace("/login?next=/smart-dispatch");
+    }, 8000);
+
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+      window.clearTimeout(timeout);
+
+      if (!user) {
+        setGate("blocked");
+        router.replace("/login?next=/smart-dispatch");
+        return;
+      }
+
+      try {
+        const session = await resolveFuseSession(user);
+        saveFuseSession(session);
+
+        if (session.role !== "admin") {
+          setGate("blocked");
+          setGateMessage("لوحة التوزيع الذكي متاحة لحساب الإدارة فقط.");
+          router.replace(session.role === "restaurant" ? "/restaurant-admin" : "/");
+          return;
+        }
+
+        setGate("allowed");
+        setGateMessage("");
+      } catch (error) {
+        setGate("blocked");
+        setGateMessage(error instanceof Error ? error.message : "تعذر التحقق من الحساب.");
+        router.replace("/login?next=/smart-dispatch");
+      }
+    });
+
+    return () => {
+      window.clearTimeout(timeout);
+      unsubscribe();
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (gate !== "allowed") return;
+
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
 
     const unsub = onSnapshot(q, (snapshot) => {
@@ -167,9 +221,11 @@ export default function SmartDispatchPage() {
     });
 
     return () => unsub();
-  }, []);
+  }, [gate]);
 
   useEffect(() => {
+    if (gate !== "allowed") return;
+
     // Use canonical drivers collection (email required for driver-app queries).
     const unsub = onSnapshot(collection(db, "drivers"), (snapshot) => {
       const data = snapshot.docs.map((item) => ({
@@ -181,7 +237,7 @@ export default function SmartDispatchPage() {
     });
 
     return () => unsub();
-  }, []);
+  }, [gate]);
 
   const readyOrders = useMemo(() => {
     return orders.filter(
@@ -328,6 +384,7 @@ export default function SmartDispatchPage() {
   }
 
   useEffect(() => {
+    if (gate !== "allowed") return;
     if (!autoDispatch) return;
     if (readyOrders.length === 0) return;
     if (availableDrivers.length === 0) return;
@@ -335,7 +392,21 @@ export default function SmartDispatchPage() {
     readyOrders.forEach((order) => {
       void assignOrder(order);
     });
-  }, [autoDispatch, readyOrders, availableDrivers]);
+  }, [gate, autoDispatch, readyOrders, availableDrivers]);
+
+  if (gate !== "allowed") {
+    return (
+      <main dir="rtl" className="min-h-screen bg-black px-4 py-6 text-white grid place-items-center">
+        <section className="w-full max-w-lg rounded-3xl border border-yellow-500/30 bg-white/5 p-8 text-center">
+          <p className="font-black text-yellow-400">FUSE Admin Gate</p>
+          <h1 className="mt-3 text-3xl font-black">التحقق من صلاحية التوزيع</h1>
+          <p className="mt-3 text-gray-300 leading-8">
+            {gateMessage || "جاري توجيه الحساب الصحيح... لوحة /smart-dispatch للأدمن فقط."}
+          </p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main dir="rtl" className="min-h-screen bg-black px-4 py-6 text-white">

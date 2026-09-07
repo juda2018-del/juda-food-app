@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -62,23 +61,7 @@ export default function MenuManager() {
   }, [items, search]);
 
   async function addItem() {
-    if (!name.trim()) return alert("اكتب اسم المنتج");
-    if (!price.trim()) return alert("اكتب السعر");
-
-    await addDoc(collection(db, "menuItems"), {
-      name: name.trim(),
-      price: Number(price),
-      category,
-      image: image.trim(),
-      available: true,
-      restaurant: restaurantName,
-      createdAt: Date.now(),
-    });
-
-    setName("");
-    setPrice("");
-    setImage("");
-    setCategory("الفطور");
+    alert("إضافة أصناف جديدة تحتاج موافقة الإدارة عبر الكتالوج الرسمي. استخدم تفعيل/إخفاء الأصناف الحالية فقط.");
   }
 
   async function toggleAvailable(item: MenuItem) {
@@ -110,7 +93,7 @@ export default function MenuManager() {
             🍽️ إدارة المنيو
           </h2>
           <p style={{ marginTop: 6, color: "#a1a1aa", fontWeight: 800 }}>
-            إضافة، حذف، وإخفاء منتجات المطعم
+            تفعيل/إخفاء أصناف المطعم — الإضافة الحرة غير مفعلة للإطلاق (كتالوج رسمي فقط)
           </p>
         </div>
 
@@ -150,7 +133,7 @@ export default function MenuManager() {
         </select>
         <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="رابط الصورة اختياري" style={inputStyle} />
         <button onClick={addItem} style={orangeButton}>
-          + إضافة
+          طلب إضافة (يحتاج موافقة)
         </button>
       </div>
 

@@ -8,6 +8,7 @@ import { db } from "./firebase";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { addFuseCartItem, FUSE_CART_EVENT, readFuseCart } from "@/lib/fuse-cart";
 import { catalogIsLive, FUSE_RESTAURANT_IDS, isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
+import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 import { performFuseLogout } from "@/lib/fuse-logout";
 import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
 import {
@@ -205,7 +206,7 @@ function getRestaurantName(item: RestaurantDoc | MenuDoc) {
 }
 
 function isOpen(item: RestaurantDoc) {
-  return item.active !== false && item.open !== false && item.isOpen !== false && item.status !== "مغلق";
+  return isFuseRestaurantOpen(item);
 }
 
 function menuBelongsToRestaurant(menuItem: MenuDoc, restaurant: RestaurantDoc) {

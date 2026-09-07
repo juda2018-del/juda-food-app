@@ -6,6 +6,7 @@ import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { addFuseCartItem, readFuseCart } from "@/lib/fuse-cart";
 import { isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
+import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
 
 type RestaurantDoc = {
@@ -27,6 +28,7 @@ type RestaurantDoc = {
   open?: boolean;
   isOpen?: boolean;
   active?: boolean;
+  status?: string;
   deliveryTime?: string;
   deliveryFee?: number;
   minOrder?: number;
@@ -188,7 +190,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
     return <main dir="rtl" className="missing"><h1>المطعم غير موجود</h1><Link href="/restaurants">العودة للمطاعم</Link></main>;
   }
 
-  const isOpen = restaurant?.active !== false && restaurant?.open !== false && restaurant?.isOpen !== false;
+  const isOpen = isFuseRestaurantOpen(restaurant);
   const image = restaurant?.image || restaurant?.cover || restaurant?.logo || "";
 
   return (

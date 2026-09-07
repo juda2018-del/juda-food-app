@@ -7,6 +7,7 @@ import { db } from "../firebase";
 import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
 import { addFuseCartItem } from "@/lib/fuse-cart";
 import { isCatalogMenuItemId } from "@/lib/fuse-catalog";
+import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 
 type RestaurantState = {
   documentId: string;
@@ -105,7 +106,7 @@ export default function ReelsPage() {
       const name = restaurantName(reel);
       const restaurant = restaurants.find((item) => item.documentId === slug || clean(item.restaurantName || item.name || item.title) === name);
       if (!restaurant) return true;
-      return restaurant.active !== false && restaurant.open !== false && restaurant.isOpen !== false && restaurant.status !== "مغلق";
+      return isFuseRestaurantOpen(restaurant);
     });
   }, [reels, restaurants]);
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { addDoc, collection, onSnapshot, query, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { addFuseCartItem } from "@/lib/fuse-cart";
+import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 
 type RestaurantState = {
   documentId: string;
@@ -314,7 +315,7 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
         }));
         const current = restaurants.find((item) => (item.restaurantName || item.name || item.title || "") === restaurant);
         setRestaurantDocumentId(current?.documentId || "");
-        setRestaurantOpen(current ? current.active !== false && current.open !== false && current.isOpen !== false && current.status !== "مغلق" : true);
+        setRestaurantOpen(current ? isFuseRestaurantOpen(current) : true);
       },
       () => setRestaurantOpen(true)
     );
