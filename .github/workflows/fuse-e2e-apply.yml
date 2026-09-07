@@ -1,0 +1,48 @@
+name: Apply FUSE E2E production fixes
+
+on:
+  push:
+    branches:
+      - fuse/e2e-production-fix
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified FUSE patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/juda2018-del/-/refs/heads/cursor/fuse-food-app-handoff-patches-361a/patches"
+          curl -fsSL "$base/fuse-e2e-0001-ratings.patch" -o /tmp/0001.patch
+          curl -fsSL "$base/fuse-e2e-0002-restaurant-transitions.patch" -o /tmp/0002.patch
+          curl -fsSL "$base/fuse-e2e-0003-smart-dispatch.patch" -o /tmp/0003.patch
+          git apply --check /tmp/0001.patch
+          git apply /tmp/0001.patch
+          git apply --check /tmp/0002.patch
+          git apply /tmp/0002.patch
+          git apply --check /tmp/0003.patch
+          git apply /tmp/0003.patch
+          git diff --check
+
+      - name: Remove bootstrap workflow
+        run: git rm .github/workflows/fuse-e2e-apply.yml
+
+      - name: Commit and push production fixes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: complete FUSE order lifecycle E2E fixes"
+          git push origin HEAD:fuse/e2e-production-fix
