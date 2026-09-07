@@ -1,0 +1,42 @@
+# Apply the prepared FUSE commercial soft-launch patch.
+# Run from GitHub Actions after this workflow is committed.
+name: Apply FUSE commercial launch
+on:
+  workflow_dispatch:
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply patch from JAZAL handoff
+        env:
+          PATCH_URL: https://raw.githubusercontent.com/juda2018-del/-/cursor/fuse-commercial-handoff-3657/patches/fuse-commercial-launch.patch
+        run: |
+          set -euo pipefail
+          curl -fsSL "$PATCH_URL" -o /tmp/fuse-commercial-launch.patch
+          git apply --check /tmp/fuse-commercial-launch.patch
+          git apply /tmp/fuse-commercial-launch.patch
+      - name: Commit and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH=cursor/fuse-commercial-launch-3657
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add -A
+          git status
+          git diff --cached --stat
+          git commit -m "fix: commercial soft-launch blockers for FUSE"
+          git push -u origin "$BRANCH" --force
+          gh pr create --base main --head "$BRANCH" \
+            --title "fix: commercial soft-launch blockers for FUSE" \
+            --body "Applies the commercial soft-launch patch (open/close rules alignment, canonical menu admin, smart-dispatch admin gate, COD/deliveryFee polish). Source handoff: juda2018-del/- patches/fuse-commercial-launch.patch" \
+            || gh pr edit "$BRANCH" --title "fix: commercial soft-launch blockers for FUSE" || true
