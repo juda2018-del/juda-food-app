@@ -49,6 +49,22 @@ export function fuseCustomerProgressIndex(status?: string | null) {
   return index >= 0 ? index : 0;
 }
 
+export function canRestaurantTransition(from: string | null | undefined, to: FuseOrderStatus) {
+  const current = normalizeFuseOrderStatus(from);
+  return (
+    (current === "جديد" && (to === "قيد التحضير" || to === "مرفوض")) ||
+    (current === "قيد التحضير" && (to === "جاهز للتوصيل" || to === "مرفوض")) ||
+    current === to
+  );
+}
+
+export function restaurantNextStatuses(from: string | null | undefined): FuseOrderStatus[] {
+  const current = normalizeFuseOrderStatus(from);
+  if (current === "جديد") return ["قيد التحضير", "مرفوض"];
+  if (current === "قيد التحضير") return ["جاهز للتوصيل", "مرفوض"];
+  return [current];
+}
+
 export function canDriverTransition(from: string | null | undefined, to: FuseOrderStatus) {
   const current = normalizeFuseOrderStatus(from);
   return (
@@ -65,5 +81,6 @@ export function fuseStatusTimestampField(status: FuseOrderStatus) {
   if (status === "تم التسليم") return "deliveredAt";
   if (status === "جاهز للتوصيل") return "readyAt";
   if (status === "قيد التحضير") return "preparingAt";
+  if (status === "مرفوض") return "rejectedAt";
   return "updatedAt";
 }

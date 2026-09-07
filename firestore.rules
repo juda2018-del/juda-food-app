@@ -45,9 +45,10 @@ service cloud.firestore {
         || from == to;
     }
     function driverTransition(from, to) {
-      return (from in ['جاهز للتوصيل','جاهز للاستلام','جاهز','ready'] && to in ['السائق استلم الطلب','السائق استلم','قيد التوصيل','out_for_delivery','picked_up'])
+      // Must pick up before out-for-delivery; no direct jump جاهز → قيد التوصيل.
+      return (from in ['جاهز للتوصيل','جاهز للاستلام','جاهز','ready'] && to in ['السائق استلم الطلب','السائق استلم','picked_up'])
         || (from in ['السائق استلم الطلب','السائق استلم','picked_up'] && to in ['قيد التوصيل','out_for_delivery'])
-        || (from in ['قيد التوصيل','out_for_delivery','السائق استلم'] && to in ['تم التسليم','delivered'])
+        || (from in ['قيد التوصيل','out_for_delivery'] && to in ['تم التسليم','delivered'])
         || from == to;
     }
     function restaurantExists(id) { return id is string && id.size() > 0 && exists(/databases/$(database)/documents/restaurants/$(id)); }
@@ -176,7 +177,15 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/orders/$(orderId)).data.status in ['تم التسليم','delivered']
         && request.resource.data.restaurantId == get(/databases/$(database)/documents/orders/$(orderId)).data.restaurantId
         && !exists(/databases/$(database)/documents/ratings/$(orderId));
-      allow read: if isAdmin() || (isCustomer() && resource.data.customerUid == request.auth.uid) || (isRestaurant() && resource.data.restaurantId == restaurantId()) || (isDriver() && resource.data.driverUid == request.auth.uid);
+      // Allow get on missing rating only when the customer owns the related order.
+      allow get: if isAdmin()
+        || (isCustomer() && resource != null && resource.data.customerUid == request.auth.uid)
+        || (isCustomer() && resource == null
+          && exists(/databases/$(database)/documents/orders/$(orderId))
+          && get(/databases/$(database)/documents/orders/$(orderId)).data.customerUid == request.auth.uid)
+        || (isRestaurant() && resource != null && resource.data.restaurantId == restaurantId())
+        || (isDriver() && resource != null && resource.data.driverUid == request.auth.uid);
+      allow list: if isAdmin();
       allow update, delete: if isAdmin();
     }
     match /users/{uid} {

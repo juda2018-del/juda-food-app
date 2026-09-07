@@ -5,7 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
-import { FUSE_ORDER_STATUSES, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import {
+  canRestaurantTransition,
+  fuseStatusTimestampField,
+  normalizeFuseOrderStatus,
+  restaurantNextStatuses,
+  type FuseOrderStatus,
+} from "@/lib/fuse-order-status";
 import { notifyOrderStatusChange } from "@/lib/fuse-order-notifications";
 
 type RestaurantDoc = {
@@ -376,14 +382,22 @@ export default function RestaurantAdminPage() {
     try {
       const canonical = normalizeFuseOrderStatus(status);
       const previous = normalizeFuseOrderStatus(order.status);
+      if (!canRestaurantTransition(previous, canonical)) {
+        flash(`لا يمكن نقل الطلب من «${previous}» إلى «${canonical}».`, true);
+        return;
+      }
+      if (previous === canonical) return;
+
+      const stampField = fuseStatusTimestampField(canonical);
       await updateDoc(doc(db, "orders", order.documentId), {
         status: canonical,
         statusAr: canonical,
         restaurantUpdatedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        ...(stampField !== "updatedAt" ? { [stampField]: serverTimestamp() } : {}),
       });
 
-      if (order.customerUid && previous !== canonical) {
+      if (order.customerUid) {
         try {
           await notifyOrderStatusChange({
             customerUid: order.customerUid,
@@ -443,7 +457,27 @@ export default function RestaurantAdminPage() {
         <section className="layout">
           <section className="panel">
             <div className="panel-head"><div><small>Live Orders</small><h2>طلبات المطعم</h2></div><b>{sortedOrders.length}</b></div>
-            {sortedOrders.length ? sortedOrders.slice(0, 40).map((order) => <article className="card" key={order.documentId}><div><h3>{order.customerName || order.customer || "زبون"}</h3><p>#{order.orderId || order.documentId} — {order.address || "بدون عنوان"} — {order.phone || order.customerPhone || "بدون هاتف"}</p></div><strong>{money(order.total || order.amount)}</strong><select value={normalizeFuseOrderStatus(order.status)} onChange={(e) => updateOrder(order, e.target.value)}>{FUSE_ORDER_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select></article>) : <div className="empty">ماكو طلبات حالياً.</div>}
+            {sortedOrders.length ? sortedOrders.slice(0, 40).map((order) => {
+              const currentStatus = normalizeFuseOrderStatus(order.status);
+              const nextStatuses = restaurantNextStatuses(currentStatus);
+              const options = Array.from(new Set<FuseOrderStatus>([currentStatus, ...nextStatuses]));
+              return (
+                <article className="card" key={order.documentId}>
+                  <div>
+                    <h3>{order.customerName || order.customer || "زبون"}</h3>
+                    <p>#{order.orderId || order.documentId} — {order.address || "بدون عنوان"} — {order.phone || order.customerPhone || "بدون هاتف"}</p>
+                  </div>
+                  <strong>{money(order.total || order.amount)}</strong>
+                  <select
+                    value={currentStatus}
+                    disabled={nextStatuses.length === 1 && nextStatuses[0] === currentStatus}
+                    onChange={(e) => updateOrder(order, e.target.value)}
+                  >
+                    {options.map((status) => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                </article>
+              );
+            }) : <div className="empty">ماكو طلبات حالياً.</div>}
           </section>
 
           <aside className="panel">

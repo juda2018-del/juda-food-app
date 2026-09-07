@@ -1,93 +1,115 @@
 "use client";
 
+/**
+ * Smart dispatch = admin assignment helper (optional auto while page is open).
+ * Correct path: keep status "جاهز للتوصيل", set assignedDriverId/Email,
+ * then driver advances: استلم → قيد التوصيل → تم التسليم.
+ * Does NOT jump status to قيد التوصيل.
+ */
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  addDoc,
   collection,
   doc,
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 
 type Order = {
   id: string;
+  orderId?: string;
   customerName?: string;
   phone?: string;
   address?: string;
   restaurant?: string;
+  restaurantName?: string;
   total?: number;
   status?: string;
   driverName?: string;
   driverPhone?: string;
-  createdAt?: any;
+  driverId?: string;
+  driverEmail?: string;
+  assignedDriverId?: string;
+  assignedDriverEmail?: string;
+  assignedDriverName?: string;
+  createdAt?: unknown;
 };
 
 type Driver = {
   id: string;
+  uid?: string;
   name?: string;
+  driverName?: string;
   phone?: string;
+  driverPhone?: string;
+  email?: string;
   status?: string;
-  latitude?: number;
-  longitude?: number;
-  accuracy?: number;
+  online?: boolean;
+  isOnline?: boolean;
+  available?: boolean;
+  rating?: number;
+  completedOrders?: number;
   lastSeen?: number;
 };
 
-function isOnline(driver: Driver) {
-  if (driver.status !== "متصل") return false;
-  if (!driver.lastSeen) return true;
-
-  return Date.now() - driver.lastSeen < 1000 * 60 * 3;
-}
-
-function hasLocation(driver: Driver) {
+function isDriverOnline(driver: Driver) {
   return (
-    typeof driver.latitude === "number" &&
-    typeof driver.longitude === "number"
+    driver.online === true ||
+    driver.isOnline === true ||
+    driver.available === true ||
+    driver.status === "متصل" ||
+    driver.status === "online"
   );
 }
 
-function distanceKm(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) {
-  const r = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-
-  return r * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+function driverEmail(driver: Driver) {
+  return String(driver.email || "").trim().toLowerCase();
 }
 
-function formatDate(value: any) {
+function driverDisplayName(driver: Driver) {
+  return String(driver.name || driver.driverName || "سائق").trim();
+}
+
+function driverPhone(driver: Driver) {
+  return String(driver.phone || driver.driverPhone || "").trim();
+}
+
+function isAssigned(order: Order) {
+  return Boolean(
+    order.assignedDriverId ||
+      order.assignedDriverEmail ||
+      order.driverId ||
+      order.driverEmail ||
+      order.assignedDriverName ||
+      order.driverName
+  );
+}
+
+function formatDate(value: unknown) {
   if (!value) return "لا يوجد وقت";
 
   try {
     let date: Date;
 
-    if (typeof value?.toDate === "function") {
-      date = value.toDate();
+    if (typeof value === "object" && value !== null && "toDate" in value) {
+      const fn = (value as { toDate?: unknown }).toDate;
+      if (typeof fn === "function") date = (fn as () => Date)();
+      else return "لا يوجد وقت";
     } else if (value instanceof Date) {
       date = value;
-    } else if (typeof value === "number") {
-      date = new Date(value);
-    } else if (typeof value === "string") {
+    } else if (typeof value === "number" || typeof value === "string") {
       date = new Date(value);
     } else {
       return "لا يوجد وقت";
     }
 
-    if (isNaN(date.getTime())) return "لا يوجد وقت";
+    if (Number.isNaN(date.getTime())) return "لا يوجد وقت";
 
     return date.toLocaleString("ar-IQ", {
       hour: "2-digit",
@@ -99,6 +121,29 @@ function formatDate(value: any) {
   } catch {
     return "لا يوجد وقت";
   }
+}
+
+function StatCard({
+  title,
+  value,
+  green,
+  red,
+}: {
+  title: string;
+  value: number;
+  green?: boolean;
+  red?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-3xl p-4 text-center ${
+        green ? "bg-green-900/40" : red ? "bg-red-900/40" : "bg-white/10"
+      }`}
+    >
+      <p className="text-sm text-gray-300">{title}</p>
+      <b className="mt-2 block text-3xl font-black">{value}</b>
+    </div>
+  );
 }
 
 export default function SmartDispatchPage() {
@@ -125,7 +170,8 @@ export default function SmartDispatchPage() {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "driversStatus"), (snapshot) => {
+    // Use canonical drivers collection (email required for driver-app queries).
+    const unsub = onSnapshot(collection(db, "drivers"), (snapshot) => {
       const data = snapshot.docs.map((item) => ({
         id: item.id,
         ...item.data(),
@@ -139,28 +185,42 @@ export default function SmartDispatchPage() {
 
   const readyOrders = useMemo(() => {
     return orders.filter(
-      (order) =>
-        order.status === "جاهز للتوصيل" &&
-        !order.driverName &&
-        !order.driverPhone
+      (order) => normalizeFuseOrderStatus(order.status) === "جاهز للتوصيل" && !isAssigned(order)
     );
   }, [orders]);
 
   const onlineDrivers = useMemo(() => {
-    return drivers.filter((driver) => isOnline(driver) && hasLocation(driver));
+    return drivers.filter((driver) => isDriverOnline(driver) && Boolean(driverEmail(driver)));
   }, [drivers]);
 
-  const busyDriverNames = useMemo(() => {
-    return orders
-      .filter((order) => order.status === "قيد التوصيل" && order.driverName)
-      .map((order) => String(order.driverName).trim());
+  const busyDriverIds = useMemo(() => {
+    const active = new Set<string>();
+    for (const order of orders) {
+      const status = normalizeFuseOrderStatus(order.status);
+      if (!["السائق استلم الطلب", "قيد التوصيل"].includes(status)) continue;
+      const id = String(order.assignedDriverId || order.driverId || "").trim();
+      const email = String(order.assignedDriverEmail || order.driverEmail || "")
+        .trim()
+        .toLowerCase();
+      if (id) active.add(id);
+      if (email) active.add(email);
+    }
+    return active;
   }, [orders]);
 
   const availableDrivers = useMemo(() => {
-    return onlineDrivers.filter(
-      (driver) => !busyDriverNames.includes(String(driver.name || "").trim())
-    );
-  }, [onlineDrivers, busyDriverNames]);
+    return onlineDrivers
+      .filter((driver) => {
+        const id = String(driver.uid || driver.id).trim();
+        const email = driverEmail(driver);
+        return !busyDriverIds.has(id) && !busyDriverIds.has(email);
+      })
+      .sort((a, b) => {
+        const scoreA = Number(a.rating || 0) * 10 + Math.min(Number(a.completedOrders || 0), 50);
+        const scoreB = Number(b.rating || 0) * 10 + Math.min(Number(b.completedOrders || 0), 50);
+        return scoreB - scoreA;
+      });
+  }, [onlineDrivers, busyDriverIds]);
 
   function addLog(message: string) {
     const time = new Date().toLocaleTimeString("ar-IQ", {
@@ -173,16 +233,7 @@ export default function SmartDispatchPage() {
   }
 
   function chooseBestDriver() {
-    if (availableDrivers.length === 0) return null;
-
-    const sorted = [...availableDrivers].sort((a, b) => {
-      const aSeen = a.lastSeen || 0;
-      const bSeen = b.lastSeen || 0;
-
-      return bSeen - aSeen;
-    });
-
-    return sorted[0];
+    return availableDrivers[0] || null;
   }
 
   async function assignOrder(order: Order) {
@@ -191,35 +242,71 @@ export default function SmartDispatchPage() {
     const driver = chooseBestDriver();
 
     if (!driver) {
-      addLog(`لا يوجد سائق متاح للطلب ${order.id.slice(0, 6)}`);
+      addLog(`لا يوجد سائق متاح للطلب ${order.orderId || order.id.slice(0, 6)}`);
+      return;
+    }
+
+    const email = driverEmail(driver);
+    if (!email) {
+      addLog(`السائق ${driverDisplayName(driver)} غير مربوط ببريد دخول`);
+      return;
+    }
+
+    if (normalizeFuseOrderStatus(order.status) !== "جاهز للتوصيل" || isAssigned(order)) {
+      addLog(`الطلب ${order.orderId || order.id.slice(0, 6)} لم يعد متاحاً للتوزيع`);
       return;
     }
 
     try {
       processingOrders.current.push(order.id);
 
+      const id = String(driver.uid || driver.id).trim();
+      const name = driverDisplayName(driver);
+      const phone = driverPhone(driver);
+
+      // Keep status جاهز للتوصيل — driver must pick up before out-for-delivery.
       await updateDoc(doc(db, "orders", order.id), {
-        status: "قيد التوصيل",
-        driverName: driver.name || driver.id,
-        driverPhone: driver.phone || "",
+        status: "جاهز للتوصيل",
+        statusAr: "جاهز للتوصيل",
+        assignedDriverId: id,
+        assignedDriverEmail: email,
+        assignedDriverName: name,
+        assignedDriverPhone: phone,
+        driverId: id,
+        driverEmail: email,
+        driverName: name,
+        driverPhone: phone,
         dispatchType: "تلقائي",
         dispatchAt: Date.now(),
-        dispatchNote: "تم اختيار السائق تلقائياً من لوحة التوزيع الذكي",
+        dispatchNote: "تم اختيار السائق تلقائياً من لوحة التوزيع الذكي مع إبقاء الحالة جاهز للتوصيل",
+        assignedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
-      addLog(
-        `تم إسناد الطلب ${order.id.slice(0, 6)} إلى ${
-          driver.name || driver.id
-        }`
-      );
+      try {
+        await addDoc(collection(db, "notifications"), {
+          type: "driver",
+          role: "driver",
+          title: "طلب جديد مخصص إلك",
+          message: `تم تخصيص طلب ${order.customerName || "زبون"} من ${order.restaurantName || order.restaurant || "مطعم"} إلك.`,
+          orderId: order.orderId || order.id,
+          orderDocumentId: order.id,
+          driverId: id,
+          driverEmail: email,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } catch {
+        // Assignment succeeded; driver notification is best-effort (admin-only create).
+      }
+
+      addLog(`تم تخصيص ${order.orderId || order.id.slice(0, 6)} للسائق ${name} (بانتظار استلام السائق)`);
     } catch (error) {
       console.error(error);
-      addLog(`صار خطأ بإسناد الطلب ${order.id.slice(0, 6)}`);
+      addLog(`صار خطأ بإسناد الطلب ${order.orderId || order.id.slice(0, 6)}`);
     } finally {
       setTimeout(() => {
-        processingOrders.current = processingOrders.current.filter(
-          (id) => id !== order.id
-        );
+        processingOrders.current = processingOrders.current.filter((id) => id !== order.id);
       }, 3000);
     }
   }
@@ -246,7 +333,7 @@ export default function SmartDispatchPage() {
     if (availableDrivers.length === 0) return;
 
     readyOrders.forEach((order) => {
-      assignOrder(order);
+      void assignOrder(order);
     });
   }, [autoDispatch, readyOrders, availableDrivers]);
 
@@ -258,14 +345,14 @@ export default function SmartDispatchPage() {
         </h1>
 
         <p className="mt-2 text-center text-gray-300">
-          إسناد الطلبات الجاهزة تلقائياً للسائقين المتاحين
+          تخصيص سائق حقيقي مع إبقاء الحالة «جاهز للتوصيل» حتى يستلم السائق الطلب بنفسه
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard title="جاهزة للتوزيع" value={readyOrders.length} />
           <StatCard title="سائقين متصلين" value={onlineDrivers.length} green />
           <StatCard title="سائقين متاحين" value={availableDrivers.length} green />
-          <StatCard title="سائقين مشغولين" value={busyDriverNames.length} red />
+          <StatCard title="سائقين مشغولين" value={busyDriverIds.size} red />
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-2">
@@ -279,9 +366,7 @@ export default function SmartDispatchPage() {
           <button
             onClick={() => setAutoDispatch((old) => !old)}
             className={`rounded-3xl py-4 text-xl font-black ${
-              autoDispatch
-                ? "bg-green-600 text-white"
-                : "bg-white/10 text-white"
+              autoDispatch ? "bg-green-600 text-white" : "bg-white/10 text-white"
             }`}
           >
             {autoDispatch ? "التوزيع التلقائي شغّال" : "تشغيل التوزيع التلقائي"}
@@ -301,18 +386,12 @@ export default function SmartDispatchPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {readyOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="rounded-2xl bg-white p-4 text-black"
-                  >
+                  <div key={order.id} className="rounded-2xl bg-white p-4 text-black">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="text-xl font-black">
-                          {order.customerName || "زبون"}
-                        </h3>
-
+                        <h3 className="text-xl font-black">{order.customerName || "زبون"}</h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          #{String(order.id).slice(0, 6)}
+                          #{order.orderId || String(order.id).slice(0, 8)}
                         </p>
                       </div>
 
@@ -322,20 +401,18 @@ export default function SmartDispatchPage() {
                     </div>
 
                     <div className="mt-3 space-y-1 text-sm text-gray-700">
-                      <p>🍽️ {order.restaurant || "مطعم غير محدد"}</p>
+                      <p>🍽️ {order.restaurantName || order.restaurant || "مطعم غير محدد"}</p>
                       <p>📞 {order.phone || "لا يوجد رقم"}</p>
                       <p>📍 {order.address || "لا يوجد عنوان"}</p>
                       <p>🕒 {formatDate(order.createdAt)}</p>
-                      <p className="font-black">
-                        {(order.total || 0).toLocaleString()} د.ع
-                      </p>
+                      <p className="font-black">{(order.total || 0).toLocaleString()} د.ع</p>
                     </div>
 
                     <button
-                      onClick={() => assignOrder(order)}
+                      onClick={() => void assignOrder(order)}
                       className="mt-4 w-full rounded-2xl bg-black py-3 font-black text-white"
                     >
-                      إسناد ذكي لهذا الطلب
+                      تخصيص سائق لهذا الطلب
                     </button>
                   </div>
                 ))}
@@ -344,114 +421,41 @@ export default function SmartDispatchPage() {
           </div>
 
           <div className="rounded-3xl bg-white/10 p-4">
-            <h2 className="mb-4 text-2xl font-black text-yellow-400">
-              السائقين المتاحين
-            </h2>
-
-            {availableDrivers.length === 0 ? (
+            <h2 className="mb-4 text-2xl font-black text-yellow-400">سجل التوزيع</h2>
+            {dispatchLog.length === 0 ? (
               <div className="rounded-2xl bg-black/40 p-6 text-center text-gray-300">
-                لا يوجد سائقين متاحين حالياً
+                لا يوجد سجل بعد
               </div>
             ) : (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                {dispatchLog.map((log, index) => (
+                  <div key={`${log}-${index}`} className="rounded-2xl bg-black/50 px-4 py-3 text-sm">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <h2 className="mb-4 mt-8 text-2xl font-black text-yellow-400">سائقون متاحون</h2>
+            {availableDrivers.length === 0 ? (
+              <div className="rounded-2xl bg-black/40 p-6 text-center text-gray-300">
+                لا يوجد سائقون متصلون ومربوطون ببريد
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
                 {availableDrivers.map((driver) => (
-                  <div
-                    key={driver.id}
-                    className="rounded-2xl bg-white p-4 text-black"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-xl font-black">
-                          {driver.name || driver.id}
-                        </h3>
-
-                        <p className="mt-1 text-sm text-gray-700">
-                          📞 {driver.phone || "لا يوجد رقم"}
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-700">
-                          🎯 الدقة:{" "}
-                          {driver.accuracy
-                            ? `${Math.round(driver.accuracy)} متر`
-                            : "غير محددة"}
-                        </p>
-
-                        <p className="mt-1 text-sm text-gray-700">
-                          🕒 آخر تحديث: {formatDate(driver.lastSeen)}
-                        </p>
-                      </div>
-
-                      <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
-                        متاح
-                      </span>
-                    </div>
-
-                    {hasLocation(driver) && (
-                      <a
-                        href={`https://www.google.com/maps?q=${driver.latitude},${driver.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-4 block rounded-2xl bg-blue-600 py-3 text-center font-black text-white"
-                      >
-                        فتح موقع السائق
-                      </a>
-                    )}
+                  <div key={driver.id} className="rounded-2xl bg-black/50 px-4 py-3">
+                    <b>{driverDisplayName(driver)}</b>
+                    <p className="text-sm text-gray-300" dir="ltr">
+                      {driverEmail(driver)}
+                    </p>
                   </div>
                 ))}
               </div>
             )}
           </div>
         </div>
-
-        <div className="mt-8 rounded-3xl bg-white/10 p-4">
-          <h2 className="mb-4 text-2xl font-black text-yellow-400">
-            سجل التوزيع
-          </h2>
-
-          {dispatchLog.length === 0 ? (
-            <div className="rounded-2xl bg-black/40 p-5 text-center text-gray-400">
-              لا توجد عمليات توزيع بعد
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {dispatchLog.map((log, index) => (
-                <div
-                  key={index}
-                  className="rounded-2xl bg-black/40 p-3 text-sm text-gray-200"
-                >
-                  {log}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </section>
     </main>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  green,
-  red,
-}: {
-  title: string;
-  value: string | number;
-  green?: boolean;
-  red?: boolean;
-}) {
-  return (
-    <div className="rounded-3xl bg-white/10 p-4 text-center">
-      <p className="text-sm text-gray-300">{title}</p>
-
-      <p
-        className={`mt-2 text-3xl font-black ${
-          green ? "text-green-400" : red ? "text-red-400" : "text-yellow-400"
-        }`}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
