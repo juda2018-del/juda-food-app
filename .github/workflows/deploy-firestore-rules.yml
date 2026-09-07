@@ -1,0 +1,34 @@
+name: Deploy Firestore rules
+
+on:
+  push:
+    branches:
+      - ops/deploy-firestore-rules
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Firestore rules
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_TOKEN"
+          npx --yes firebase-tools@latest deploy --only firestore:rules --project juda-food-app --token "$FIREBASE_TOKEN"
+
+      - name: Remove temporary workflow
+        run: git rm .github/workflows/deploy-firestore-rules.yml
+
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove temporary Firestore rules deploy workflow"
+          git push origin HEAD:ops/deploy-firestore-rules
