@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { performFuseLogout } from "@/lib/fuse-logout";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import {
   FUSE_COOKIE_EMAIL,
   FUSE_COOKIE_NAME,
   FUSE_COOKIE_PHONE,
   FUSE_COOKIE_RESTAURANT,
   FUSE_COOKIE_ROLE,
-  FUSE_LOCAL_SESSION,
-  type FuseSession,
+  saveFuseSession,
 } from "@/lib/fuse-auth";
 
 type CustomerStatus = "checking" | "allowed" | "blocked";
@@ -33,17 +33,6 @@ function clean(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
 
-function roleFromEmail(email: string) {
-  const e = clean(email);
-
-  if (e === "admin@fuse.iq") return "admin";
-  if (e === "restaurant@fuse.iq") return "restaurant";
-  if (e === "driver@fuse.iq") return "driver";
-  if (e === "customer@fuse.iq") return "customer";
-
-  return "unknown";
-}
-
 function targetForRole(role: string) {
   if (role === "admin") return "/fuse-admin";
   if (role === "restaurant") return "/restaurant-admin";
@@ -51,10 +40,6 @@ function targetForRole(role: string) {
   if (role === "customer") return "/customer?fuseRole=customer&fuseEmail=customer%40fuse.iq";
 
   return "/login?next=/customer";
-}
-
-function setCookie(name: string, value: string) {
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=2592000; SameSite=Lax`;
 }
 
 function clearCustomerCookies() {
@@ -68,42 +53,6 @@ function clearCustomerCookies() {
 
   for (const name of cookies) {
     document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
-  }
-}
-
-function writeCustomerSession(email: string) {
-  const session: FuseSession & Record<string, unknown> = {
-    role: "customer",
-    fuseRole: "customer",
-    email,
-    fuseEmail: email,
-    uid: "fuse-customer",
-    name: "FUSE Customer",
-    displayName: "FUSE Customer",
-    customerId: "customer-demo",
-    restaurant: "",
-    restaurantId: "",
-    restaurantName: "",
-    createdAt: Date.now(),
-    source: "customer-page",
-  };
-
-  try {
-    const serialized = JSON.stringify(session);
-
-    localStorage.setItem(FUSE_LOCAL_SESSION, serialized);
-    localStorage.setItem("FUSE_LOCAL_SESSION", serialized);
-    localStorage.setItem("fuseRole", "customer");
-    localStorage.setItem("fuseEmail", email);
-    localStorage.setItem("fuseUser", serialized);
-
-    setCookie(FUSE_COOKIE_ROLE, "customer");
-    setCookie(FUSE_COOKIE_EMAIL, email);
-    setCookie(FUSE_COOKIE_NAME, "FUSE Customer");
-    setCookie(FUSE_COOKIE_PHONE, "");
-    setCookie(FUSE_COOKIE_RESTAURANT, "");
-  } catch (error) {
-    console.error("Customer session write failed", error);
   }
 }
 
@@ -461,15 +410,13 @@ function GuardScreen({
 
 export default function CustomerClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [status, setStatus] = useState<CustomerStatus>("checking");
   const [user, setUser] = useState<User | null>(null);
+  const [resolvedRole, setResolvedRole] = useState("unknown");
   const [message, setMessage] = useState("جاري فحص حساب الزبون...");
   const [activeCategory, setActiveCategory] = useState("الكل");
   const [queryText, setQueryText] = useState("");
-
-  const urlEmail = useMemo(() => clean(searchParams.get("fuseEmail")), [searchParams]);
 
   const visibleRestaurants = useMemo(() => {
     const q = clean(queryText);
@@ -494,31 +441,49 @@ export default function CustomerClient() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
-      const email = clean(nextUser?.email || urlEmail);
-      const role = roleFromEmail(email);
-
       setUser(nextUser);
 
       if (!nextUser?.email) {
+        setResolvedRole("unknown");
         setStatus("checking");
         setMessage("ماكو حساب داخل. جاري تحويلك إلى دخول الزبون...");
         router.replace("/login?next=/customer");
         return;
       }
 
-      if (role !== "customer") {
-        setStatus("blocked");
-        setMessage(`الحساب الحالي ${email} مو حساب زبون.`);
-        return;
-      }
+      const uid = nextUser.uid;
 
-      writeCustomerSession(email);
-      setStatus("allowed");
-      setMessage("تم تثبيت جلسة الزبون بنجاح.");
+      void (async () => {
+        try {
+          const session = await resolveFuseSession(nextUser);
+
+          if (firebaseAuth.currentUser?.uid !== uid) return;
+
+          if (session.role !== "customer") {
+            setResolvedRole(session.role);
+            setStatus("blocked");
+            setMessage(`الحساب الحالي ${clean(nextUser.email)} مو حساب زبون.`);
+            return;
+          }
+
+          saveFuseSession(session);
+          setResolvedRole(session.role);
+          setStatus("allowed");
+          setMessage("تم تثبيت جلسة الزبون بنجاح.");
+        } catch (error) {
+          if (firebaseAuth.currentUser?.uid !== uid) return;
+
+          setResolvedRole("unknown");
+          setStatus("blocked");
+          setMessage(
+            error instanceof Error ? error.message : "تعذر قراءة صلاحية الحساب."
+          );
+        }
+      })();
     });
 
     return () => unsubscribe();
-  }, [router, urlEmail]);
+  }, [router]);
 
   if (status === "checking") {
     return <GuardScreen title="جاري فتح صفحة الزبون..." message={message} />;
@@ -526,7 +491,7 @@ export default function CustomerClient() {
 
   if (status === "blocked") {
     const currentEmail = clean(user?.email);
-    const currentRole = roleFromEmail(currentEmail);
+    const currentRole = resolvedRole;
 
     return (
       <GuardScreen
