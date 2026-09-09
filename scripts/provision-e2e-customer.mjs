@@ -3,7 +3,11 @@
 
 const PROJECT_API_KEY = "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0";
 const email = process.env.FUSE_E2E_EMAIL || "fuse.e2e.launch.083026@gmail.com";
-const password = process.env.FUSE_E2E_PASSWORD || "FuseLaunch2026!";
+const password = process.env.E2E_CUSTOMER_PASSWORD || process.env.FUSE_E2E_PASSWORD;
+if (!password) {
+  console.error("E2E_CUSTOMER_PASSWORD is required");
+  process.exit(1);
+}
 const name = "زبون FUSE E2E";
 const phone = "07701234567";
 const address = "بغداد، المنصور، شارع 14";

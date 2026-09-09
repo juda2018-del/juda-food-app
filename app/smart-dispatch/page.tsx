@@ -329,6 +329,7 @@ export default function SmartDispatchPage() {
         assignedDriverName: name,
         assignedDriverPhone: phone,
         driverId: id,
+        driverUid: id,
         driverEmail: email,
         driverName: name,
         driverPhone: phone,

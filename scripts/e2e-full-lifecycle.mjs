@@ -24,6 +24,8 @@ import {
   where,
   updateDoc,
 } from "firebase/firestore";
+import { firebaseCliAuthorizedUserCredentials } from "./firebase-cli-credentials.mjs";
+import { GoogleAuth } from "google-auth-library";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0",
@@ -102,13 +104,28 @@ async function main() {
   const db = getFirestore(app);
 
   const customerEmail = process.env.FUSE_E2E_EMAIL || "fuse.e2e.launch.083026@gmail.com";
-  const customerPassword = process.env.FUSE_E2E_PASSWORD || "FuseLaunch2026!";
+  const customerPassword = process.env.E2E_CUSTOMER_PASSWORD || process.env.FUSE_E2E_PASSWORD;
+  if (!customerPassword) {
+    console.error("E2E_CUSTOMER_PASSWORD is required");
+    process.exit(1);
+  }
+
+  const PROTECTED_UIDS = new Set([
+    "mCrM45IftPbED3mLV1kRiyNlol22",
+    "bE4ODzVN4zNHIguXVW2VBNLx5zm2",
+    "2ZBvku4r7BWSgfWKNGLObcu1rjE3",
+    "GwOVzAlqp9d7z2ynZ3hri635VVJ2",
+  ]);
+  let fallbackUid = "";
+  let fallbackEmailCreated = "";
 
   // --- no-role fallback: brand-new Auth user, no claims, no profile ---
   const fallbackEmail = `fuse.e2e.fallback.${Date.now()}@gmail.com`;
   const fallbackPassword = `FuseFb${Date.now()}Aa1`;
   try {
     const created = await createUserWithEmailAndPassword(auth, fallbackEmail, fallbackPassword);
+    fallbackUid = created.user.uid;
+    fallbackEmailCreated = fallbackEmail;
     const token = await created.user.getIdTokenResult(true);
     const profile = await readProfile(db, created.user.uid);
     const claimRole = token.claims.role || token.claims.fuseRole || null;
@@ -470,6 +487,32 @@ async function main() {
   if (report.BLOCKERS.length) {
     console.log("BLOCKERS:");
     for (const item of report.BLOCKERS) console.log(`- ${item}`);
+  }
+
+  if (fallbackUid && fallbackEmailCreated.startsWith("fuse.e2e.fallback.") && !PROTECTED_UIDS.has(fallbackUid)) {
+    try {
+      const credentials = firebaseCliAuthorizedUserCredentials();
+      if (!credentials) {
+        console.log("CLEANUP_SKIP missing Firebase CLI admin session");
+      } else {
+        const admin = new GoogleAuth({
+          credentials,
+          scopes: ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/identitytoolkit"],
+        });
+        const token = await admin.getAccessToken();
+        const res = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/projects/309377324974/accounts:delete`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ localId: fallbackUid }),
+          }
+        );
+        console.log(res.ok ? `CLEANUP_OK fallback uid=${fallbackUid}` : `CLEANUP_FAIL HTTP ${res.status}`);
+      }
+    } catch (error) {
+      console.log(`CLEANUP_SKIP ${error.message || error}`);
+    }
   }
 
   const failed = Object.entries(report).some(([key, value]) => key !== "BLOCKERS" && key !== "ORDER_ID" && key !== "ORDER_DOC" && value === "FAIL");

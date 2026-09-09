@@ -9,8 +9,6 @@ import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
 type GateState = "checking" | "allowed" | "redirecting";
 
-const LOAD_TIMEOUT_MS = 8000;
-
 function normalize(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
@@ -44,14 +42,7 @@ export default function RestaurantAdminGate({
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      setState("redirecting");
-      router.replace("/login?next=/restaurant-admin");
-    }, LOAD_TIMEOUT_MS);
-
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-      window.clearTimeout(timeout);
-
       if (!user) {
         setState("redirecting");
         router.replace("/login?next=/restaurant-admin");
@@ -76,7 +67,6 @@ export default function RestaurantAdminGate({
     });
 
     return () => {
-      window.clearTimeout(timeout);
       unsubscribe();
     };
   }, [router, urlRole, urlEmail]);

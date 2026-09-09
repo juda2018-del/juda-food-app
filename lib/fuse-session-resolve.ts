@@ -74,9 +74,32 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
   }
 
   const email = clean(user.email);
+  const source = claimRole
+    ? "firebase-custom-claims"
+    : profileRole
+      ? "firestore-user-profile"
+      : legacyRole
+        ? "legacy-email-migration"
+        : "authenticated-customer-fallback";
   const restaurant = String(
-    profile?.restaurantId || profile?.restaurant || profile?.restaurantName || ""
+    token.claims.restaurantId ||
+      token.claims.restaurant ||
+      profile?.restaurantId ||
+      profile?.restaurant ||
+      profile?.restaurantName ||
+      ""
   ).trim();
+
+  if (typeof console !== "undefined") {
+    console.info("[FUSE AUTH]", {
+      uid: user.uid,
+      authState: "signed-in",
+      profileFound: Boolean(profile),
+      resolvedRole: role,
+      source,
+      restaurantId: restaurant || null,
+    });
+  }
 
   return {
     uid: user.uid,
@@ -94,17 +117,13 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
       roleTitle[role],
     phone: profile?.phone || user.phoneNumber || "",
     restaurant,
-    restaurantId: profile?.restaurantId || restaurant,
+    restaurantId:
+      String(token.claims.restaurantId || profile?.restaurantId || restaurant).trim() ||
+      restaurant,
     restaurantName: profile?.restaurantName || profile?.restaurant || restaurant,
     fuseRole: role,
     fuseEmail: email,
-    source: claimRole
-      ? "firebase-custom-claims"
-      : profileRole
-        ? "firestore-user-profile"
-        : legacyRole
-          ? "legacy-email-migration"
-          : "authenticated-customer-fallback",
+    source,
     loggedAt: Date.now(),
     createdAt: Date.now(),
   };

@@ -33,17 +33,21 @@ android {
 
     signingConfigs {
         release {
-            def storePath = keystoreProperties['storeFile'] ?: System.getenv('FUSE_KEYSTORE_FILE') ?: 'upload-keystore.jks'
-            storeFile file(storePath)
-            storePassword resolveSigningValue('storePassword', 'FUSE_KEYSTORE_PASSWORD')
-            keyAlias keystoreProperties['keyAlias'] ?: System.getenv('FUSE_KEY_ALIAS') ?: 'upload'
-            keyPassword resolveSigningValue('keyPassword', 'FUSE_KEY_PASSWORD')
+            def storePath = keystoreProperties['storeFile'] ?: System.getenv('FUSE_KEYSTORE_FILE') ?: ''
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword resolveSigningValue('storePassword', 'FUSE_KEYSTORE_PASSWORD')
+                keyAlias keystoreProperties['keyAlias'] ?: System.getenv('FUSE_KEY_ALIAS') ?: 'upload'
+                keyPassword resolveSigningValue('keyPassword', 'FUSE_KEY_PASSWORD')
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (signingConfigs.release.storeFile) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

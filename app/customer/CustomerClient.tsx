@@ -443,7 +443,7 @@ export default function CustomerClient() {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
       setUser(nextUser);
 
-      if (!nextUser?.email) {
+      if (!nextUser) {
         setResolvedRole("unknown");
         setStatus("checking");
         setMessage("ماكو حساب داخل. جاري تحويلك إلى دخول الزبون...");
