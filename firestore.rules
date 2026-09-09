@@ -22,7 +22,7 @@ service cloud.firestore {
         : hasProfile() && profile().fuseRole == 'restaurant' ? 'restaurant'
         : hasProfile() && profile().fuseRole == 'driver' ? 'driver'
         : hasProfile() && profile().fuseRole == 'customer' ? 'customer'
-        : '';
+        : 'customer';
     }
     function isAdmin() { return role() == 'admin'; }
     function isRestaurant() { return role() == 'restaurant'; }

@@ -1,4 +1,4 @@
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/app/firebase";
 import { parseFuseRole, roleTitle, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
@@ -57,6 +57,22 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
   const legacyRole = legacyRoleFromEmail(user.email || "");
   const role = claimRole || profileRole || legacyRole || "customer";
 
+  if (role === "customer" && !profile) {
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        role: "customer",
+        name: user.displayName || roleTitle.customer,
+        phone: user.phoneNumber || "",
+        email: clean(user.email),
+        active: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      // Session still resolves as customer even if the profile write is denied.
+    }
+  }
+
   const email = clean(user.email);
   const restaurant = String(
     profile?.restaurantId || profile?.restaurant || profile?.restaurantName || ""
@@ -86,7 +102,9 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
       ? "firebase-custom-claims"
       : profileRole
         ? "firestore-user-profile"
-        : "legacy-email-migration",
+        : legacyRole
+          ? "legacy-email-migration"
+          : "authenticated-customer-fallback",
     loggedAt: Date.now(),
     createdAt: Date.now(),
   };

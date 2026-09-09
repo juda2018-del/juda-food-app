@@ -25,6 +25,30 @@ function cleanNext(value: string | null) {
   return value;
 }
 
+function loginErrorMessage(error: unknown) {
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code?: string }).code || "")
+      : "";
+
+  if (
+    code === "auth/invalid-credential" ||
+    code === "auth/wrong-password" ||
+    code === "auth/user-not-found" ||
+    code === "auth/invalid-email" ||
+    code === "auth/missing-password"
+  ) {
+    return "البريد أو كلمة المرور غير صحيحة.";
+  }
+  if (code === "auth/user-disabled") return "هذا الحساب موقوف.";
+  if (code === "auth/too-many-requests") return "محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.";
+  if (code === "auth/network-request-failed") return "تعذر الاتصال. تحقق من الإنترنت.";
+  if (error instanceof Error && (error.message.includes("FUSE") || error.message.includes("الحساب"))) {
+    return error.message;
+  }
+  return "فشل تسجيل الدخول. تأكد من البريد وكلمة المرور وصلاحية الحساب.";
+}
+
 function targetFor(role: FuseRole, requestedNext: string) {
   if (!requestedNext) return roleHome[role];
 
@@ -67,6 +91,12 @@ export default function LoginClient() {
   const [currentSession, setCurrentSession] = useState<FuseSession | null>(null);
 
   useEffect(() => {
+    if (!currentSession || busy) return;
+    if (!next) return;
+    router.replace(targetFor(currentSession.role, next));
+  }, [busy, currentSession, next, router]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       if (!user) {
         clearFuseSession();
@@ -98,8 +128,13 @@ export default function LoginClient() {
     event.preventDefault();
     if (busy) return;
 
-    const wantedEmail = email.trim().toLowerCase();
-    if (!wantedEmail || !password) {
+    const form = new FormData(event.currentTarget);
+    const wantedEmail = String(form.get("email") || email)
+      .trim()
+      .toLowerCase();
+    const wantedPassword = String(form.get("password") || password);
+
+    if (!wantedEmail || !wantedPassword) {
       setMessage("اكتب البريد وكلمة المرور.");
       return;
     }
@@ -111,7 +146,7 @@ export default function LoginClient() {
       const credential = await signInWithEmailAndPassword(
         firebaseAuth,
         wantedEmail,
-        password
+        wantedPassword
       );
       const session = await resolveFuseSession(credential.user);
       saveFuseSession(session);
@@ -120,11 +155,7 @@ export default function LoginClient() {
       router.refresh();
     } catch (error) {
       clearFuseSession();
-      setMessage(
-        error instanceof Error && error.message.includes("FUSE")
-          ? error.message
-          : "فشل تسجيل الدخول. تأكد من البريد وكلمة المرور وصلاحية الحساب."
-      );
+      setMessage(loginErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -181,6 +212,7 @@ export default function LoginClient() {
             <label htmlFor="login-email">البريد الإلكتروني</label>
             <input
               id="login-email"
+              name="email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -192,6 +224,7 @@ export default function LoginClient() {
             <label htmlFor="login-password">كلمة المرور</label>
             <input
               id="login-password"
+              name="password"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}

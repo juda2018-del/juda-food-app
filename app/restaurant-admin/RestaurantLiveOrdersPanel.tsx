@@ -9,6 +9,7 @@ import {
   limit,
   onSnapshot,
   query,
+  serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 import { firebaseApp } from "@/lib/firebase/client";
@@ -129,6 +130,7 @@ export default function RestaurantLiveOrdersPanel() {
       await updateDoc(doc(db, "orders", orderId), {
         status: canonical,
         statusAr: canonical,
+        updatedAt: serverTimestamp(),
         updatedAtText: new Date().toISOString(),
       });
     } catch (error) {
