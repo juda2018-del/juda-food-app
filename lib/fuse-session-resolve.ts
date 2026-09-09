@@ -55,11 +55,7 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
   const claimRole = parseFuseRole(token.claims.role || token.claims.fuseRole);
   const profileRole = parseFuseRole(profile?.role || profile?.fuseRole);
   const legacyRole = legacyRoleFromEmail(user.email || "");
-  const role = claimRole || profileRole || legacyRole;
-
-  if (!role) {
-    throw new Error("الحساب مسجل في Firebase لكنه غير مربوط بدور داخل FUSE.");
-  }
+  const role = claimRole || profileRole || legacyRole || "customer";
 
   const email = clean(user.email);
   const restaurant = String(
