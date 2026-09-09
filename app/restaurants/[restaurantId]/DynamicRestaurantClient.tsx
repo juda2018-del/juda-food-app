@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, query } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { addFuseCartItem, readFuseCart } from "@/lib/fuse-cart";
 import { isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
@@ -86,6 +86,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
   const [loading, setLoading] = useState(true);
   const [connectionWarning, setConnectionWarning] = useState(false);
   const [menuLive, setMenuLive] = useState(false);
+  const [catalogReady, setCatalogReady] = useState(false);
 
   useEffect(() => {
     const fallbackForRestaurant = fallbackMenuFor(restaurantId);
@@ -93,6 +94,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
       setRestaurants((current) => current.length ? current : fallbackRestaurants);
       setMenu((current) => current.length ? current : fallbackForRestaurant);
       setMenuLive(false);
+      setCatalogReady(true);
       setLoading(false);
       setConnectionWarning(true);
     }, 4500);
@@ -118,7 +120,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
     );
 
     const unsubscribeMenu = onSnapshot(
-      query(collection(db, "menu")),
+      query(collection(db, "menu"), where("restaurantId", "==", restaurantId)),
       (snapshot) => {
         const remote = snapshot.docs.map((item) => ({
           ...(item.data() as Omit<MenuDoc, "documentId">),
@@ -128,12 +130,14 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         const live = restaurantHasLiveCatalog(canonicalRemote, restaurantId);
         setMenu(live ? canonicalRemote : fallbackForRestaurant);
         setMenuLive(live);
+        setCatalogReady(true);
         if (live) setConnectionWarning(false);
       },
       () => {
         setMenu(fallbackForRestaurant);
         setConnectionWarning(true);
         setMenuLive(false);
+        setCatalogReady(true);
       }
     );
 
@@ -228,7 +232,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
             <article key={item.documentId}>
               <div className="item-image">{item.image ? <img src={item.image} alt={item.name || "صنف"} /> : <FuseIcon name="breakfast" size="lg" />}</div>
               <div className="copy"><small>{item.category || "عام"}</small><h3>{item.name || item.title || "صنف"}</h3><b>{formatIQD(item.price)}</b></div>
-              <button type="button" className="add-btn" disabled={!isOpen || !menuLive} onClick={() => addItem(item)} title={menuLive ? "إضافة للسلة" : "المنيو غير متصل"} aria-label="إضافة للسلة"><FuseIcon name="plus" size="sm" /></button>
+              <button type="button" className="add-btn" disabled={!catalogReady || !isOpen || !menuLive} onClick={() => addItem(item)} title={!catalogReady ? "جاري تحميل المنيو" : !isOpen ? "المطعم مغلق حالياً" : menuLive ? "إضافة للسلة" : "المنيو غير متصل"} aria-label="إضافة للسلة"><FuseIcon name="plus" size="sm" /></button>
             </article>
           ))}
         </section>

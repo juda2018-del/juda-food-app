@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
-import { db } from "../firebase";
-import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
+import { auth, db } from "../firebase";
+import { roleHome, saveFuseSession, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import { isCatalogMenuItemId } from "@/lib/fuse-catalog";
 import {
   canRestaurantTransition,
@@ -90,19 +92,6 @@ const emptyRestaurant = {
 
 const emptyMenu = { price: "" };
 
-function readSession(): FuseSession | null {
-  try {
-    const raw = localStorage.getItem(FUSE_LOCAL_SESSION);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as FuseSession;
-    const role = parseFuseRole(parsed.role);
-    if (!parsed.email || !role) return null;
-    return { ...parsed, role };
-  } catch {
-    return null;
-  }
-}
-
 function getRestaurantName(item: RestaurantDoc | MenuDoc | OrderDoc) {
   return String(item.restaurantName || item.restaurant || item.name || item.title || "مطعم").trim();
 }
@@ -130,16 +119,29 @@ export default function RestaurantAdminPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const saved = readSession();
-    if (!saved) {
-      window.location.href = "/login?next=/restaurant-admin";
-      return;
-    }
-    if (saved.role !== "admin" && saved.role !== "restaurant") {
-      window.location.href = roleHome[saved.role] || "/login";
-      return;
-    }
-    setSession(saved);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "/login?next=/restaurant-admin";
+        return;
+      }
+      try {
+        const resolved = await resolveFuseSession(user);
+        saveFuseSession(resolved);
+        if (resolved.role !== "admin" && resolved.role !== "restaurant") {
+          window.location.href = roleHome[resolved.role] || "/login";
+          return;
+        }
+        console.info("[FUSE ORDER]", {
+          restaurantId: resolved.restaurantId || resolved.restaurant || null,
+          role: resolved.role,
+          uid: resolved.uid || user.uid,
+        });
+        setSession(resolved);
+      } catch {
+        window.location.href = "/login?next=/restaurant-admin";
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -179,7 +181,18 @@ export default function RestaurantAdminPage() {
 
     const unsubOrders = onSnapshot(
       query(collection(db, "orders"), where("restaurantId", "==", selectedId)),
-      (snapshot) => setOrders(snapshot.docs.map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }))),
+      (snapshot) => {
+        const next = snapshot.docs.map((item) => ({ ...(item.data() as Omit<OrderDoc, "documentId">), documentId: item.id }));
+        setOrders(next);
+        const sample = next[0];
+        console.info("[FUSE ORDER]", {
+          restaurantId: selectedId,
+          count: next.length,
+          orderId: sample?.orderId || null,
+          status: sample?.status || null,
+          customerId: sample?.customerUid || null,
+        });
+      },
       () => setOrders([])
     );
 
@@ -406,6 +419,16 @@ export default function RestaurantAdminPage() {
     () => menu.filter((item) => !isCatalogMenuItemId(item.documentId)),
     [menu]
   );
+
+  if (!session) {
+    return (
+      <main dir="rtl" className="page">
+        <section className="shell">
+          <p>جاري التحقق من حساب المطعم...</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main dir="rtl" className="page">

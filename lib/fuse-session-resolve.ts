@@ -1,4 +1,4 @@
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import { db } from "@/app/firebase";
 import { parseFuseRole, roleTitle, type FuseRole, type FuseSession } from "@/lib/fuse-auth";
@@ -57,10 +57,49 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
   const legacyRole = legacyRoleFromEmail(user.email || "");
   const role = claimRole || profileRole || legacyRole || "customer";
 
+  if (role === "customer" && !profile) {
+    try {
+      await setDoc(doc(db, "users", user.uid), {
+        role: "customer",
+        name: user.displayName || roleTitle.customer,
+        phone: user.phoneNumber || "",
+        email: clean(user.email),
+        active: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch {
+      // Session still resolves as customer even if the profile write is denied.
+    }
+  }
+
   const email = clean(user.email);
+  const source = claimRole
+    ? "firebase-custom-claims"
+    : profileRole
+      ? "firestore-user-profile"
+      : legacyRole
+        ? "legacy-email-migration"
+        : "authenticated-customer-fallback";
   const restaurant = String(
-    profile?.restaurantId || profile?.restaurant || profile?.restaurantName || ""
+    token.claims.restaurantId ||
+      token.claims.restaurant ||
+      profile?.restaurantId ||
+      profile?.restaurant ||
+      profile?.restaurantName ||
+      ""
   ).trim();
+
+  if (typeof console !== "undefined") {
+    console.info("[FUSE AUTH]", {
+      uid: user.uid,
+      authState: "signed-in",
+      profileFound: Boolean(profile),
+      resolvedRole: role,
+      source,
+      restaurantId: restaurant || null,
+    });
+  }
 
   return {
     uid: user.uid,
@@ -78,15 +117,13 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
       roleTitle[role],
     phone: profile?.phone || user.phoneNumber || "",
     restaurant,
-    restaurantId: profile?.restaurantId || restaurant,
+    restaurantId:
+      String(token.claims.restaurantId || profile?.restaurantId || restaurant).trim() ||
+      restaurant,
     restaurantName: profile?.restaurantName || profile?.restaurant || restaurant,
     fuseRole: role,
     fuseEmail: email,
-    source: claimRole
-      ? "firebase-custom-claims"
-      : profileRole
-        ? "firestore-user-profile"
-        : "legacy-email-migration",
+    source,
     loggedAt: Date.now(),
     createdAt: Date.now(),
   };

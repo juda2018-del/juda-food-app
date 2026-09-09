@@ -250,6 +250,7 @@ export default function AutoDispatchPage() {
         assignedDriverName: name,
         assignedDriverPhone: phone,
         driverId: id,
+        driverUid: id,
         driverEmail: email,
         driverName: name,
         driverPhone: phone,

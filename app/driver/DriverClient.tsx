@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { performFuseLogout } from "@/lib/fuse-logout";
+import { saveFuseSession, type FuseRole } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
 type DriverStatus = "checking" | "allowed" | "blocked";
 
@@ -12,84 +14,63 @@ function clean(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
 
-function roleFromEmail(email: string) {
-  const e = clean(email);
-  if (e === "admin@fuse.iq") return "admin";
-  if (e === "restaurant@fuse.iq") return "restaurant";
-  if (e === "driver@fuse.iq") return "driver";
-  if (e === "customer@fuse.iq") return "customer";
-  return "unknown";
-}
-
 function targetForRole(role: string) {
   if (role === "admin") return "/fuse-admin";
   if (role === "restaurant") return "/restaurant-admin";
-  if (role === "driver") return "/driver?fuseRole=driver&fuseEmail=driver%40fuse.iq";
-  if (role === "customer") return "/customer?fuseRole=customer&fuseEmail=customer%40fuse.iq";
+  if (role === "driver") return "/driver-app";
+  if (role === "customer") return "/customer";
   return "/login?next=/driver";
-}
-
-function writeDriverSession(email: string) {
-  const session = {
-    role: "driver",
-    fuseRole: "driver",
-    email,
-    fuseEmail: email,
-    uid: "fuse-driver",
-    name: "FUSE Driver",
-    displayName: "FUSE Driver",
-    driverId: "driver-demo",
-    createdAt: new Date().toISOString(),
-    source: "driver-page"
-  };
-
-  try {
-    localStorage.setItem("FUSE_LOCAL_SESSION", JSON.stringify(session));
-    localStorage.setItem("fuseRole", "driver");
-    localStorage.setItem("fuseEmail", email);
-    localStorage.setItem("fuseUser", JSON.stringify(session));
-  } catch (error) {
-    console.error("Driver session write failed", error);
-  }
 }
 
 export default function DriverClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [status, setStatus] = useState<DriverStatus>("checking");
   const [user, setUser] = useState<User | null>(null);
+  const [resolvedRole, setResolvedRole] = useState<FuseRole | "unknown">("unknown");
   const [message, setMessage] = useState("جاري فحص حساب السائق...");
-
-  const urlEmail = useMemo(() => clean(searchParams.get("fuseEmail")), [searchParams]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
-      const email = clean(nextUser?.email || urlEmail);
-      const role = roleFromEmail(email);
-
       setUser(nextUser);
 
-      if (!nextUser?.email) {
+      if (!nextUser) {
+        setResolvedRole("unknown");
         setStatus("checking");
         setMessage("ماكو حساب داخل. جاري تحويلك إلى دخول السائق...");
         router.replace("/login?next=/driver");
         return;
       }
 
-      if (role !== "driver") {
-        setStatus("blocked");
-        setMessage(`الحساب الحالي ${email} مو حساب سائق.`);
-        return;
-      }
+      const uid = nextUser.uid;
 
-      writeDriverSession(email);
-      setStatus("allowed");
-      setMessage("تم تثبيت جلسة السائق بنجاح.");
+      void (async () => {
+        try {
+          const session = await resolveFuseSession(nextUser);
+          if (firebaseAuth.currentUser?.uid !== uid) return;
+
+          if (session.role !== "driver") {
+            setResolvedRole(session.role);
+            setStatus("blocked");
+            setMessage(`الحساب الحالي ${clean(nextUser.email)} مو حساب سائق.`);
+            return;
+          }
+
+          saveFuseSession(session);
+          setResolvedRole(session.role);
+          setStatus("allowed");
+          setMessage("تم تثبيت جلسة السائق بنجاح.");
+        } catch (error) {
+          if (firebaseAuth.currentUser?.uid !== uid) return;
+          setResolvedRole("unknown");
+          setStatus("blocked");
+          setMessage(error instanceof Error ? error.message : "تعذر قراءة صلاحية الحساب.");
+        }
+      })();
     });
 
     return () => unsubscribe();
-  }, [router, urlEmail]);
+  }, [router]);
 
   if (status === "checking") {
     return (
@@ -126,7 +107,7 @@ export default function DriverClient() {
 
   if (status === "blocked") {
     const currentEmail = clean(user?.email);
-    const currentRole = roleFromEmail(currentEmail);
+    const currentRole = resolvedRole === "unknown" ? "customer" : resolvedRole;
 
     return (
       <main dir="rtl" style={{
@@ -313,7 +294,23 @@ export default function DriverClient() {
           color: "rgba(255,255,255,0.68)",
           lineHeight: 1.8
         }}>
-          ماكو طلبات مخصصة للسائق حاليًا. أول ما ينربط dispatch راح تظهر الطلبات هنا مباشرة.
+          الطلبات الحية تظهر في تطبيق السائق بعد التخصيص.
+          <div style={{ marginTop: 16 }}>
+            <button
+              onClick={() => router.push("/driver-app")}
+              style={{
+                border: 0,
+                borderRadius: 16,
+                padding: "14px 18px",
+                background: "#FF7A00",
+                color: "#111",
+                fontWeight: 950,
+                cursor: "pointer"
+              }}
+            >
+              فتح تطبيق التوصيل
+            </button>
+          </div>
         </div>
       </section>
     </main>

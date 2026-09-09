@@ -9,10 +9,14 @@ import {
   limit,
   onSnapshot,
   query,
+  serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
-import { firebaseApp } from "@/lib/firebase/client";
-import { fuseOrderStatusLabel, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import { onAuthStateChanged } from "firebase/auth";
+import { firebaseApp, firebaseAuth } from "@/lib/firebase/client";
+import { canRestaurantTransition, fuseOrderStatusLabel, fuseStatusTimestampField, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
 type AnyOrder = {
   id: string;
@@ -20,6 +24,7 @@ type AnyOrder = {
   statusAr?: string;
   restaurantName?: string;
   restaurant?: string;
+  restaurantId?: string;
   customerName?: string;
   customerPhone?: string;
   phone?: string;
@@ -54,61 +59,89 @@ export default function RestaurantLiveOrdersPanel() {
 
   useEffect(() => {
     let unsubscribe: undefined | (() => void);
+    let unsubAuth: undefined | (() => void);
 
     async function start() {
-      try {
-        const db = getFirestore(firebaseApp);
-        const q = query(collection(db, "orders"), limit(30));
-
-        unsubscribe = onSnapshot(
-          q,
-          async (snapshot) => {
-            try {
-              const next = snapshot.docs
-                .map((item) => ({
-                  id: item.id,
-                  ...(item.data() as Omit<AnyOrder, "id">),
-                }))
-                .reverse();
-
-              setOrders(next);
-              setMessage(next.length ? "تم ربط الطلبات الحية." : "ماكو طلبات بعد داخل orders.");
-              setReady(true);
-            } catch (innerError) {
-              console.error(innerError);
-              setMessage("وصلت بيانات الطلبات بس صار خطأ عرض. الصفحة باقية شغالة.");
-              setReady(true);
-            }
-          },
-          async (liveError) => {
-            console.error("Live orders snapshot failed", liveError);
-
-            try {
-              const once = await getDocs(q);
-              const next = once.docs
-                .map((item) => ({
-                  id: item.id,
-                  ...(item.data() as Omit<AnyOrder, "id">),
-                }))
-                .reverse();
-
-              setOrders(next);
-              setMessage(next.length ? "تمت قراءة الطلبات مرة واحدة." : "ماكو طلبات بعد داخل orders.");
-            } catch (fallbackError) {
-              console.error("Live orders fallback failed", fallbackError);
-              setOrders([]);
-              setMessage("Firestore رفض قراءة orders. نحتاج نفتح Rules للقراءة/الكتابة بعدين.");
-            }
-
-            setReady(true);
+      unsubAuth = onAuthStateChanged(firebaseAuth, async (user) => {
+        try {
+          if (unsubscribe) {
+            unsubscribe();
+            unsubscribe = undefined;
           }
-        );
-      } catch (error) {
-        console.error("RestaurantLiveOrdersPanel crashed safely", error);
-        setOrders([]);
-        setMessage("بلوك الطلبات تعطل بأمان بدون كسر لوحة المطعم.");
-        setReady(true);
-      }
+          if (!user) {
+            setOrders([]);
+            setMessage("ماكو حساب داخل.");
+            setReady(true);
+            return;
+          }
+
+          const session = await resolveFuseSession(user);
+          const db = getFirestore(firebaseApp);
+          const restaurantId = String(session.restaurantId || session.restaurant || "").trim();
+          const q =
+            session.role === "admin"
+              ? query(collection(db, "orders"), limit(30))
+              : restaurantId
+                ? query(collection(db, "orders"), where("restaurantId", "==", restaurantId), limit(30))
+                : null;
+
+          if (!q) {
+            setOrders([]);
+            setMessage("حساب المطعم غير مربوط بمعرّف مطعم.");
+            setReady(true);
+            return;
+          }
+
+          unsubscribe = onSnapshot(
+            q,
+            async (snapshot) => {
+              try {
+                const next = snapshot.docs
+                  .map((item) => ({
+                    id: item.id,
+                    ...(item.data() as Omit<AnyOrder, "id">),
+                  }))
+                  .reverse();
+
+                setOrders(next);
+                setMessage(next.length ? "تم ربط الطلبات الحية." : "ماكو طلبات بعد داخل orders.");
+                setReady(true);
+              } catch (innerError) {
+                console.error(innerError);
+                setMessage("وصلت بيانات الطلبات بس صار خطأ عرض. الصفحة باقية شغالة.");
+                setReady(true);
+              }
+            },
+            async (liveError) => {
+              console.error("Live orders snapshot failed", liveError);
+
+              try {
+                const once = await getDocs(q);
+                const next = once.docs
+                  .map((item) => ({
+                    id: item.id,
+                    ...(item.data() as Omit<AnyOrder, "id">),
+                  }))
+                  .reverse();
+
+                setOrders(next);
+                setMessage(next.length ? "تمت قراءة الطلبات مرة واحدة." : "ماكو طلبات بعد داخل orders.");
+              } catch (fallbackError) {
+                console.error("Live orders fallback failed", fallbackError);
+                setOrders([]);
+                setMessage("تعذر قراءة طلبات هذا المطعم.");
+              }
+
+              setReady(true);
+            }
+          );
+        } catch (error) {
+          console.error("RestaurantLiveOrdersPanel crashed safely", error);
+          setOrders([]);
+          setMessage("بلوك الطلبات تعطل بأمان بدون كسر لوحة المطعم.");
+          setReady(true);
+        }
+      });
     }
 
     start();
@@ -116,6 +149,7 @@ export default function RestaurantLiveOrdersPanel() {
     return () => {
       try {
         if (unsubscribe) unsubscribe();
+        if (unsubAuth) unsubAuth();
       } catch {}
     };
   }, []);
@@ -126,14 +160,24 @@ export default function RestaurantLiveOrdersPanel() {
     try {
       const db = getFirestore(firebaseApp);
       const canonical = normalizeFuseOrderStatus(status);
+      const current = orders.find((item) => item.id === orderId);
+      const previous = normalizeFuseOrderStatus(current?.status);
+      if (!canRestaurantTransition(previous, canonical) || previous === canonical) {
+        alert(`لا يمكن نقل الطلب من «${previous}» إلى «${canonical}».`);
+        return;
+      }
+      const stampField = fuseStatusTimestampField(canonical);
       await updateDoc(doc(db, "orders", orderId), {
         status: canonical,
         statusAr: canonical,
+        updatedAt: serverTimestamp(),
         updatedAtText: new Date().toISOString(),
+        restaurantUpdatedAt: serverTimestamp(),
+        ...(stampField !== "updatedAt" ? { [stampField]: serverTimestamp() } : {}),
       });
     } catch (error) {
       console.error(error);
-      alert("ما قدرنا نحدث حالة الطلب. غالبًا Firestore Rules تحتاج سماح.");
+      alert("ما قدرنا نحدث حالة الطلب.");
     } finally {
       setUpdating("");
     }

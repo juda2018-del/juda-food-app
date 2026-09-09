@@ -28,7 +28,11 @@ const firebaseConfig = {
 };
 
 const email = process.env.FUSE_E2E_EMAIL || "fuse.e2e.launch.083026@gmail.com";
-const password = process.env.FUSE_E2E_PASSWORD || "FuseLaunch2026!";
+const password = process.env.E2E_CUSTOMER_PASSWORD || process.env.FUSE_E2E_PASSWORD;
+if (!password) {
+  console.error("E2E_CUSTOMER_PASSWORD is required");
+  process.exit(1);
+}
 
 async function main() {
   const app = initializeApp(firebaseConfig);

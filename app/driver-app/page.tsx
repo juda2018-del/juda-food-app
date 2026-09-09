@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
-import { db } from "../firebase";
-import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "../firebase";
+import { roleHome, saveFuseSession, type FuseSession } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import { canDriverTransition, fuseOrderStatusLabel, normalizeFuseOrderStatus, type FuseOrderStatus } from "@/lib/fuse-order-status";
 import { notifyOrderStatusChange } from "@/lib/fuse-order-notifications";
 
@@ -19,31 +21,74 @@ type OrderDoc = {
 type DriverIdentity = { id: string; email: string; name: string; phone: string };
 const activeStatuses = ["جاهز للتوصيل", "السائق استلم الطلب", "قيد التوصيل"];
 
-function readSession(): FuseSession | null { try { const raw = localStorage.getItem(FUSE_LOCAL_SESSION); if (!raw) return null; const parsed = JSON.parse(raw) as FuseSession; const role = parseFuseRole(parsed.role); if (!parsed.email || !role) return null; return { ...parsed, role }; } catch { return null; } }
 function toDate(value: unknown): Date | null { try { if (!value) return null; if (typeof value === "object" && value !== null && "toDate" in value) { const fn = (value as { toDate?: unknown }).toDate; if (typeof fn === "function") return (fn as () => Date)(); } const date = value instanceof Date ? value : new Date(value as string | number); return Number.isNaN(date.getTime()) ? null : date; } catch { return null; } }
+function belongsToDriver(order: OrderDoc, driver: DriverIdentity) { const values = [order.assignedDriverId, order.driverId, order.assignedDriverEmail, order.driverEmail].map(v => String(v || "").trim().toLowerCase()).filter(Boolean); const mine = [driver.id, driver.email].map(v => String(v || "").trim().toLowerCase()).filter(Boolean); return values.some(v => mine.includes(v)); }
 function formatDate(value: unknown) { const date = toDate(value); if (!date) return "بدون وقت"; return date.toLocaleString("ar-IQ", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }); }
 function formatIQD(value: number) { return `${Number(value || 0).toLocaleString("en-US")} د.ع`; }
 function getCustomer(order: OrderDoc) { return order.customerName || order.customer || order.name || "زبون"; }
 function getPhone(order: OrderDoc) { return order.phone || order.customerPhone || ""; }
 function getRestaurant(order: OrderDoc) { return order.restaurantName || order.restaurant || "مطعم"; }
 function getTotal(order: OrderDoc) { return Number(order.total || order.amount || 0); }
-function belongsToDriver(order: OrderDoc, driver: DriverIdentity) { const values = [order.assignedDriverId, order.driverId, order.assignedDriverEmail, order.driverEmail].map(v => String(v || "").trim().toLowerCase()).filter(Boolean); const mine = [driver.id, driver.email].map(v => String(v || "").trim().toLowerCase()).filter(Boolean); return values.some(v => mine.includes(v)); }
 function phoneHref(phone: string) { const value = phone.replace(/\s+/g, ""); return value ? `tel:${value}` : "#"; }
 function whatsappHref(phone: string) { const value = phone.replace(/\D/g, ""); if (!value) return "#"; const international = value.startsWith("964") ? value : `964${value.replace(/^0/, "")}`; return `https://wa.me/${international}`; }
 
 export default function DriverAppPage() {
   const [session, setSession] = useState<FuseSession | null>(null); const [orders, setOrders] = useState<OrderDoc[]>([]); const [loading, setLoading] = useState(true); const [online, setOnline] = useState(true); const [savingOrderId, setSavingOrderId] = useState(""); const [message, setMessage] = useState(""); const [error, setError] = useState("");
-  useEffect(() => { const saved = readSession(); if (!saved) { window.location.replace("/login?next=/driver-app"); return; } if (saved.role !== "driver") { window.location.replace(roleHome[saved.role] || "/"); return; } setSession(saved); setOnline(localStorage.getItem("fuse_driver_online") !== "0"); }, []);
-  const driver = useMemo<DriverIdentity | null>(() => { if (!session || session.role !== "driver") return null; return { id: session.uid || session.email, email: session.email, name: session.name || session.displayName || "سائق FUSE", phone: session.phone || "" }; }, [session]);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.replace("/login?next=/driver-app");
+        return;
+      }
+      try {
+        const resolved = await resolveFuseSession(user);
+        saveFuseSession(resolved);
+        if (resolved.role !== "driver") {
+          window.location.replace(roleHome[resolved.role] || "/");
+          return;
+        }
+        setSession(resolved);
+        setOnline(localStorage.getItem("fuse_driver_online") !== "0");
+      } catch {
+        window.location.replace("/login?next=/driver-app");
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+  const driver = useMemo<DriverIdentity | null>(() => { if (!session || session.role !== "driver" || !session.uid) return null; return { id: session.uid, email: session.email, name: session.name || session.displayName || "سائق FUSE", phone: session.phone || "" }; }, [session]);
   useEffect(() => { if (!driver) return; const merged = new Map<string, OrderDoc>(); const refresh = () => { const data = Array.from(merged.values()).filter(item => belongsToDriver(item, driver)); data.sort((a,b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0)); setOrders(data); setLoading(false); }; const listeners = [query(collection(db,"orders"),where("assignedDriverEmail","==",driver.email)),query(collection(db,"orders"),where("driverEmail","==",driver.email)),query(collection(db,"orders"),where("assignedDriverId","==",driver.id)),query(collection(db,"orders"),where("driverId","==",driver.id))].map(request => onSnapshot(request, snapshot => { snapshot.docs.forEach(item => merged.set(item.id,{...(item.data() as Omit<OrderDoc,"documentId">),documentId:item.id})); refresh(); setError(""); }, () => { setLoading(false); setError("تعذر تحميل طلبات السائق المخصصة."); })); return () => listeners.forEach(unsubscribe => unsubscribe()); }, [driver]);
   const activeOrders = useMemo(() => orders.filter(order => activeStatuses.includes(normalizeFuseOrderStatus(order.status))), [orders]);
   const deliveredOrders = useMemo(() => orders.filter(order => normalizeFuseOrderStatus(order.status) === "تم التسليم"), [orders]);
-  async function toggleOnline() { if (!driver) return; const next=!online; setOnline(next); localStorage.setItem("fuse_driver_online",next?"1":"0"); setError(""); try { const snapshot=await getDocs(query(collection(db,"drivers"),where("email","==",driver.email))); if(snapshot.empty){setError("حساب السائق غير مسجل في النظام. راجع إدارة FUSE.");return;} await Promise.all(snapshot.docs.map(item=>updateDoc(item.ref,{online:next,isOnline:next,status:next?"متصل":"غير متصل",updatedAt:serverTimestamp()}))); setMessage(next?"تم تفعيل حالة الاتصال.":"تم إيقاف حالة الاتصال."); } catch(e){setError(e instanceof Error?e.message:"تعذر تحديث حالة الاتصال في Firebase.");} }
+  async function toggleOnline() {
+    if (!driver) return;
+    const next = !online;
+    setOnline(next);
+    localStorage.setItem("fuse_driver_online", next ? "1" : "0");
+    setError("");
+    try {
+      const driverRef = doc(db, "drivers", driver.id);
+      const snapshot = await getDoc(driverRef);
+      if (!snapshot.exists()) {
+        setError("حساب السائق غير مسجل في النظام. راجع إدارة FUSE.");
+        return;
+      }
+      await updateDoc(driverRef, {
+        online: next,
+        isOnline: next,
+        status: next ? "متصل" : "غير متصل",
+        updatedAt: serverTimestamp(),
+        lastSeenAt: serverTimestamp(),
+      });
+      setMessage(next ? "تم تفعيل حالة الاتصال." : "تم إيقاف حالة الاتصال.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر تحديث حالة الاتصال في Firebase.");
+    }
+  }
   async function updateOrder(order: OrderDoc, status: FuseOrderStatus) {
     if (!driver || !belongsToDriver(order,driver)) { setError("هذا الطلب غير مخصص لحسابك."); return; }
     const current=normalizeFuseOrderStatus(order.status); if(!canDriverTransition(current,status)){setError(`لا يمكن نقل الطلب من «${fuseOrderStatusLabel(current)}» إلى «${status}».`);return;}
     setSavingOrderId(order.documentId); setError(""); setMessage("");
-    try { await updateDoc(doc(db,"orders",order.documentId),{status,statusAr:status,driverId:driver.id,driverEmail:driver.email,driverName:driver.name,driverPhone:driver.phone,assignedDriverId:driver.id,assignedDriverEmail:driver.email,assignedDriverName:driver.name,assignedDriverPhone:driver.phone,driverUpdatedAt:serverTimestamp(),updatedAt:serverTimestamp(),...(status === "السائق استلم الطلب"?{pickedUpAt:serverTimestamp()}:{}) ,...(status === "قيد التوصيل"?{outForDeliveryAt:serverTimestamp()}:{}),...(status === "تم التسليم"?{deliveredAt:serverTimestamp()}:{})}); await notifyOrderStatusChange({customerUid:order.customerUid,orderDocumentId:order.documentId,orderId:order.orderId || order.documentId,status}); setMessage(status === "السائق استلم الطلب" ? "تم استلام الطلب من المطعم." : status === "قيد التوصيل" ? "بدأ التوصيل للزبون." : "تم تأكيد تسليم الطلب."); } catch(e){setError(e instanceof Error?e.message:"تعذر تحديث الطلب.");} finally {setSavingOrderId("");}
+    try { await updateDoc(doc(db,"orders",order.documentId),{status,statusAr:status,driverId:driver.id,driverUid:driver.id,driverEmail:driver.email,driverName:driver.name,driverPhone:driver.phone,assignedDriverId:driver.id,assignedDriverEmail:driver.email,assignedDriverName:driver.name,assignedDriverPhone:driver.phone,driverUpdatedAt:serverTimestamp(),updatedAt:serverTimestamp(),...(status === "السائق استلم الطلب"?{pickedUpAt:serverTimestamp()}:{}) ,...(status === "قيد التوصيل"?{outForDeliveryAt:serverTimestamp()}:{}),...(status === "تم التسليم"?{deliveredAt:serverTimestamp()}:{})}); await notifyOrderStatusChange({customerUid:order.customerUid,orderDocumentId:order.documentId,orderId:order.orderId || order.documentId,status}); console.info("[FUSE ORDER]",{orderId:order.orderId||order.documentId,driverId:driver.id,status}); setMessage(status === "السائق استلم الطلب" ? "تم استلام الطلب من المطعم." : status === "قيد التوصيل" ? "بدأ التوصيل للزبون." : "تم تأكيد تسليم الطلب."); } catch(e){setError(e instanceof Error?e.message:"تعذر تحديث الطلب.");} finally {setSavingOrderId("");}
   }
   if(!session||!driver) return <main dir="rtl" className="loading">جاري التحقق من حساب السائق...</main>;
   const activeMoney=activeOrders.reduce((sum,order)=>sum+getTotal(order),0);

@@ -22,7 +22,7 @@ service cloud.firestore {
         : hasProfile() && profile().fuseRole == 'restaurant' ? 'restaurant'
         : hasProfile() && profile().fuseRole == 'driver' ? 'driver'
         : hasProfile() && profile().fuseRole == 'customer' ? 'customer'
-        : '';
+        : 'customer';
     }
     function isAdmin() { return role() == 'admin'; }
     function isRestaurant() { return role() == 'restaurant'; }
@@ -37,7 +37,13 @@ service cloud.firestore {
     function customerOwns(data) { return signedIn() && data.customerUid == request.auth.uid; }
     function restaurantOwns(data) { return isRestaurant() && restaurantId() != '' && data.restaurantId == restaurantId(); }
     function driverOwns(data) {
-      return isDriver() && ((data.driverUid is string && data.driverUid == request.auth.uid) || (data.driverId is string && data.driverId == request.auth.uid));
+      return isDriver() && (
+        (data.driverUid is string && data.driverUid == request.auth.uid)
+        || (data.driverId is string && data.driverId == request.auth.uid)
+        || (data.assignedDriverId is string && data.assignedDriverId == request.auth.uid)
+        || (data.assignedDriverEmail is string && data.assignedDriverEmail == request.auth.token.email)
+        || (data.driverEmail is string && data.driverEmail == request.auth.token.email)
+      );
     }
     function restaurantTransition(from, to) {
       return (from in ['جديد','new','تم استلام الطلب'] && to in ['قيد التحضير','preparing','مرفوض','rejected'])
@@ -99,7 +105,7 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusAr','updatedAt','updatedAtText','restaurantUpdatedAt','acceptedAt','rejectedAt','readyAt','preparingAt','restaurantNote']))
         || (driverOwns(resource.data)
           && driverTransition(resource.data.status, request.resource.data.status)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusAr','updatedAt','driverUpdatedAt','pickedUpAt','outForDeliveryAt','deliveredAt','driverLatitude','driverLongitude','driverLocationUpdatedAt','driverId','driverEmail','driverName','driverPhone','assignedDriverId','assignedDriverEmail','assignedDriverName','assignedDriverPhone']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','statusAr','updatedAt','driverUpdatedAt','pickedUpAt','outForDeliveryAt','deliveredAt','driverLatitude','driverLongitude','driverLocationUpdatedAt','driverId','driverUid','driverEmail','driverName','driverPhone','assignedDriverId','assignedDriverEmail','assignedDriverName','assignedDriverPhone']));
       allow delete: if isAdmin();
     }
     match /notifications/{id} {

@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 android/app/keystore.properties
+*.jks
+*.keystore
+android/app/*.jks
+android/app/*.keystore
 
 # vercel
 .vercel
@@ -46,6 +50,7 @@ next-env.d.ts
 *.zip
 .fuse-tools/
 .fuse-backups/
+e2e-production-evidence/
 .env*
 
 backups/

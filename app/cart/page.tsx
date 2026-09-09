@@ -15,6 +15,7 @@ import {
   type FuseCartItem,
 } from "@/lib/fuse-cart";
 import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import { isFuseRestaurantOpen, resolveRestaurantDeliveryFee } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
 
@@ -190,6 +191,15 @@ export default function CartPage() {
     const role = typeof token.claims.role === "string" ? token.claims.role : "";
     if (role && role !== "customer") {
       return setError("تأكيد الطلب متاح لحساب الزبون فقط.");
+    }
+
+    try {
+      const session = await resolveFuseSession(user);
+      if (session.role !== "customer") {
+        return setError("تأكيد الطلب متاح لحساب الزبون فقط.");
+      }
+    } catch (sessionError) {
+      return setError(sessionError instanceof Error ? sessionError.message : "تعذر تثبيت جلسة الزبون.");
     }
 
     if (!items.length) return setError("السلة فارغة. أضف صنفاً واحداً على الأقل.");
