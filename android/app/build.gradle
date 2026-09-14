@@ -54,6 +54,25 @@ android {
     }
 }
 
+tasks.configureEach { task ->
+    if (task.name == "bundleRelease" || task.name == "assembleRelease") {
+        task.doFirst {
+            def storePath = keystoreProperties['storeFile'] ?: System.getenv('FUSE_KEYSTORE_FILE') ?: ''
+            def storePassword = resolveSigningValue('storePassword', 'FUSE_KEYSTORE_PASSWORD')
+            def keyPassword = resolveSigningValue('keyPassword', 'FUSE_KEY_PASSWORD')
+            if (!storePath || !storePassword || !keyPassword) {
+                throw new GradleException(
+                    "FUSE release signing is not configured. Copy android/keystore.properties.example to android/app/keystore.properties, or set FUSE_KEYSTORE_FILE, FUSE_KEYSTORE_PASSWORD, FUSE_KEY_ALIAS, and FUSE_KEY_PASSWORD. Never commit the keystore or passwords."
+                )
+            }
+            def store = file(storePath)
+            if (!store.exists()) {
+                throw new GradleException("FUSE release keystore not found at ${store.absolutePath}")
+            }
+        }
+    }
+}
+
 repositories {
     flatDir {
         dirs 'libs'

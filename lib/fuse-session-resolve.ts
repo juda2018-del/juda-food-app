@@ -20,15 +20,6 @@ function clean(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
 
-function legacyRoleFromEmail(email: string): FuseRole | null {
-  const value = clean(email);
-  if (value === "admin@fuse.iq") return "admin";
-  if (value === "restaurant@fuse.iq") return "restaurant";
-  if (value === "driver@fuse.iq") return "driver";
-  if (value === "customer@fuse.iq") return "customer";
-  return null;
-}
-
 async function readProfile(user: User): Promise<UserProfile | null> {
   const collections = ["users", "accounts", "profiles"];
 
@@ -54,8 +45,9 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
 
   const claimRole = parseFuseRole(token.claims.role || token.claims.fuseRole);
   const profileRole = parseFuseRole(profile?.role || profile?.fuseRole);
-  const legacyRole = legacyRoleFromEmail(user.email || "");
-  const role = claimRole || profileRole || legacyRole || "customer";
+  // Staff roles must come from Auth custom claims or Firestore profile only.
+  // Never elevate privileges from email address alone.
+  const role = claimRole || profileRole || "customer";
 
   if (role === "customer" && !profile) {
     try {
@@ -78,9 +70,7 @@ export async function resolveFuseSession(user: User): Promise<FuseSession> {
     ? "firebase-custom-claims"
     : profileRole
       ? "firestore-user-profile"
-      : legacyRole
-        ? "legacy-email-migration"
-        : "authenticated-customer-fallback";
+      : "authenticated-customer-fallback";
   const restaurant = String(
     token.claims.restaurantId ||
       token.claims.restaurant ||

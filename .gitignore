@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — keep .env.example tracked for required variable names
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
 android/app/keystore.properties
 *.jks
 *.keystore
@@ -45,12 +50,9 @@ android/app/*.keystore
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-
 *.zip
 .fuse-tools/
 .fuse-backups/
 e2e-production-evidence/
-.env*
 
 backups/

@@ -2,7 +2,7 @@
 
 const config: CapacitorConfig = {
   appId: 'com.fuseiraq.app',
-  appName: 'Fuse Iraq',
+  appName: 'FUSE',
   webDir: 'out',
 };
 

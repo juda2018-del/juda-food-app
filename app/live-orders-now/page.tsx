@@ -9,8 +9,9 @@ type LiveOrder = {
 
 const PAGE_VERSION = "FUSE_RESTAURANT_ORDERS_V17_REAL_FIRESTORE_ON_V5_FIXED";
 
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
-const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+// Public Firebase web config (same values as app/firebase.ts). Env overrides optional.
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "juda-food-app";
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0";
 
 function decodeValue(value: any): any {
   if (!value || typeof value !== "object") return value;
@@ -218,7 +219,7 @@ export default function RestaurantOrdersV5LivePage() {
       setError("");
 
       if (!projectId || !apiKey) {
-        throw new Error("Firebase ENV ناقصة: NEXT_PUBLIC_FIREBASE_PROJECT_ID / NEXT_PUBLIC_FIREBASE_API_KEY");
+        throw new Error("Firebase config missing for live orders");
       }
 
       const url =
