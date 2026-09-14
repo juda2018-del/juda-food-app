@@ -1,17 +1,13 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
-import { parseFuseRole, roleHome, saveFuseSession, type FuseRole } from "@/lib/fuse-auth";
+import { roleHome, saveFuseSession, type FuseRole } from "@/lib/fuse-auth";
 import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 
 type GateState = "checking" | "allowed" | "redirecting";
-
-function normalize(value: string | null | undefined) {
-  return (value || "").trim().toLowerCase();
-}
 
 function targetForRole(role: FuseRole) {
   return roleHome[role];
@@ -23,25 +19,9 @@ export default function RestaurantAdminGate({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [state, setState] = useState<GateState>("checking");
 
-  const urlRole = useMemo(() => {
-    return normalize(searchParams.get("fuseRole") || searchParams.get("role"));
-  }, [searchParams]);
-
-  const urlEmail = useMemo(() => {
-    return normalize(searchParams.get("fuseEmail") || searchParams.get("email"));
-  }, [searchParams]);
-
   useEffect(() => {
-    const parsedUrlRole = parseFuseRole(urlRole);
-    if (parsedUrlRole && parsedUrlRole !== "restaurant") {
-      setState("redirecting");
-      router.replace(targetForRole(parsedUrlRole));
-      return;
-    }
-
     const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
       if (!user) {
         setState("redirecting");
@@ -69,7 +49,7 @@ export default function RestaurantAdminGate({
     return () => {
       unsubscribe();
     };
-  }, [router, urlRole, urlEmail]);
+  }, [router]);
 
   if (state !== "allowed") {
     return (

@@ -1,7 +1,8 @@
 ﻿const VERSION = "FUSE_RESTAURANT_ORDERS_V21_STATIC_BROWSER_FETCH";
 
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
-const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "";
+// Public Firebase web config (same values as app/firebase.ts). Env overrides optional.
+const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "juda-food-app";
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyB8sjJEn2meAPdYDsLn9RjLoQ3d51dsqa0";
 
 export default function RestaurantOrdersV5StaticPage() {
   const clientScript = `

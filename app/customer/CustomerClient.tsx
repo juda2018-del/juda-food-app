@@ -36,8 +36,8 @@ function clean(value: string | null | undefined) {
 function targetForRole(role: string) {
   if (role === "admin") return "/fuse-admin";
   if (role === "restaurant") return "/restaurant-admin";
-  if (role === "driver") return "/driver?fuseRole=driver&fuseEmail=driver%40fuse.iq";
-  if (role === "customer") return "/customer?fuseRole=customer&fuseEmail=customer%40fuse.iq";
+  if (role === "driver") return "/driver-app";
+  if (role === "customer") return "/customer";
 
   return "/login?next=/customer";
 }

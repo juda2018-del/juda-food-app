@@ -21,27 +21,11 @@ workflows:
       - name: Build Next.js app
         script: npm run build
 
-      - name: Prepare iOS files
+      - name: Sync Capacitor iOS
         script: |
-          rm -rf ios/App/App/public
-          mkdir -p ios/App/App/public
-          cp -R out/* ios/App/App/public/
-
-          cat > ios/App/App/capacitor.config.json <<'EOF'
-          {
-            "appId": "com.fuseiraq.app",
-            "appName": "Fuse Iraq",
-            "webDir": "public",
-            "packageClassList": []
-          }
-          EOF
-
-          cat > ios/App/App/config.xml <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <widget id="com.fuseiraq.app" version="1.0.2">
-            <name>Fuse Iraq</name>
-          </widget>
-          EOF
+          npx cap sync ios
+          test -f ios/App/App/public/index.html
+          test -f ios/App/App/PrivacyInfo.xcprivacy
 
       - name: Set App Store build number
         script: |
@@ -89,22 +73,11 @@ workflows:
       - name: Build Next.js app
         script: npm run build
 
-      - name: Prepare Android project
+      - name: Sync Capacitor Android
         script: |
-          rm -rf android/app/src/main/assets/public
-          mkdir -p android/app/src/main/assets/public
-          cp -R out/* android/app/src/main/assets/public/
-
-          cat > android/app/src/main/assets/capacitor.config.json <<'EOF'
-          {
-            "appId": "com.fuseiraq.app",
-            "appName": "Fuse Iraq",
-            "webDir": "public",
-            "packageClassList": []
-          }
-          EOF
-
+          npx cap sync android
           test -f android/app/src/main/assets/public/index.html
+          test -f android/capacitor-cordova-android-plugins/cordova.variables.gradle
 
       - name: Configure Android signing secrets
         script: |
@@ -112,8 +85,21 @@ workflows:
             echo "Set FUSE_KEYSTORE_PASSWORD and FUSE_KEY_PASSWORD in Codemagic environment."
             exit 1
           fi
+          # Codemagic file secret is typically available as CM_KEYSTORE_PATH or the named file path.
+          KEYSTORE_PATH="${FUSE_KEYSTORE_FILE}"
+          if [ ! -f "$KEYSTORE_PATH" ] && [ -n "${CM_KEYSTORE_PATH:-}" ]; then
+            KEYSTORE_PATH="$CM_KEYSTORE_PATH"
+          fi
+          if [ ! -f "$KEYSTORE_PATH" ] && [ -f "$CM_BUILD_DIR/$FUSE_KEYSTORE_FILE" ]; then
+            KEYSTORE_PATH="$CM_BUILD_DIR/$FUSE_KEYSTORE_FILE"
+          fi
+          if [ ! -f "$KEYSTORE_PATH" ]; then
+            echo "Upload keystore file not found. Add file secret upload-keystore.jks and set FUSE_KEYSTORE_FILE."
+            exit 1
+          fi
+          cp "$KEYSTORE_PATH" android/app/upload-keystore.jks
           cat > android/app/keystore.properties <<EOF
-          storeFile=${FUSE_KEYSTORE_FILE:-upload-keystore.jks}
+          storeFile=upload-keystore.jks
           storePassword=${FUSE_KEYSTORE_PASSWORD}
           keyAlias=${FUSE_KEY_ALIAS:-upload}
           keyPassword=${FUSE_KEY_PASSWORD}
