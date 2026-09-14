@@ -1,23 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { firebaseAuth } from "@/lib/firebase/client";
+import { parseFuseRole, saveFuseSession, type FuseRole } from "@/lib/fuse-auth";
+import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import { performFuseLogout } from "@/lib/fuse-logout";
 
 type GuardStatus = "checking" | "allowed" | "blocked";
 
 type ClientRouteGuardProps = {
   children: ReactNode;
+  /** @deprecated Email allowlists are insecure; use allowedRoles instead. */
   allowedEmails?: string[];
+  allowedRoles?: FuseRole[];
   loginPath?: string;
   guardName?: string;
 };
 
+const DEFAULT_STAFF_ROLES: FuseRole[] = ["admin", "restaurant"];
+
 export default function ClientRouteGuard({
   children,
   allowedEmails = [],
+  allowedRoles,
   loginPath = "/login",
   guardName = "FUSE Route Guard",
 }: ClientRouteGuardProps) {
@@ -26,7 +33,7 @@ export default function ClientRouteGuard({
   const searchParams = useSearchParams();
 
   const [status, setStatus] = useState<GuardStatus>("checking");
-  const [user, setUser] = useState<User | null>(null);
+  const [email, setEmail] = useState("");
 
   const queryString = searchParams?.toString() || "";
 
@@ -34,41 +41,44 @@ export default function ClientRouteGuard({
     return `${pathname || "/"}${queryString ? `?${queryString}` : ""}`;
   }, [pathname, queryString]);
 
-  const allowedSet = useMemo(() => {
-    return new Set(
-      allowedEmails
-        .map((email) => email.trim().toLowerCase())
-        .filter(Boolean)
-    );
-  }, [allowedEmails]);
+  const roles = useMemo(() => {
+    if (allowedRoles && allowedRoles.length > 0) return allowedRoles;
+    // Ignore legacy email allowlists for authorization decisions.
+    if (allowedEmails.length > 0) return DEFAULT_STAFF_ROLES;
+    return DEFAULT_STAFF_ROLES;
+  }, [allowedEmails, allowedRoles]);
 
   const loginUrl = useMemo(() => {
     return `${loginPath}?next=${encodeURIComponent(currentPath || "/restaurant-admin")}`;
   }, [loginPath, currentPath]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (nextUser) => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, async (nextUser) => {
       if (!nextUser) {
-        setUser(null);
+        setEmail("");
         setStatus("checking");
         router.replace(loginUrl);
         return;
       }
 
-      const email = nextUser.email?.trim().toLowerCase() || "";
+      setEmail(nextUser.email?.trim().toLowerCase() || "");
 
-      if (allowedSet.size > 0 && !allowedSet.has(email)) {
-        setUser(nextUser);
+      try {
+        const session = await resolveFuseSession(nextUser);
+        saveFuseSession(session);
+        const role = parseFuseRole(session.role);
+        if (role && roles.includes(role)) {
+          setStatus("allowed");
+          return;
+        }
         setStatus("blocked");
-        return;
+      } catch {
+        setStatus("blocked");
       }
-
-      setUser(nextUser);
-      setStatus("allowed");
     });
 
     return () => unsubscribe();
-  }, [allowedSet, loginUrl, router]);
+  }, [loginUrl, roles, router]);
 
   if (status === "checking") {
     return (
@@ -95,7 +105,7 @@ export default function ClientRouteGuard({
             جاري فحص تسجيل الدخول...
           </h1>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.68)", lineHeight: 1.8 }}>
-            إذا ماكو جلسة فعّالة، راح يحولك إلى صفحة الدخول النظيفة.
+            يتم التحقق من صلاحية الحساب عبر Firebase Auth والملف الشخصي فقط.
           </p>
         </section>
       </main>
@@ -128,7 +138,7 @@ export default function ClientRouteGuard({
             هذا الحساب ما عنده صلاحية للوحة المطعم
           </h1>
           <p style={{ margin: "0 0 18px", color: "rgba(255,255,255,0.72)", lineHeight: 1.8 }}>
-            الحساب الحالي: <b>{user?.email || "غير معروف"}</b>
+            الحساب الحالي: <b>{email || "غير معروف"}</b>
           </p>
           <button
             onClick={() => performFuseLogout("/restaurant-admin")}

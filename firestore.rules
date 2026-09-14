@@ -22,9 +22,15 @@ service cloud.firestore {
         : hasProfile() && profile().fuseRole == 'restaurant' ? 'restaurant'
         : hasProfile() && profile().fuseRole == 'driver' ? 'driver'
         : hasProfile() && profile().fuseRole == 'customer' ? 'customer'
+        // Fail closed for staff: unsigned/unprofiled users are customers only.
+        // Staff elevation requires Auth custom claims or a server-provisioned profile.
         : 'customer';
     }
-    function isAdmin() { return role() == 'admin'; }
+    function isAdmin() {
+      // Admin must be claim-backed or an existing provisioned profile.
+      // Profile role is write-protected (clients cannot self-assign admin).
+      return role() == 'admin';
+    }
     function isRestaurant() { return role() == 'restaurant'; }
     function isDriver() { return role() == 'driver'; }
     function isCustomer() { return role() == 'customer'; }
