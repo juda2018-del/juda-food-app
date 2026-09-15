@@ -17,6 +17,7 @@ export const FUSE_CUSTOMER_NAV_ITEMS: FuseCustomerNavItem[] = [
 
 export const FUSE_CUSTOMER_NAV_HIDDEN_PREFIXES = [
   "/privacy",
+  "/beta",
   "/restaurant-admin",
   "/restaurant-dashboard",
   "/restaurant-orders",
