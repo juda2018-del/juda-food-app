@@ -1,6 +1,11 @@
 # Remaining human actions — FUSE commercial launch
 
+**12-TESTER GOOGLE PLAY GATE INTENTIONALLY DEFERRED** for this readiness track.
+Use an org/publisher account that can ship without that personal-developer restriction when uploading, or complete Closed Testing separately.
+
 Repository-side prep is complete for version **1.0.2** (Android versionCode **14**, iOS build **18**). The items below require human credentials or store consoles. Do not commit secrets.
+
+See also: `COMMERCIAL_RELEASE_READINESS.md`, `store-assets/DATA_SAFETY_PREP.md`.
 
 ## Mandatory — Android signing / Play upload
 
@@ -9,9 +14,10 @@ Repository-side prep is complete for version **1.0.2** (Android versionCode **14
 | Place upload keystore locally or in Codemagic file secrets | Local machine or Codemagic → Environment → File secrets | `upload-keystore.jks` (never commit) |
 | Set keystore passwords | Codemagic env vars or `android/app/keystore.properties` (gitignored) | `FUSE_KEYSTORE_PASSWORD`, `FUSE_KEY_PASSWORD`, optional `FUSE_KEY_ALIAS=upload`, `FUSE_KEYSTORE_FILE` |
 | Build signed AAB | Codemagic workflow `fuse-android-build` (runs `npx cap sync android` then `bundleRelease`) or local `npm run mobile:sync` + `./gradlew bundleRelease` | Signed `app-release.aab` |
-| Upload AAB | Google Play Console → FUSE → Production (or testing track) → Create release | The signed AAB |
+| Upload AAB | Google Play Console → FUSE → testing or Production track as authorized | The signed AAB |
 | Confirm Play App Signing | Play Console → Setup → App signing | Keep Google app-signing key; only rotate **upload** key if needed |
 | Paste store listing copy | Play Console → Store presence → Main store listing | From `store-assets/PLAY_STORE_METADATA.md` |
+| Complete Data safety | Play Console → App content → Data safety | From `store-assets/DATA_SAFETY_PREP.md` |
 | Upload screenshots | Play Console → Store listing → Graphics | Capture per `store-assets/SCREENSHOT_CHECKLIST.md` |
 | Add review credentials | Play Console → App content → App access | Dedicated customer review account (password not in git) |
 
@@ -36,6 +42,11 @@ Repository-side prep is complete for version **1.0.2** (Android versionCode **14
 | Create App Store / Play review customer | Firebase Auth + store review forms | Dedicated customer account |
 | Deploy rules if remote differs | `npm run firebase:deploy` with Firebase login / ADC | Uses `firestore.rules`, `firestore.indexes.json`, `storage.rules` |
 
+## Deferred — personal Closed Testing gate
+| Action | Notes |
+|--------|-------|
+| 12 opted-in testers + 14-day continuous testing | Intentionally not worked in this readiness track. Keep `/beta` available if needed later. |
+
 ## Optional
 
 | Action | Console / page | Notes |
@@ -44,9 +55,10 @@ Repository-side prep is complete for version **1.0.2** (Android versionCode **14
 | Enable App Check | Firebase Console → App Check | Keep off until Capacitor-compatible test passes |
 | Play upload-key rotation | Play Console → App signing | Only if old upload key was exposed |
 | Branded support email | DNS / mailbox | Replace `fuseiraq@gmail.com` when ready |
-| Run full E2E lifecycle | Local/CI with secrets | `E2E_CUSTOMER_PASSWORD` + `STAFF_*_PASSWORD` then `npm run test:e2e-lifecycle` |
+| Run full E2E lifecycle | Local/CI with secrets | `E2E_CUSTOMER_PASSWORD` + `STAFF_*` passwords then `npm run test:e2e-lifecycle` |
 
 ## Explicitly out of scope for automation here
 - Inventing or resetting production passwords
 - Committing keystores, certificates, or API secrets
 - Claiming store upload or commercial launch complete while any mandatory row above is unfinished
+- Fabricating Closed Tester counts or 14-day completion
