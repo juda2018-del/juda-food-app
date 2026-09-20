@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, onSnapshot, query, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../firebase";
-import { addFuseCartItem } from "@/lib/fuse-cart";
+import { collection, onSnapshot, query } from "firebase/firestore";
+import { db } from "../firebase";
+import { addFuseCartItem, updateFuseCartQty, writeFuseCart } from "@/lib/fuse-cart";
 import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 
 type RestaurantState = {
@@ -280,13 +280,7 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("الكل");
-  const [customerName, setCustomerName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [orderId, setOrderId] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -355,6 +349,15 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
       setError("المطعم مغلق حالياً ولا يستقبل طلبات.");
       return;
     }
+    if (!restaurantDocumentId) {
+      setError("تعذر تحديد المطعم. حدّث الصفحة وحاول مرة ثانية.");
+      return;
+    }
+    if (!menu.some((live) => live.documentId === item.documentId && getRestaurant(live) === restaurant && menuAvailable(live))) {
+      setError("القائمة الحية غير متاحة حالياً. حدّث الصفحة قبل إضافة أصناف.");
+      return;
+    }
+
     const id = item.documentId;
     const name = getMenuName(item);
     const selectedPrice = itemPrice(item.price);
@@ -382,23 +385,26 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
       qty: 1,
       category: itemCategory,
       restaurant,
+      restaurantId: restaurantDocumentId,
     });
 
     setMessage(`تمت إضافة ${name} للسلة.`);
   }
 
   function changeQty(id: string, direction: 1 | -1) {
-    setCart((current) =>
-      current
+    setCart((current) => {
+      const next = current
         .map((item) => (item.id === id ? { ...item, qty: Math.max(0, item.qty + direction) } : item))
-        .filter((item) => item.qty > 0)
-    );
+        .filter((item) => item.qty > 0);
+      const target = next.find((item) => item.id === id);
+      updateFuseCartQty(id, target ? target.qty : 0);
+      return next;
+    });
   }
 
-  async function submitOrder() {
+  function goToSecureCheckout() {
     setMessage("");
     setError("");
-    setOrderId("");
 
     if (!restaurantOpen) {
       setError("المطعم مغلق حالياً ولا يستقبل طلبات.");
@@ -410,94 +416,24 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
       return;
     }
 
-    if (!customerName.trim()) {
-      setError("اكتب اسمك.");
+    if (!restaurantDocumentId) {
+      setError("تعذر تحديد المطعم. حدّث الصفحة وحاول مرة ثانية.");
       return;
     }
 
-    if (!phone.trim()) {
-      setError("اكتب رقم الهاتف.");
-      return;
-    }
-
-    if (!address.trim()) {
-      setError("اكتب العنوان.");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
-        throw new Error("سجّل دخولك أولاً حتى ترسل الطلب.");
-      }
-      if (!restaurantDocumentId) {
-        throw new Error("تعذر تحديد المطعم. حدّث الصفحة وحاول مرة ثانية.");
-      }
-      const shortOrderId = "FUSE-" + Date.now().toString().slice(-6);
-
-      const orderRef = await addDoc(collection(db, "orders"), {
-        orderId: shortOrderId,
-        customerUid: user.uid,
-        customerEmail: user.email || "",
-        customerName: customerName.trim(),
-        customer: customerName.trim(),
-        phone: phone.trim(),
-        customerPhone: phone.trim(),
-        address: address.trim(),
-        note: note.trim(),
+    // Commercial path: only the hardened /cart checkout may create orders.
+    writeFuseCart(
+      cart.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        qty: item.qty,
+        category: item.category,
         restaurant,
-        restaurantName: restaurant,
         restaurantId: restaurantDocumentId,
-        items: cart.map((item) => ({
-          name: item.name,
-          title: item.name,
-          qty: item.qty,
-          quantity: item.qty,
-          price: item.price,
-          category: item.category
-        })),
-        subtotal,
-        deliveryFee,
-        total,
-        amount: total,
-        currency: "IQD",
-        status: "جديد",
-        source: "customer-restaurant-page",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-
-      await addDoc(collection(db, "notifications"), {
-        type: "order",
-        audience: "restaurant",
-        title: "طلب جديد",
-        message: "وصل طلب جديد من " + customerName.trim() + " إلى مطعم " + restaurant + ".",
-        customerUid: user.uid,
-        restaurant,
-        restaurantName: restaurant,
-        restaurantId: restaurantDocumentId,
-        phone: phone.trim(),
-        orderId: shortOrderId,
-        orderDocumentId: orderRef.id,
-        read: false,
-        createdAt: serverTimestamp()
-      });
-
-      setOrderId(shortOrderId);
-      setMessage("تم إرسال الطلب بنجاح. راح يظهر مباشرة للمتابعة.");
-      setCart([]);
-
-      setTimeout(() => {
-        router.push("/order-status?phone=" + encodeURIComponent(phone.trim()));
-      }, 1500);
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "تعذر إرسال الطلب.");
-    } finally {
-      setSaving(false);
-    }
+      }))
+    );
+    router.push("/cart");
   }
 
   return (
@@ -634,23 +570,15 @@ export default function RestaurantOrderClient({ restaurant }: { restaurant: stri
               <p style={{ margin: "8px 0 0", fontSize: 28, color: "#FFB56B", fontWeight: 950 }}>{total.toLocaleString()} د.ع</p>
             </div>
 
-            <div style={styles.formGrid}>
-              <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} style={styles.input} placeholder="اسمك" />
-              <input value={phone} onChange={(event) => setPhone(event.target.value)} style={styles.input} placeholder="رقم الهاتف" dir="ltr" />
-              <input value={address} onChange={(event) => setAddress(event.target.value)} style={styles.input} placeholder="العنوان" />
-              <input value={note} onChange={(event) => setNote(event.target.value)} style={styles.input} placeholder="ملاحظة اختيارية" />
-            </div>
+            <p style={{ ...styles.muted, margin: "4px 0 0" }}>
+              إتمام الطلب يتم عبر صفحة السلة الآمنة (تحقق أسعار القائمة + رقم عراقي + عنوان).
+            </p>
 
-            <button onClick={submitOrder} disabled={saving} style={saving ? styles.disabledButton : styles.mainButton}>
-              {saving ? "جاري إرسال الطلب..." : "إرسال الطلب"}
+            <button onClick={goToSecureCheckout} disabled={!cart.length} style={!cart.length ? styles.disabledButton : styles.mainButton}>
+              إتمام الطلب في السلة
             </button>
 
-            {message ? (
-              <div style={styles.messageOk}>
-                {message}
-                {orderId ? <div style={{ marginTop: 8 }}>رقم الطلب: {orderId}</div> : null}
-              </div>
-            ) : null}
+            {message ? <div style={styles.messageOk}>{message}</div> : null}
 
             {error ? <div style={styles.messageBad}>{error}</div> : null}
           </aside>
