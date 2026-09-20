@@ -5,7 +5,7 @@ Use an org/publisher account that can ship without that personal-developer restr
 
 Repository-side prep is complete for version **1.0.2** (Android versionCode **14**, iOS build **18**). The items below require human credentials or store consoles. Do not commit secrets.
 
-See also: `COMMERCIAL_RELEASE_READINESS.md`, `store-assets/DATA_SAFETY_PREP.md`.
+See also: `COMMERCIAL_HANDOFF.md` (master publisher package), `COMMERCIAL_RELEASE_READINESS.md`, `store-assets/DATA_SAFETY_PREP.md`.
 
 ## Mandatory — Android signing / Play upload
 
