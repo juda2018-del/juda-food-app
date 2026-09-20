@@ -6,13 +6,13 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
-def resolveSigningValue(String propertyKey, String envKey) {
-    if (keystoreProperties[propertyKey]) {
-        return keystoreProperties[propertyKey]
-    }
-    def envValue = System.getenv(envKey)
-    return envValue != null ? envValue : ''
-}
+// Keep signing inputs on ext so Gradle method/closures resolve them reliably.
+ext.fuseKeystoreProperties = keystoreProperties
+ext.fuseReleaseStorePath = (keystoreProperties['storeFile'] ?: System.getenv('FUSE_KEYSTORE_FILE') ?: '').toString()
+ext.fuseReleaseStorePassword = (keystoreProperties['storePassword'] ?: System.getenv('FUSE_KEYSTORE_PASSWORD') ?: '').toString()
+ext.fuseReleaseKeyAlias = (keystoreProperties['keyAlias'] ?: System.getenv('FUSE_KEY_ALIAS') ?: 'upload').toString()
+ext.fuseReleaseKeyPassword = (keystoreProperties['keyPassword'] ?: System.getenv('FUSE_KEY_PASSWORD') ?: '').toString()
+ext.fuseReleaseSigningConfigured = ext.fuseReleaseStorePath && ext.fuseReleaseStorePassword && ext.fuseReleaseKeyPassword
 
 android {
     namespace = "com.fuseiraq.app"
@@ -33,19 +33,18 @@ android {
 
     signingConfigs {
         release {
-            def storePath = keystoreProperties['storeFile'] ?: System.getenv('FUSE_KEYSTORE_FILE') ?: ''
-            if (storePath) {
-                storeFile file(storePath)
-                storePassword resolveSigningValue('storePassword', 'FUSE_KEYSTORE_PASSWORD')
-                keyAlias keystoreProperties['keyAlias'] ?: System.getenv('FUSE_KEY_ALIAS') ?: 'upload'
-                keyPassword resolveSigningValue('keyPassword', 'FUSE_KEY_PASSWORD')
+            if (fuseReleaseSigningConfigured) {
+                storeFile file(fuseReleaseStorePath)
+                storePassword fuseReleaseStorePassword
+                keyAlias fuseReleaseKeyAlias
+                keyPassword fuseReleaseKeyPassword
             }
         }
     }
 
     buildTypes {
         release {
-            if (signingConfigs.release.storeFile) {
+            if (fuseReleaseSigningConfigured) {
                 signingConfig signingConfigs.release
             }
             minifyEnabled false
@@ -54,22 +53,27 @@ android {
     }
 }
 
-tasks.configureEach { task ->
-    if (task.name == "bundleRelease" || task.name == "assembleRelease") {
-        task.doFirst {
-            def storePath = keystoreProperties['storeFile'] ?: System.getenv('FUSE_KEYSTORE_FILE') ?: ''
-            def storePassword = resolveSigningValue('storePassword', 'FUSE_KEYSTORE_PASSWORD')
-            def keyPassword = resolveSigningValue('keyPassword', 'FUSE_KEY_PASSWORD')
-            if (!storePath || !storePassword || !keyPassword) {
-                throw new GradleException(
-                    "FUSE release signing is not configured. Copy android/keystore.properties.example to android/app/keystore.properties, or set FUSE_KEYSTORE_FILE, FUSE_KEYSTORE_PASSWORD, FUSE_KEY_ALIAS, and FUSE_KEY_PASSWORD. Never commit the keystore or passwords."
-                )
-            }
-            def store = file(storePath)
-            if (!store.exists()) {
-                throw new GradleException("FUSE release keystore not found at ${store.absolutePath}")
-            }
-        }
+// Fail before packaging so an unsigned AAB/APK is never left as a release artifact.
+gradle.taskGraph.whenReady { graph ->
+    def releaseTaskNames = [
+        'assembleRelease',
+        'bundleRelease',
+        'packageRelease',
+        'packageReleaseBundle',
+        'signReleaseBundle',
+    ] as Set
+    def needsSignedRelease = graph.allTasks.any { releaseTaskNames.contains(it.name) }
+    if (!needsSignedRelease) {
+        return
+    }
+    if (!fuseReleaseSigningConfigured) {
+        throw new GradleException(
+            "FUSE release signing is not configured. Copy android/keystore.properties.example to android/app/keystore.properties, or set FUSE_KEYSTORE_FILE, FUSE_KEYSTORE_PASSWORD, FUSE_KEY_ALIAS, and FUSE_KEY_PASSWORD. Never commit the keystore or passwords."
+        )
+    }
+    def store = file(fuseReleaseStorePath)
+    if (!store.exists()) {
+        throw new GradleException("FUSE release keystore not found at ${store.absolutePath}")
     }
 }
 
