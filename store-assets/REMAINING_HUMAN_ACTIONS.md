@@ -2,6 +2,16 @@
 
 Repository-side prep is complete for version **1.0.2** (Android versionCode **14**, iOS build **18**). The items below require human credentials or store consoles. Do not commit secrets.
 
+Live verification snapshot: `store-assets/COMMERCIAL_LAUNCH_STATUS.md`.
+
+## Current commercial gate (highest priority)
+
+| Action | Console / page | Notes |
+|--------|----------------|-------|
+| Recruit real Android closed testers to **12 opted-in** | Share https://www.fuseiraq.com/beta/ and https://play.google.com/apps/testing/com.fuseiraq.app | Real Google accounts only. No bots / paid fake installs. |
+| Keep testers opted in for **14 consecutive days** | Play Console → Closed testing → Testers | Do not leave the test early. |
+| Confirm opted-in count in Play Console | Play Console → Testing → Closed testing | Automation cannot verify count without Play API credentials. |
+
 ## Mandatory — Android signing / Play upload
 
 | Action | Console / page | Value / file needed |
