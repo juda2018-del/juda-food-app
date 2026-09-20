@@ -5,10 +5,11 @@
 This document prepares FUSE for upload/submission by an account that can publish without the personal-developer 12-tester / 14-day Closed Testing restriction. That gate is **not** worked in this run.
 
 ## Current SHAs
-- **MAIN SHA:** `5e4881528c5cf446f7e831350c3c74c5c31467b7` (baseline audited)
-- **Follow-up SHA:** see latest `main` after merge of restaurant-checkout harden PR (if landed)
-- **PRODUCTION SHA:** must match `main` after any merge (Vercel Production `juda-food-app` + `fuse-iraq`)
+- **MAIN SHA:** `63451a79685e0a8f039d7989431c200f5f288e3c`
+- **PRODUCTION SHA:** `63451a79685e0a8f039d7989431c200f5f288e3c` (Vercel Production `juda-food-app` + `fuse-iraq`)
+- **Prior baseline:** `5e4881528c5cf446f7e831350c3c74c5c31467b7`
 - **Production URL:** https://www.fuseiraq.com
+- **Merged this track:** PR #21 (harden restaurant checkout + readiness docs)
 
 ## Build / quality status
 | Gate | Status |
