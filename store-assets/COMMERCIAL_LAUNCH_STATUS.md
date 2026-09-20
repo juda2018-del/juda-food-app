@@ -6,7 +6,7 @@ Last automated verification: 2026-09-20 (agent run). Do not treat this file as P
 
 | Gate | Status | Evidence |
 |------|--------|----------|
-| MAIN SHA | `5e4881528c5cf446f7e831350c3c74c5c31467b7` (at verification start) | `git rev-parse` / GitHub |
+| MAIN SHA | `5e4881528c5cf446f7e831350c3c74c5c31467b7` | `git rev-parse` / GitHub |
 | PRODUCTION SHA | same as main (`5e48815`) — includes Android splash/signing fix from PR #19 | GitHub Deployments `Production – fuse-iraq` + `juda-food-app` |
 | VERCEL | success | commit status on main + PR previews |
 | BUILD | PASS | `npm run build` |
