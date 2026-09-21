@@ -24,6 +24,13 @@ workflows:
       - name: Sync Capacitor iOS
         script: |
           npx cap sync ios
+          test -d out
+          # Capacitor's generated web bundle is gitignored. Ensure the
+          # Xcode target always receives the Next.js export in CI.
+          rm -rf ios/App/App/public
+          mkdir -p ios/App/App/public
+          cp -R out/. ios/App/App/public/
+          rm -f ios/App/App/config.xml
           test -f ios/App/App/public/index.html
           test -f ios/App/App/PrivacyInfo.xcprivacy
 
