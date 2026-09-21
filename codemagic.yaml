@@ -25,6 +25,15 @@ workflows:
         script: |
           npx cap sync ios
           test -d out
+          # capacitor.config.json is generated/ignored locally; Xcode archives it
+          # as a bundle resource, so ensure it exists in the CI workspace.
+          test -f ios/App/App/capacitor.config.json || cat > ios/App/App/capacitor.config.json <<'EOF'
+          {
+            "appId": "com.fuseiraq.app",
+            "appName": "FUSE",
+            "webDir": "out"
+          }
+          EOF
           # Capacitor's generated web bundle is gitignored. Ensure the
           # Xcode target always receives the Next.js export in CI.
           rm -rf ios/App/App/public
