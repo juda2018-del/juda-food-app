@@ -1496,6 +1496,7 @@ main.app .heart {
     right: 10px;
     width: auto;
     height: 68px;
+    transform: none !important;
   }
 }
 
