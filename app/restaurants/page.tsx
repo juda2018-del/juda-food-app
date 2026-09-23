@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "../firebase";
+import { isCatalogRestaurantId } from "@/lib/fuse-catalog";
 import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
 
@@ -37,9 +38,12 @@ const fallbackRestaurants: RestaurantDoc[] = [
 ];
 
 function mergeRestaurants(remote: RestaurantDoc[]) {
-  if (!remote.length) return fallbackRestaurants;
+  // Keep customer listing on the four canonical restaurant IDs only.
+  // Older auto-generated restaurant docs (and orphan menus) must not create duplicate cards.
+  const canonicalRemote = remote.filter((item) => isCatalogRestaurantId(item.documentId));
+  if (!canonicalRemote.length) return fallbackRestaurants;
   const map = new Map(fallbackRestaurants.map((item) => [item.documentId, item]));
-  remote.forEach((item) => map.set(item.documentId, { ...map.get(item.documentId), ...item }));
+  canonicalRemote.forEach((item) => map.set(item.documentId, { ...map.get(item.documentId), ...item }));
   return Array.from(map.values());
 }
 

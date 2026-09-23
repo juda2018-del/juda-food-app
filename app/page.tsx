@@ -7,7 +7,7 @@ import { collection, onSnapshot, query } from "firebase/firestore";
 import { db } from "./firebase";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { addFuseCartItem, FUSE_CART_EVENT, readFuseCart } from "@/lib/fuse-cart";
-import { catalogIsLive, FUSE_RESTAURANT_IDS, isCatalogMenuItemId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
+import { catalogIsLive, FUSE_RESTAURANT_IDS, isCatalogMenuItemId, isCatalogRestaurantId, restaurantHasLiveCatalog } from "@/lib/fuse-catalog";
 import { isFuseRestaurantOpen } from "@/lib/fuse-restaurant";
 import { performFuseLogout } from "@/lib/fuse-logout";
 import FuseIcon, { type FuseIconName } from "@/components/FuseIcon";
@@ -321,10 +321,14 @@ export default function HomePage() {
       query(collection(db, "restaurants")),
       (snapshot) => {
         setRestaurants(
-          snapshot.docs.map((doc) => ({
-            ...(doc.data() as Omit<RestaurantDoc, "documentId">),
-            documentId: doc.id,
-          }))
+          snapshot.docs
+            .map((doc) => ({
+              ...(doc.data() as Omit<RestaurantDoc, "documentId">),
+              documentId: doc.id,
+            }))
+            // Soft-launch customer UI only surfaces the canonical catalog IDs.
+            // Legacy auto-ID restaurant docs stay in Firestore but must not appear as broken cards.
+            .filter((doc) => isCatalogRestaurantId(doc.documentId))
         );
       },
       () => setRestaurants([])
