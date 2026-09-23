@@ -15,7 +15,12 @@ export const FUSE_MENU_ITEM_IDS = [
   "alforn-manakish",
 ] as const;
 
+export type FuseRestaurantId = (typeof FUSE_RESTAURANT_IDS)[number];
 export type FuseMenuItemId = (typeof FUSE_MENU_ITEM_IDS)[number];
+
+export function isCatalogRestaurantId(id: string): id is FuseRestaurantId {
+  return (FUSE_RESTAURANT_IDS as readonly string[]).includes(id);
+}
 
 export function isCatalogMenuItemId(id: string): id is FuseMenuItemId {
   return (FUSE_MENU_ITEM_IDS as readonly string[]).includes(id);
