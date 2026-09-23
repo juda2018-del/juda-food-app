@@ -1862,7 +1862,7 @@ main.app,
           margin: 0 auto;
           border-radius: 0;
           overflow: visible;
-          padding: 0;
+          padding: 0 0 calc(var(--fuse-nav-height, 72px) + 28px);
           background: transparent;
           color: var(--fuse-ink, #15171a);
           box-shadow: none;
