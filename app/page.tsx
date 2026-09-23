@@ -220,7 +220,7 @@ function menuAvailable(item: MenuDoc) {
 }
 
 function restaurantSlug(name: string, documentId?: string) {
-  const clean = `${name} ${documentId || ""}`.toLowerCase();
+  const clean = [name, documentId || ""].join(" ").toLowerCase();
 
   if (clean.includes("fayrouz") || clean.includes("فيروز")) return "fayrouz";
   if (clean.includes("shalteta") || clean.includes("شلتتة")) return "shalteta";
@@ -228,6 +228,36 @@ function restaurantSlug(name: string, documentId?: string) {
   if (clean.includes("alforn") || clean.includes("الفرن")) return "alforn";
 
   return documentId || "fayrouz";
+}
+
+function fallbackRestaurantImage(item: RestaurantDoc) {
+  const slug = restaurantSlug(getRestaurantName(item), item.documentId);
+  const images: Record<string, string> = {
+    fayrouz: "/images/m7.jpg",
+    shalteta: "/images/m3.jpg",
+    khan: "/images/m4.jpg",
+    alforn: "/images/m5.jpg",
+  };
+  return images[slug] || "/images/m7.jpg";
+}
+
+function fallbackMenuImage(item: MenuDoc) {
+  const restaurantId = String(item.restaurantId || "").trim().toLowerCase();
+  const byRestaurant: Record<string, string> = {
+    fayrouz: "/images/m6.jpg",
+    shalteta: "/images/m8.jpg",
+    khan: "/images/m9.jpg",
+    alforn: "/images/m10.jpg",
+  };
+
+  if (item.documentId === "m1") return "/images/m6.jpg";
+  if (item.documentId === "m2") return "/images/m7.jpg";
+  if (item.documentId === "m3") return "/images/m8.jpg";
+  if (item.documentId === "m4") return "/images/m9.jpg";
+  if (item.documentId === "m5") return "/images/m10.jpg";
+  if (item.documentId === "m6") return "/images/1.jpg";
+
+  return byRestaurant[restaurantId] || "/images/m6.jpg";
 }
 
 function roleHomeSafe(role: FuseRole | null) {
@@ -335,16 +365,16 @@ export default function HomePage() {
   }, []);
 
   const sourceRestaurants = restaurants.length
-    ? restaurants.map((item, index) => ({
+    ? restaurants.map((item) => ({
         ...item,
-        image: item.image || item.cover || item.logo || `/images/m${index + 2}.jpg`,
+        image: item.image || item.cover || item.logo || fallbackRestaurantImage(item),
       }))
     : fallbackRestaurants;
 
   const sourceMenu = menu.length
-    ? menu.map((item, index) => ({
+    ? menu.map((item) => ({
         ...item,
-        image: item.image || `/images/m${index + 6}.jpg`,
+        image: item.image || fallbackMenuImage(item),
       }))
     : fallbackMenu;
 
