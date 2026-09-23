@@ -64,9 +64,61 @@ service cloud.firestore {
         || from == to;
     }
     function restaurantExists(id) { return id is string && id.size() > 0 && exists(/databases/$(database)/documents/restaurants/$(id)); }
+    function restaurantDoc(id) { return get(/databases/$(database)/documents/restaurants/$(id)).data; }
     function restaurantAccepts(id) {
-      let r = get(/databases/$(database)/documents/restaurants/$(id)).data;
+      let r = restaurantDoc(id);
       return r.active != false && r.open != false && r.isOpen != false && r.status != 'مغلق';
+    }
+    function restaurantDeliveryFee(id) {
+      let r = restaurantDoc(id);
+      return r.keys().hasAny(['deliveryFee']) && r.deliveryFee is number && r.deliveryFee >= 0
+        ? r.deliveryFee
+        : 2000;
+    }
+    function restaurantMinOrder(id) {
+      let r = restaurantDoc(id);
+      return r.keys().hasAny(['minOrder']) && r.minOrder is number && r.minOrder > 0
+        ? r.minOrder
+        : 0;
+    }
+    function menuDoc(id) { return get(/databases/$(database)/documents/menu/$(id)).data; }
+    // Server-side price/availability check — never trust client cart amounts.
+    function orderItemOk(item, restaurantId) {
+      return item.keys().hasAll(['id','name','qty','price'])
+        && item.id is string && item.id.size() > 0 && item.id.size() <= 80
+        && item.name is string && item.name.size() >= 1 && item.name.size() <= 120
+        && item.qty is number && item.qty >= 1 && item.qty <= 50 && item.qty == int(item.qty)
+        && item.price is number && item.price > 0
+        && exists(/databases/$(database)/documents/menu/$(item.id))
+        && menuDoc(item.id).restaurantId == restaurantId
+        && menuDoc(item.id).available != false
+        && menuDoc(item.id).isAvailable != false
+        && menuDoc(item.id).active != false
+        && menuDoc(item.id).price is number
+        && menuDoc(item.id).price == item.price;
+    }
+    function orderItemLine(item) { return item.price * item.qty; }
+    // Unrolled list checks (Firestore get() budget ~10). Soft-launch carts stay small.
+    function orderItemsOk(items, restaurantId) {
+      return items.size() > 0 && items.size() <= 8
+        && orderItemOk(items[0], restaurantId)
+        && (items.size() < 2 || orderItemOk(items[1], restaurantId))
+        && (items.size() < 3 || orderItemOk(items[2], restaurantId))
+        && (items.size() < 4 || orderItemOk(items[3], restaurantId))
+        && (items.size() < 5 || orderItemOk(items[4], restaurantId))
+        && (items.size() < 6 || orderItemOk(items[5], restaurantId))
+        && (items.size() < 7 || orderItemOk(items[6], restaurantId))
+        && (items.size() < 8 || orderItemOk(items[7], restaurantId));
+    }
+    function orderSubtotalOk(items, subtotal) {
+      return subtotal == orderItemLine(items[0])
+        + (items.size() < 2 ? 0 : orderItemLine(items[1]))
+        + (items.size() < 3 ? 0 : orderItemLine(items[2]))
+        + (items.size() < 4 ? 0 : orderItemLine(items[3]))
+        + (items.size() < 5 ? 0 : orderItemLine(items[4]))
+        + (items.size() < 6 ? 0 : orderItemLine(items[5]))
+        + (items.size() < 7 ? 0 : orderItemLine(items[6]))
+        + (items.size() < 8 ? 0 : orderItemLine(items[7]));
     }
     function validOrder() {
       return isCustomer()
@@ -77,9 +129,17 @@ service cloud.firestore {
         && request.resource.data.phone is string && request.resource.data.phone.matches('^07[0-9]{9}$')
         && request.resource.data.address is string && request.resource.data.address.size() >= 8 && request.resource.data.address.size() <= 220
         && restaurantExists(request.resource.data.restaurantId) && restaurantAccepts(request.resource.data.restaurantId)
-        && request.resource.data.items is list && request.resource.data.items.size() > 0 && request.resource.data.items.size() <= 50
+        && request.resource.data.restaurantName is string
+        && request.resource.data.restaurantName.size() >= 2
+        && request.resource.data.restaurantName.size() <= 120
+        && request.resource.data.restaurantName == restaurantDoc(request.resource.data.restaurantId).name
+        && request.resource.data.items is list
+        && orderItemsOk(request.resource.data.items, request.resource.data.restaurantId)
         && request.resource.data.subtotal is number && request.resource.data.deliveryFee is number && request.resource.data.total is number
         && request.resource.data.subtotal >= 0 && request.resource.data.deliveryFee >= 0
+        && request.resource.data.deliveryFee == restaurantDeliveryFee(request.resource.data.restaurantId)
+        && request.resource.data.subtotal >= restaurantMinOrder(request.resource.data.restaurantId)
+        && orderSubtotalOk(request.resource.data.items, request.resource.data.subtotal)
         && request.resource.data.total == request.resource.data.subtotal + request.resource.data.deliveryFee
         && request.resource.data.currency == 'IQD' && request.resource.data.status == 'جديد';
     }
@@ -94,7 +154,7 @@ service cloud.firestore {
     match /restaurants/{id} {
       allow read: if true;
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (isRestaurant() && id == restaurantId() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','description','phone','address','logo','cover','open','isOpen','status','deliveryFee','minimumOrder','workingHours','updatedAt']));
+      allow update: if isAdmin() || (isRestaurant() && id == restaurantId() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','description','phone','address','logo','cover','open','isOpen','status','deliveryFee','minOrder','minimumOrder','workingHours','updatedAt']));
     }
     match /menu/{id} {
       allow read: if true;

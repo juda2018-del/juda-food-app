@@ -57,9 +57,10 @@ async function validateCart(items: FuseCartItem[]) {
     throw new Error(`الحد الأدنى للطلب ${Number(minOrder).toLocaleString("ar-IQ")} د.ع`);
   }
 
-  const restaurantName = String(
-    restaurantData.name || restaurantData.title || restaurantData.restaurantName || "مطعم"
-  ).trim();
+  const restaurantName = String(restaurantData.name || "").trim();
+  if (restaurantName.length < 2) {
+    throw new Error("بيانات المطعم غير مكتملة. تواصل مع الدعم.");
+  }
 
   const verified: FuseCartItem[] = [];
   for (const item of items) {
@@ -76,17 +77,26 @@ async function validateCart(items: FuseCartItem[]) {
     }
 
     const price = Number(data.price);
-    if (!Number.isFinite(price) || price < 0) throw new Error(`سعر الصنف ${item.name} غير صالح.`);
+    if (!Number.isFinite(price) || price <= 0) throw new Error(`سعر الصنف ${item.name} غير صالح.`);
+
+    const liveRestaurantId = String(data.restaurantId || "").trim();
+    if (!liveRestaurantId) throw new Error(`الصنف ${item.name} غير مرتبط بمطعم.`);
 
     verified.push({
       ...item,
-      restaurantId,
+      id: String(item.id || "").trim(),
+      restaurantId: liveRestaurantId,
       restaurant: restaurantName,
       name: String(data.name || data.title || item.name).trim(),
       category: String(data.category || item.category || "عام"),
       price,
       qty: Math.max(1, Math.min(50, Math.round(Number(item.qty) || 1))),
     });
+  }
+
+  const verifiedSubtotal = verified.reduce((sum, entry) => sum + entry.price * entry.qty, 0);
+  if (minOrder > 0 && verifiedSubtotal < minOrder) {
+    throw new Error(`الحد الأدنى للطلب ${Number(minOrder).toLocaleString("ar-IQ")} د.ع`);
   }
 
   return { verified, deliveryFee };
@@ -203,6 +213,7 @@ export default function CartPage() {
     }
 
     if (!items.length) return setError("السلة فارغة. أضف صنفاً واحداً على الأقل.");
+    if (items.length > 8) return setError("الحد الأقصى 8 أصناف مختلفة في الطلب الواحد. قلل الأصناف ثم أكد.");
     if (customerName.trim().length < 2) return setError("اكتب اسم الزبون.");
     if (!validIraqiPhone(phone)) return setError("اكتب رقم هاتف عراقي صحيح مثل 07701234567.");
     if (address.trim().length < 8) return setError("اكتب عنوان توصيل واضحاً.");
@@ -236,8 +247,8 @@ export default function CartPage() {
           id: item.id,
           name: item.name,
           title: item.name,
-          qty: item.qty,
-          quantity: item.qty,
+          qty: Math.round(item.qty),
+          quantity: Math.round(item.qty),
           price: item.price,
           category: item.category || "عام",
         })),

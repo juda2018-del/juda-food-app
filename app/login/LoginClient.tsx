@@ -69,6 +69,9 @@ function targetFor(role: FuseRole, requestedNext: string) {
       "/order-status",
       "/ratings",
       "/profile",
+      "/addresses",
+      "/favorites",
+      "/support",
     ],
   };
 
