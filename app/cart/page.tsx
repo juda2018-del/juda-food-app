@@ -316,7 +316,9 @@ export default function CartPage() {
             <div className="groupHead"><h2>{restaurant}</h2><small>{items.length} صنف</small></div>
             {items.map((item) => (
               <article className="item" key={`${item.restaurantId || restaurant}-${item.id}`}>
-                <div className="thumb">{item.name.slice(0, 1)}</div>
+                <div className="thumb">
+                  {item.image ? <img src={item.image} alt={item.name} /> : item.name.slice(0, 1)}
+                </div>
                 <div className="info"><h3>{item.name}</h3><p>{item.category || "عام"} · {formatIQD(item.price)}</p><div className="row"><div className="qty"><button type="button" aria-label="تقليل الكمية" onClick={() => changeQty(item, item.qty - 1)}><FuseIcon name="minus" size="sm" /></button><b>{item.qty}</b><button type="button" aria-label="زيادة الكمية" onClick={() => changeQty(item, item.qty + 1)}><FuseIcon name="plus" size="sm" /></button></div><strong>{formatIQD(item.price * item.qty)}</strong></div></div>
               </article>
             ))}
