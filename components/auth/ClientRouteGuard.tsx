@@ -105,7 +105,7 @@ export default function ClientRouteGuard({
             جاري فحص تسجيل الدخول...
           </h1>
           <p style={{ margin: 0, color: "rgba(255,255,255,0.68)", lineHeight: 1.8 }}>
-            يتم التحقق من صلاحية الحساب عبر Firebase Auth والملف الشخصي فقط.
+            يتم التحقق من صلاحية الحساب عبر المصادقة الآمنة والملف الشخصي فقط.
           </p>
         </section>
       </main>

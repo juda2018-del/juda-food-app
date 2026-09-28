@@ -194,7 +194,7 @@ export default function LoginClient() {
           <p className="fuse-auth-eyebrow">تسجيل دخول آمن</p>
           <h1>دخول حسابك</h1>
           <p className="fuse-auth-sub">
-            الصلاحية تُقرأ من Firebase، وليس من البريد أو بيانات المتصفح وحدها.
+            الصلاحية تُقرأ من حسابك الآمن، وليس من البريد أو بيانات المتصفح وحدها.
           </p>
         </div>
 
