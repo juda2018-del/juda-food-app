@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot, orderBy, query, where, type Query } from "firebase/firestore";
 import { db } from "../firebase";
 import { FUSE_LOCAL_SESSION, parseFuseRole, roleHome, type FuseSession } from "@/lib/fuse-auth";
+import { fuseUserFacingError } from "@/lib/fuse-user-errors";
 
 type OrderItem = { name?: string; title?: string; qty?: number; quantity?: number; price?: number };
 type OrderDoc = {
@@ -105,7 +106,7 @@ export default function LiveOrdersPage() {
         documentId: item.id,
       }));
       refresh();
-    }, (e) => { setError(e.message || "تعذر تحميل الطلبات"); setLoading(false); }));
+    }, (e) => { setError(fuseUserFacingError(e, "تعذر تحميل الطلبات")); setLoading(false); }));
     return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
   }, [session, error]);
 

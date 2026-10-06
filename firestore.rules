@@ -77,9 +77,12 @@ service cloud.firestore {
     }
     function restaurantMinOrder(id) {
       let r = restaurantDoc(id);
+      // Prefer minOrder; accept legacy minimumOrder for older restaurant docs.
       return r.keys().hasAny(['minOrder']) && r.minOrder is number && r.minOrder > 0
         ? r.minOrder
-        : 0;
+        : (r.keys().hasAny(['minimumOrder']) && r.minimumOrder is number && r.minimumOrder > 0
+          ? r.minimumOrder
+          : 0);
     }
     function menuDoc(id) { return get(/databases/$(database)/documents/menu/$(id)).data; }
     // Server-side price/availability check — never trust client cart amounts.

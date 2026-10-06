@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import ClientRedirect from "@/components/ClientRedirect";
 
 export default function RedirectPage() {
-  redirect("/fuse-admin");
+  return <ClientRedirect href="/fuse-admin/" message="جاري التحويل إلى لوحة الإدارة..." />;
 }

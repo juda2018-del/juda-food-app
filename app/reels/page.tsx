@@ -141,7 +141,7 @@ export default function ReelsPage() {
     const menuItemId = clean(reel.menuItemId);
 
     if (!menuItemId || !isCatalogMenuItemId(menuItemId)) {
-      flash("الصنف غير مربوط بالمنيو الحي. افتح المطعم بعد تفعيل المنيو في Firebase.");
+      flash("الصنف غير مربوط بالمنيو الحي. افتح صفحة المطعم ثم أعد المحاولة.");
       return;
     }
 

@@ -18,9 +18,16 @@ import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 import { resolveFuseSession } from "@/lib/fuse-session-resolve";
 import { isFuseRestaurantOpen, resolveRestaurantDeliveryFee } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
+import { fuseUserFacingError } from "@/lib/fuse-user-errors";
 
 function formatIQD(value: number) {
   return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
+}
+
+function CartThumb({ src, name }: { src?: string; name: string }) {
+  const [failed, setFailed] = useState(!src);
+  if (failed) return <>{name.slice(0, 1)}</>;
+  return <img src={src} alt={name} onError={() => setFailed(true)} />;
 }
 
 function normalizePhone(value: string) {
@@ -51,7 +58,7 @@ async function validateCart(items: FuseCartItem[]) {
   if (!isFuseRestaurantOpen(restaurantData)) throw new Error("المطعم مغلق حالياً ولا يستقبل طلبات.");
 
   const deliveryFee = resolveRestaurantDeliveryFee(restaurantData);
-  const minOrder = Number(restaurantData.minOrder || 0);
+  const minOrder = Number(restaurantData.minOrder || restaurantData.minimumOrder || 0);
   const subtotalPreview = items.reduce((sum, item) => sum + item.price * item.qty, 0);
   if (minOrder > 0 && subtotalPreview < minOrder) {
     throw new Error(`الحد الأدنى للطلب ${Number(minOrder).toLocaleString("ar-IQ")} د.ع`);
@@ -209,7 +216,7 @@ export default function CartPage() {
         return setError("تأكيد الطلب متاح لحساب الزبون فقط.");
       }
     } catch (sessionError) {
-      return setError(sessionError instanceof Error ? sessionError.message : "تعذر تثبيت جلسة الزبون.");
+      return setError(fuseUserFacingError(sessionError, "تعذر تثبيت جلسة الزبون."));
     }
 
     if (!items.length) return setError("السلة فارغة. أضف صنفاً واحداً على الأقل.");
@@ -289,7 +296,12 @@ export default function CartPage() {
       setMessage(`تم إرسال الطلب بنجاح. رقم الطلب: ${shortOrderId}`);
       window.setTimeout(() => router.replace(`/order-status?orderId=${encodeURIComponent(shortOrderId)}`), 700);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "تعذر إرسال الطلب. حاول مرة ثانية.");
+      // Preserve intentional Arabic validation messages; map SDK jargon otherwise.
+      if (submitError instanceof Error && submitError.message && !/firestore|firebase/i.test(submitError.message)) {
+        setError(submitError.message);
+      } else {
+        setError(fuseUserFacingError(submitError, "تعذر إرسال الطلب. حاول مرة ثانية."));
+      }
     } finally {
       setSaving(false);
     }
@@ -317,7 +329,7 @@ export default function CartPage() {
             {items.map((item) => (
               <article className="item" key={`${item.restaurantId || restaurant}-${item.id}`}>
                 <div className="thumb">
-                  {item.image ? <img src={item.image} alt={item.name} /> : item.name.slice(0, 1)}
+                  <CartThumb src={item.image} name={item.name} />
                 </div>
                 <div className="info"><h3>{item.name}</h3><p>{item.category || "عام"} · {formatIQD(item.price)}</p><div className="row"><div className="qty"><button type="button" aria-label="تقليل الكمية" onClick={() => changeQty(item, item.qty - 1)}><FuseIcon name="minus" size="sm" /></button><b>{item.qty}</b><button type="button" aria-label="زيادة الكمية" onClick={() => changeQty(item, item.qty + 1)}><FuseIcon name="plus" size="sm" /></button></div><strong>{formatIQD(item.price * item.qty)}</strong></div></div>
               </article>

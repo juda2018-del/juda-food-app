@@ -81,7 +81,11 @@ export default function DriverAppPage() {
       });
       setMessage(next ? "تم تفعيل حالة الاتصال." : "تم إيقاف حالة الاتصال.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر تحديث حالة الاتصال في Firebase.");
+      setError(
+        e instanceof Error && e.message && !/firestore|firebase/i.test(e.message)
+          ? e.message
+          : "تعذر تحديث حالة الاتصال. حاول مرة ثانية."
+      );
     }
   }
   async function updateOrder(order: OrderDoc, status: FuseOrderStatus) {
