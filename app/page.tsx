@@ -440,7 +440,7 @@ export default function HomePage() {
 
   function addPopularToCart(item: MenuDoc) {
     if (!canQuickAdd(item)) {
-      showNotice("المنيو غير متصل بقاعدة البيانات. افتح المطعم بعد تفعيل المنيو.");
+      showNotice("المنيو غير جاهز حالياً. افتح صفحة المطعم ثم أعد المحاولة.");
       return;
     }
 
@@ -486,7 +486,7 @@ export default function HomePage() {
           </div>
 
           <div className="top-actions">
-            <Link href="/notification-center" className="icon-btn">
+            <Link href="/notifications" className="icon-btn" aria-label="الإشعارات">
               <FuseIcon name="bell" />
             </Link>
 

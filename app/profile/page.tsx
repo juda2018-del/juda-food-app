@@ -127,7 +127,7 @@ export default function ProfilePage() {
   return (
     <main className="profile-shell" dir="rtl">
       <header className="top customer-header profile-header">
-        <Link className="icon-btn" href="/notification-center" aria-label="الإشعارات"><FuseIcon name="bell" /></Link>
+        <Link className="icon-btn" href="/notifications" aria-label="الإشعارات"><FuseIcon name="bell" /></Link>
         <span className="brand">حسابي</span>
         <Link className="icon-btn" href="/settings" aria-label="الإعدادات"><FuseIcon name="settings" /></Link>
       </header>

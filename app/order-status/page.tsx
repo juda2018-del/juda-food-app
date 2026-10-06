@@ -9,6 +9,7 @@ import { auth, db } from "../firebase";
 import { parseFuseRole, roleHome } from "@/lib/fuse-auth";
 import { fuseCustomerProgressIndex, normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 import FuseIcon from "@/components/FuseIcon";
+import { fuseUserFacingError } from "@/lib/fuse-user-errors";
 
 type OrderItem = { name?: string; title?: string; qty?: number; quantity?: number; price?: number };
 type OrderDoc = {
@@ -148,7 +149,7 @@ export default function OrderStatusPage() {
         window.clearTimeout(loadingTimer);
         setOrders([]);
         setLoading(false);
-        setError(snapshotError.message || "تعذر تحميل طلباتك.");
+        setError(fuseUserFacingError(snapshotError, "تعذر تحميل طلباتك."));
       }
     );
     return () => {

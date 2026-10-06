@@ -77,6 +77,12 @@ function fallbackMenuFor(restaurantId: string) {
   return fallbackMenu.filter((item) => item.restaurantId === restaurantId);
 }
 
+function MenuThumb({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = useState(!src);
+  if (failed) return <FuseIcon name="breakfast" size="lg" />;
+  return <img src={src} alt={alt} onError={() => setFailed(true)} />;
+}
+
 export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp }: { restaurantId: string }) {
   const restaurantId = decodeURIComponent(restaurantIdProp || "");
   const [restaurants, setRestaurants] = useState<RestaurantDoc[]>(fallbackRestaurants);
@@ -171,7 +177,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
 
   function addItem(item: MenuDoc) {
     if (!menuLive || !isCatalogMenuItemId(item.documentId)) {
-      setNotice("المنيو غير متصل بقاعدة البيانات. حاول مرة ثانية بعد لحظات.");
+      setNotice("المنيو غير جاهز حالياً. حاول مرة ثانية بعد لحظات.");
       window.setTimeout(() => setNotice(""), 2600);
       return;
     }
@@ -207,7 +213,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         </header>
 
         {loading && !restaurant ? <div className="state-card">جاري تحميل المطعم…</div> : null}
-        {connectionWarning && restaurant ? <div className="state-card">البيانات المباشرة غير متاحة حالياً. عرض الأصناف متاح، لكن الطلب يتطلب منيو متصل بـ Firebase.</div> : null}
+        {connectionWarning && restaurant ? <div className="state-card">الاتصال المباشر غير متاح حالياً. يمكنك تصفح الأصناف، وأعد المحاولة قبل إضافة الطلب.</div> : null}
 
         <section className="hero" style={image ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.78)),url(${image})` } : undefined}>
           <span className="emoji"><FuseIcon name="store" size="lg" /></span>
@@ -230,7 +236,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
         <section className="menu">
           {items.length === 0 ? <div className="empty"><h3>المنيو قيد الإضافة</h3><p>تظهر الأصناف هنا فور إضافتها من لوحة الإدارة.</p></div> : items.map((item) => (
             <article key={item.documentId}>
-              <div className="item-image">{item.image ? <img src={item.image} alt={item.name || "صنف"} /> : <FuseIcon name="breakfast" size="lg" />}</div>
+              <div className="item-image"><MenuThumb src={item.image} alt={item.name || "صنف"} /></div>
               <div className="copy"><small>{item.category || "عام"}</small><h3>{item.name || item.title || "صنف"}</h3><b>{formatIQD(item.price)}</b></div>
               <button type="button" className="add-btn" disabled={!catalogReady || !isOpen || !menuLive} onClick={() => addItem(item)} title={!catalogReady ? "جاري تحميل المنيو" : !isOpen ? "المطعم مغلق حالياً" : menuLive ? "إضافة للسلة" : "المنيو غير متصل"} aria-label="إضافة للسلة"><FuseIcon name="plus" size="sm" /></button>
             </article>

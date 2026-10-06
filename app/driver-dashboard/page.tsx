@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import ClientRedirect from "@/components/ClientRedirect";
 
 export default function RedirectPage() {
-  redirect("/driver-app");
+  return <ClientRedirect href="/driver-app/" message="جاري التحويل إلى تطبيق السائق..." />;
 }

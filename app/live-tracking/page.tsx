@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import ClientRedirect from "@/components/ClientRedirect";
 
-export default function RedirectPage() {
-  redirect("/live-orders");
+export default function LiveTrackingRedirect() {
+  return <ClientRedirect href="/live-orders/" message="جاري التحويل إلى الطلبات المباشرة..." dark />;
 }

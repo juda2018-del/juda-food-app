@@ -1,17 +1,35 @@
-import { redirect } from "next/navigation";
+"use client";
 
-export default function OrdersPage({
-  searchParams,
-}: {
-  searchParams?: { phone?: string; orderId?: string; order?: string };
-}) {
-  const phone = searchParams?.phone?.trim();
-  const orderId = (searchParams?.orderId || searchParams?.order)?.trim();
-  const params = new URLSearchParams();
+import { useEffect } from "react";
 
-  if (phone) params.set("phone", phone);
-  if (orderId) params.set("orderId", orderId);
+/** Static-export safe redirect — preserves phone/orderId query params. */
+export default function OrdersLegacyRedirect() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const phone = params.get("phone")?.trim();
+    const orderId = (params.get("orderId") || params.get("order"))?.trim();
+    const next = new URLSearchParams();
+    if (phone) next.set("phone", phone);
+    if (orderId) next.set("orderId", orderId);
+    const query = next.toString();
+    window.location.replace(query ? `/order-status/?${query}` : "/order-status/");
+  }, []);
 
-  const query = params.toString();
-  redirect(query ? `/order-status?${query}` : "/order-status");
+  return (
+    <main
+      dir="rtl"
+      style={{
+        minHeight: "100dvh",
+        display: "grid",
+        placeItems: "center",
+        background: "#f4efe6",
+        color: "#15171a",
+        fontFamily: 'var(--fuse-body-font), "Tajawal", sans-serif',
+        padding: 24,
+        textAlign: "center",
+      }}
+    >
+      <p>جاري التحويل إلى تتبع الطلب...</p>
+    </main>
+  );
 }

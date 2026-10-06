@@ -52,6 +52,9 @@ const ACCESS_RULES: AccessRule[] = [
       "/drivers-admin",
       "/auto-dispatch",
       "/reels-review",
+      "/uber-dashboard",
+      "/revenue-center",
+      "/system-monitor",
     ],
     roles: ["admin"],
   },
@@ -66,11 +69,15 @@ const ACCESS_RULES: AccessRule[] = [
       "/restaurants-admin",
       "/restaurant-orders",
       "/restaurant-dashboard",
+      "/restaurant-orders-v5",
+      "/restaurant-intelligence",
+      "/vendor",
+      "/vendor-dashboard",
     ],
     roles: ["admin", "restaurant"],
   },
   {
-    prefixes: ["/live-orders"],
+    prefixes: ["/live-orders", "/live-orders-now"],
     roles: ["admin", "restaurant", "driver", "customer"],
   },
   {
@@ -78,7 +85,15 @@ const ACCESS_RULES: AccessRule[] = [
     roles: ["admin", "restaurant", "customer"],
   },
   {
-    prefixes: ["/driver-app", "/driver", "/live-tracking", "/live-map-tracking"],
+    prefixes: [
+      "/driver-app",
+      "/driver",
+      "/driver-dashboard",
+      "/driver-live",
+      "/drivers",
+      "/live-tracking",
+      "/live-map-tracking",
+    ],
     roles: ["admin", "driver"],
   },
 ];
