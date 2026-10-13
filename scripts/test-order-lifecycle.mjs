@@ -9,6 +9,11 @@ const ORDER_ID = "FUSE-93911664";
 const STATUSES = ["قيد التحضير", "جاهز للتوصيل", "قيد التوصيل", "تم التسليم"];
 
 async function main() {
+  if (process.env.FUSE_ALLOW_PRODUCTION_ORDER_MUTATION !== "1") {
+    console.error("Refusing to change a live order. This script is not part of CI and is not a test environment.");
+    process.exit(1);
+  }
+
   const auth = new GoogleAuth({
     credentials: firebaseCliAuthorizedUserCredentials(),
     scopes: ["https://www.googleapis.com/auth/cloud-platform", "https://www.googleapis.com/auth/datastore"],

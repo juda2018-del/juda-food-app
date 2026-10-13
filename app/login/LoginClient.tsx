@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
@@ -18,6 +19,11 @@ import {
   type FuseSession,
 } from "@/lib/fuse-auth";
 import { resolveFuseSession } from "@/lib/fuse-session-resolve";
+import {
+  normalizeRecoveryEmail,
+  passwordRecoveryOutcome,
+  recoveryEmailError,
+} from "@/lib/fuse-password-recovery";
 
 function cleanNext(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "";
@@ -92,6 +98,7 @@ export default function LoginClient() {
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("جاري فحص الحساب الحالي...");
   const [currentSession, setCurrentSession] = useState<FuseSession | null>(null);
+  const [mode, setMode] = useState<"login" | "recover">("login");
 
   useEffect(() => {
     if (!currentSession || busy) return;
@@ -164,6 +171,33 @@ export default function LoginClient() {
     }
   }
 
+  async function handleRecovery(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+
+    const wantedEmail = normalizeRecoveryEmail(String(new FormData(event.currentTarget).get("email") || email));
+    const invalid = recoveryEmailError(wantedEmail);
+    if (invalid) {
+      setMessage(invalid);
+      return;
+    }
+
+    setBusy(true);
+    setMessage("جاري إرسال رسالة الاستعادة...");
+    try {
+      await sendPasswordResetEmail(firebaseAuth, wantedEmail);
+      setMessage(passwordRecoveryOutcome(null).message);
+    } catch (error) {
+      const code =
+        typeof error === "object" && error && "code" in error
+          ? String((error as { code?: string }).code || "")
+          : "";
+      setMessage(passwordRecoveryOutcome(code).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleLogout() {
     setBusy(true);
     try {
@@ -192,7 +226,7 @@ export default function LoginClient() {
             className="fuse-auth-logo mx-auto"
           />
           <p className="fuse-auth-eyebrow">تسجيل دخول آمن</p>
-          <h1>دخول حسابك</h1>
+          <h1>{!currentSession && mode === "recover" ? "استعادة كلمة المرور" : "دخول حسابك"}</h1>
           <p className="fuse-auth-sub">
             الصلاحية تُقرأ من حسابك الآمن، وليس من البريد أو بيانات المتصفح وحدها.
           </p>
@@ -210,6 +244,34 @@ export default function LoginClient() {
               تسجيل الخروج
             </button>
           </section>
+        ) : mode === "recover" ? (
+          <form className="fuse-auth-form" onSubmit={handleRecovery}>
+            <label htmlFor="recovery-email">البريد الإلكتروني</label>
+            <input
+              id="recovery-email"
+              name="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              dir="ltr"
+              placeholder="name@example.com"
+            />
+            <button type="submit" className="fuse-auth-submit" disabled={busy}>
+              {busy ? "جاري الإرسال..." : "إرسال رابط الاستعادة"}
+            </button>
+            <button
+              type="button"
+              className="fuse-auth-secondary"
+              onClick={() => {
+                setMode("login");
+                setMessage("اكتب بريد الحساب وكلمة المرور.");
+              }}
+              disabled={busy}
+            >
+              رجوع لتسجيل الدخول
+            </button>
+          </form>
         ) : (
           <form className="fuse-auth-form" onSubmit={handleLogin}>
             <label htmlFor="login-email">البريد الإلكتروني</label>
@@ -238,6 +300,17 @@ export default function LoginClient() {
 
             <button type="submit" className="fuse-auth-submit" disabled={busy}>
               {busy ? "جاري التحقق..." : "تسجيل الدخول"}
+            </button>
+            <button
+              type="button"
+              className="fuse-auth-secondary"
+              onClick={() => {
+                setMode("recover");
+                setMessage("اكتب البريد الإلكتروني المرتبط بالحساب.");
+              }}
+              disabled={busy}
+            >
+              نسيت كلمة المرور؟
             </button>
           </form>
         )}

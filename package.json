@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/register-test-hooks.mjs --test lib/fuse-password-recovery.test.ts lib/fuse-cart.test.ts lib/fuse-order-draft.test.ts lib/fuse-order-lifecycle.test.ts",
     "check:catalog": "node scripts/check-firestore-catalog.mjs",
     "mobile:sync": "npm run build && npx cap sync android && npx cap sync ios",
     "seed:catalog": "node scripts/seed-fuse-catalog.mjs",
