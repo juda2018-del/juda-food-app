@@ -30,10 +30,11 @@ export function normalizeCartItem(item: Partial<FuseCartItem>): FuseCartItem | n
   const name = String(item.name || "صنف").trim();
   const restaurant = String(item.restaurant || "FUSE").trim();
   const restaurantId = String(item.restaurantId || "").trim() || undefined;
-  const price = Math.max(0, safeNumber(item.price, 0));
-  const qty = Math.max(1, Math.round(safeNumber(item.qty, 1)));
+  const price = safeNumber(item.price, 0);
+  const qty = Math.min(50, Math.max(1, Math.round(safeNumber(item.qty, 1))));
 
-  if (!id) return null;
+  if (!id || !Number.isFinite(price) || price <= 0) return null;
+  if (!Number.isInteger(qty) || qty < 1) return null;
 
   return {
     id,
@@ -106,7 +107,7 @@ export function addFuseCartItem(item: FuseCartItem) {
   if (index >= 0) {
     const next = current.map((cartItem, itemIndex) =>
       itemIndex === index
-        ? { ...cartItem, qty: cartItem.qty + normalized.qty }
+        ? { ...cartItem, qty: Math.min(50, cartItem.qty + normalized.qty) }
         : cartItem
     );
     writeFuseCart(next);
@@ -119,8 +120,9 @@ export function addFuseCartItem(item: FuseCartItem) {
 }
 
 export function updateFuseCartQty(id: string, qty: number) {
+  const nextQty = Math.round(qty);
   const next = readFuseCart()
-    .map((item) => (item.id === id ? { ...item, qty: Math.max(0, qty) } : item))
+    .map((item) => (item.id === id ? { ...item, qty: Math.max(0, Math.min(50, nextQty)) } : item))
     .filter((item) => item.qty > 0);
   writeFuseCart(next);
   return next;

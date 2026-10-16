@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore";
@@ -16,9 +16,17 @@ import {
 } from "@/lib/fuse-cart";
 import { normalizeFuseOrderStatus } from "@/lib/fuse-order-status";
 import { resolveFuseSession } from "@/lib/fuse-session-resolve";
-import { isFuseRestaurantOpen, resolveRestaurantDeliveryFee } from "@/lib/fuse-restaurant";
+import { resolveRestaurantDeliveryFee } from "@/lib/fuse-restaurant";
 import FuseIcon from "@/components/FuseIcon";
 import { fuseUserFacingError } from "@/lib/fuse-user-errors";
+import {
+  buildCustomerCodOrder,
+  buildRestaurantNewOrderNotification,
+  createSubmitGuard,
+  newOrderAttemptId,
+  type MenuRecord,
+  type RestaurantRecord,
+} from "@/lib/fuse-order-draft";
 
 function formatIQD(value: number) {
   return `${Number(value || 0).toLocaleString("en-US")} د.ع`;
@@ -30,83 +38,68 @@ function CartThumb({ src, name }: { src?: string; name: string }) {
   return <img src={src} alt={name} onError={() => setFailed(true)} />;
 }
 
-function normalizePhone(value: string) {
-  return value
-    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
-    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-    .replace(/[^0-9+]/g, "");
-}
+async function loadCustomerOrder(input: {
+  items: FuseCartItem[];
+  actor: { uid: string; email?: string | null; role: string };
+  customerName: string;
+  phone: string;
+  address: string;
+  note: string;
+  attemptId: string;
+}) {
+  const restaurantId = String(input.items[0]?.restaurantId || "").trim();
+  const restaurantSnap = restaurantId
+    ? await getDoc(doc(db, "restaurants", restaurantId))
+    : null;
+  const restaurantData = restaurantSnap?.exists() ? restaurantSnap.data() : {};
+  const restaurant: RestaurantRecord = {
+    exists: Boolean(restaurantSnap?.exists()),
+    name: typeof restaurantData.name === "string" ? restaurantData.name : "",
+    active: restaurantData.active as boolean | undefined,
+    open: restaurantData.open as boolean | undefined,
+    isOpen: restaurantData.isOpen as boolean | undefined,
+    status: typeof restaurantData.status === "string" ? restaurantData.status : undefined,
+    deliveryFee: restaurantData.deliveryFee,
+    minOrder: restaurantData.minOrder,
+    minimumOrder: restaurantData.minimumOrder,
+  };
 
-function validIraqiPhone(value: string) {
-  return /^07\d{9}$/.test(normalizePhone(value).replace(/^\+964/, "0"));
-}
+  const menuSnaps = await Promise.all(
+    input.items.map((item) => getDoc(doc(db, "menu", String(item.id || ""))))
+  );
+  const menuById: Record<string, MenuRecord> = {};
+  input.items.forEach((item, index) => {
+    const snap = menuSnaps[index];
+    const data = snap.exists() ? snap.data() : {};
+    menuById[String(item.id || "")] = {
+      exists: snap.exists(),
+      restaurantId: typeof data.restaurantId === "string" ? data.restaurantId : "",
+      name: typeof data.name === "string" ? data.name : "",
+      title: typeof data.title === "string" ? data.title : "",
+      category: typeof data.category === "string" ? data.category : "",
+      price: data.price,
+      available: data.available as boolean | undefined,
+      isAvailable: data.isAvailable as boolean | undefined,
+      active: data.active as boolean | undefined,
+    };
+  });
 
-async function validateCart(items: FuseCartItem[]) {
-  if (!items.length) throw new Error("السلة فارغة.");
-
-  const restaurantId = String(items[0].restaurantId || "").trim();
-  if (!restaurantId) throw new Error("تعذر تحديد المطعم. فرّغ السلة وأعد إضافة الأصناف.");
-
-  if (items.some((item) => String(item.restaurantId || "").trim() !== restaurantId)) {
-    throw new Error("السلة تحتوي أصنافاً من أكثر من مطعم. فرّغ السلة وأعد الطلب.");
-  }
-
-  const restaurantSnap = await getDoc(doc(db, "restaurants", restaurantId));
-  if (!restaurantSnap.exists()) throw new Error("هذا المطعم غير موجود أو لم يعد متاحاً.");
-
-  const restaurantData = restaurantSnap.data();
-  if (!isFuseRestaurantOpen(restaurantData)) throw new Error("المطعم مغلق حالياً ولا يستقبل طلبات.");
-
-  const deliveryFee = resolveRestaurantDeliveryFee(restaurantData);
-  const minOrder = Number(restaurantData.minOrder || restaurantData.minimumOrder || 0);
-  const subtotalPreview = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  if (minOrder > 0 && subtotalPreview < minOrder) {
-    throw new Error(`الحد الأدنى للطلب ${Number(minOrder).toLocaleString("ar-IQ")} د.ع`);
-  }
-
-  const restaurantName = String(restaurantData.name || "").trim();
-  if (restaurantName.length < 2) {
-    throw new Error("بيانات المطعم غير مكتملة. تواصل مع الدعم.");
-  }
-
-  const verified: FuseCartItem[] = [];
-  for (const item of items) {
-    const menuSnap = await getDoc(doc(db, "menu", item.id));
-    if (!menuSnap.exists()) throw new Error(`الصنف ${item.name} لم يعد متوفراً.`);
-
-    const data = menuSnap.data();
-    if (data.available === false || data.isAvailable === false || data.active === false) {
-      throw new Error(`الصنف ${item.name} غير متوفر حالياً.`);
-    }
-
-    if (String(data.restaurantId || "").trim() !== restaurantId) {
-      throw new Error(`الصنف ${item.name} لا يتبع لهذا المطعم.`);
-    }
-
-    const price = Number(data.price);
-    if (!Number.isFinite(price) || price <= 0) throw new Error(`سعر الصنف ${item.name} غير صالح.`);
-
-    const liveRestaurantId = String(data.restaurantId || "").trim();
-    if (!liveRestaurantId) throw new Error(`الصنف ${item.name} غير مرتبط بمطعم.`);
-
-    verified.push({
-      ...item,
-      id: String(item.id || "").trim(),
-      restaurantId: liveRestaurantId,
-      restaurant: restaurantName,
-      name: String(data.name || data.title || item.name).trim(),
-      category: String(data.category || item.category || "عام"),
-      price,
-      qty: Math.max(1, Math.min(50, Math.round(Number(item.qty) || 1))),
-    });
-  }
-
-  const verifiedSubtotal = verified.reduce((sum, entry) => sum + entry.price * entry.qty, 0);
-  if (minOrder > 0 && verifiedSubtotal < minOrder) {
-    throw new Error(`الحد الأدنى للطلب ${Number(minOrder).toLocaleString("ar-IQ")} د.ع`);
-  }
-
-  return { verified, deliveryFee };
+  return buildCustomerCodOrder({
+    actor: {
+      uid: input.actor.uid,
+      email: input.actor.email || "",
+      role: input.actor.role,
+    },
+    items: input.items,
+    restaurantId,
+    restaurant,
+    menuById,
+    customerName: input.customerName,
+    phone: input.phone,
+    address: input.address,
+    note: input.note,
+    attemptId: input.attemptId,
+  });
 }
 
 export default function CartPage() {
@@ -122,6 +115,8 @@ export default function CartPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(2000);
+  const submitGuard = useRef(createSubmitGuard());
+  const attemptRef = useRef("");
 
   useEffect(() => {
     const refresh = () => setItems(readFuseCart());
@@ -194,116 +189,98 @@ export default function CartPage() {
   }
 
   async function submitOrder() {
-    if (saving) return;
+    if (!submitGuard.current.acquire()) return;
     setMessage("");
     setError("");
-
-    if (!authReady) return setError("جاري التحقق من الحساب، حاول بعد لحظة.");
-    if (!user) {
-      router.push("/login?next=/cart");
-      return;
-    }
-
-    const token = await user.getIdTokenResult(true);
-    const role = typeof token.claims.role === "string" ? token.claims.role : "";
-    if (role && role !== "customer") {
-      return setError("تأكيد الطلب متاح لحساب الزبون فقط.");
-    }
+    let writing = false;
 
     try {
-      const session = await resolveFuseSession(user);
-      if (session.role !== "customer") {
-        return setError("تأكيد الطلب متاح لحساب الزبون فقط.");
+      if (!authReady) {
+        setError("جاري التحقق من الحساب، حاول بعد لحظة.");
+        return;
       }
-    } catch (sessionError) {
-      return setError(fuseUserFacingError(sessionError, "تعذر تثبيت جلسة الزبون."));
-    }
+      if (!user) {
+        router.push("/login?next=/cart");
+        return;
+      }
 
-    if (!items.length) return setError("السلة فارغة. أضف صنفاً واحداً على الأقل.");
-    if (items.length > 8) return setError("الحد الأقصى 8 أصناف مختلفة في الطلب الواحد. قلل الأصناف ثم أكد.");
-    if (customerName.trim().length < 2) return setError("اكتب اسم الزبون.");
-    if (!validIraqiPhone(phone)) return setError("اكتب رقم هاتف عراقي صحيح مثل 07701234567.");
-    if (address.trim().length < 8) return setError("اكتب عنوان توصيل واضحاً.");
+      const token = await user.getIdTokenResult(true);
+      const role = typeof token.claims.role === "string" ? token.claims.role : "";
+      if (role && role !== "customer") {
+        setError("تأكيد الطلب متاح لحساب الزبون فقط.");
+        return;
+      }
 
-    setSaving(true);
-    try {
-      const { verified: verifiedItems, deliveryFee: verifiedDeliveryFee } = await validateCart(items);
-      const verifiedTotals = fuseCartTotals(verifiedItems, verifiedDeliveryFee);
-      const cleanPhone = normalizePhone(phone).replace(/^\+964/, "0");
-      const shortOrderId = `FUSE-${Date.now().toString().slice(-8)}`;
-      const orderRef = doc(collection(db, "orders"));
+      let sessionRole = "";
+      try {
+        const session = await resolveFuseSession(user);
+        sessionRole = session.role;
+      } catch (sessionError) {
+        setError(fuseUserFacingError(sessionError, "تعذر تثبيت جلسة الزبون."));
+        return;
+      }
+      if (sessionRole !== "customer") {
+        setError("تأكيد الطلب متاح لحساب الزبون فقط.");
+        return;
+      }
+
+      writing = true;
+      setSaving(true);
+      if (!attemptRef.current) attemptRef.current = newOrderAttemptId();
+
+      const draft = await loadCustomerOrder({
+        items,
+        actor: { uid: user.uid, email: user.email, role: sessionRole },
+        customerName,
+        phone,
+        address,
+        note,
+        attemptId: attemptRef.current,
+      });
+      if (!draft.ok) {
+        setError("message" in draft ? draft.message : "تعذر تثبيت الطلب.");
+        return;
+      }
+
+      const { documentId, ...orderBody } = draft.order;
+      const orderRef = doc(db, "orders", documentId);
       const notificationRef = doc(collection(db, "notifications"));
       const batch = writeBatch(db);
-      const restaurantId = String(verifiedItems[0].restaurantId || "");
-      const restaurantName = verifiedItems[0].restaurant;
-
       batch.set(orderRef, {
-        orderId: shortOrderId,
-        customerUid: user.uid,
-        customerEmail: user.email || "",
-        customerName: customerName.trim(),
-        customer: customerName.trim(),
-        phone: cleanPhone,
-        customerPhone: cleanPhone,
-        address: address.trim(),
-        note: note.trim().slice(0, 300),
-        restaurant: restaurantName,
-        restaurantName,
-        restaurantId,
-        items: verifiedItems.map((item) => ({
-          id: item.id,
-          name: item.name,
-          title: item.name,
-          qty: Math.round(item.qty),
-          quantity: Math.round(item.qty),
-          price: item.price,
-          category: item.category || "عام",
-        })),
-        subtotal: verifiedTotals.subtotal,
-        deliveryFee: verifiedTotals.deliveryFee,
-        total: verifiedTotals.total,
-        amount: verifiedTotals.total,
-        currency: "IQD",
-        paymentMethod: "cod",
-        paymentStatus: "awaiting_delivery",
-        paymentNote: "بوابة الدفع الإلكتروني غير متصلة — الدفع عند الاستلام فقط",
-        status: normalizeFuseOrderStatus("جديد"),
-        source: "customer-cart-page",
+        ...orderBody,
+        status: normalizeFuseOrderStatus(orderBody.status),
         pricingVerifiedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-
       batch.set(notificationRef, {
-        type: "order",
-        audience: "restaurant",
-        title: "طلب جديد",
-        message: `وصل طلب جديد من ${customerName.trim()} بقيمة ${formatIQD(verifiedTotals.total)}.`,
-        customerUid: user.uid,
-        restaurant: restaurantName,
-        restaurantName,
-        restaurantId,
-        phone: cleanPhone,
-        orderId: shortOrderId,
-        orderDocumentId: orderRef.id,
-        read: false,
+        ...buildRestaurantNewOrderNotification(draft.order),
         createdAt: serverTimestamp(),
       });
 
-      await batch.commit();
+      try {
+        await batch.commit();
+      } catch (commitError) {
+        const existing = await getDoc(orderRef);
+        const existingCustomer = existing.exists() ? String(existing.data().customerUid || "") : "";
+        if (!existing.exists() || existingCustomer !== user.uid) throw commitError;
+      }
+
+      const shortOrderId = draft.order.orderId;
+      attemptRef.current = "";
       clearFuseCart();
       setItems([]);
       setMessage(`تم إرسال الطلب بنجاح. رقم الطلب: ${shortOrderId}`);
       window.setTimeout(() => router.replace(`/order-status?orderId=${encodeURIComponent(shortOrderId)}`), 700);
     } catch (submitError) {
-      // Preserve intentional Arabic validation messages; map SDK jargon otherwise.
       if (submitError instanceof Error && submitError.message && !/firestore|firebase/i.test(submitError.message)) {
         setError(submitError.message);
       } else {
         setError(fuseUserFacingError(submitError, "تعذر إرسال الطلب. حاول مرة ثانية."));
       }
     } finally {
-      setSaving(false);
+      if (writing) setSaving(false);
+      submitGuard.current.release();
     }
   }
 
