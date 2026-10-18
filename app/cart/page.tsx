@@ -115,6 +115,7 @@ export default function CartPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(2000);
+  const [minimumOrder, setMinimumOrder] = useState(0);
   const submitGuard = useRef(createSubmitGuard());
   const attemptRef = useRef("");
 
@@ -133,6 +134,7 @@ export default function CartPage() {
     const restaurantId = String(items[0]?.restaurantId || "").trim();
     if (!restaurantId) {
       setDeliveryFee(2000);
+      setMinimumOrder(0);
       return;
     }
 
@@ -141,11 +143,18 @@ export default function CartPage() {
       if (cancelled) return;
       if (!snap.exists()) {
         setDeliveryFee(2000);
+        setMinimumOrder(0);
         return;
       }
-      setDeliveryFee(resolveRestaurantDeliveryFee(snap.data()));
+      const restaurantData = snap.data();
+      const minimum = Number(restaurantData.minOrder || restaurantData.minimumOrder || 0);
+      setMinimumOrder(Number.isFinite(minimum) && minimum > 0 ? minimum : 0);
+      setDeliveryFee(resolveRestaurantDeliveryFee(restaurantData));
     }).catch(() => {
-      if (!cancelled) setDeliveryFee(2000);
+      if (!cancelled) {
+        setDeliveryFee(2000);
+        setMinimumOrder(0);
+      }
     });
 
     return () => {
@@ -175,6 +184,7 @@ export default function CartPage() {
   }, []);
 
   const totals = fuseCartTotals(items, deliveryFee);
+  const minimumOrderShortfall = Math.max(0, minimumOrder - totals.subtotal);
   const restaurant = items[0]?.restaurant || "FUSE";
 
   function changeQty(item: FuseCartItem, nextQty: number) {
@@ -313,9 +323,9 @@ export default function CartPage() {
             ))}
           </section>
 
-          <section className="summary"><h2>ملخص الطلب</h2><div><span>المجموع الفرعي</span><b>{formatIQD(totals.subtotal)}</b></div><div><span>التوصيل</span><b>{formatIQD(totals.deliveryFee)}</b></div><div className="total"><span>الإجمالي</span><b>{formatIQD(totals.total)}</b></div><small>يُراجع السعر والتوفر عند تأكيد الطلب.</small></section>
+          <section className="summary"><h2>ملخص الطلب</h2><div><span>المجموع الفرعي</span><b>{formatIQD(totals.subtotal)}</b></div><div><span>التوصيل</span><b>{formatIQD(totals.deliveryFee)}</b></div><div className="total"><span>الإجمالي</span><b>{formatIQD(totals.total)}</b></div><small>يُراجع السعر والتوفر عند تأكيد الطلب.</small>{minimumOrderShortfall > 0 ? <small className="minimum-order-note" role="status">باقي {formatIQD(minimumOrderShortfall)} من قيمة الأصناف حتى تصل للحد الأدنى للمطعم.</small> : null}</section>
           <section className="payment"><h2>طريقة الدفع</h2><div className="payment-row"><span>الدفع عند الاستلام (COD)</span><b>نقداً فقط</b></div><small>الإطلاق التجاري الحالي يعتمد الدفع نقداً عند التسليم فقط. لا توجد بوابة دفع إلكتروني متصلة حالياً.</small></section>
-          <section className="form"><h2>بيانات التوصيل</h2><input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="الاسم الكامل" autoComplete="name" maxLength={80}/><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07701234567" inputMode="tel" autoComplete="tel" dir="ltr" maxLength={14}/><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="المنطقة، الشارع، أقرب نقطة دالة" autoComplete="street-address" maxLength={220}/><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظة اختيارية للمطعم أو السائق" maxLength={300}/></section>
+          <section className="form"><h2>بيانات التوصيل</h2><input aria-label="الاسم الكامل" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="الاسم الكامل" autoComplete="name" maxLength={80}/><input aria-label="رقم الهاتف العراقي" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07701234567" inputMode="tel" autoComplete="tel" dir="ltr" maxLength={14}/><input aria-label="عنوان التوصيل" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="المنطقة، الشارع، أقرب نقطة دالة" autoComplete="street-address" maxLength={220}/><input aria-label="ملاحظة للمطعم أو السائق" value={note} onChange={(e) => setNote(e.target.value)} placeholder="ملاحظة اختيارية للمطعم أو السائق" maxLength={300}/></section>
           <button className="checkout" type="button" onClick={submitOrder} disabled={saving || !authReady}>{saving ? "جاري فحص الأسعار وتثبيت الطلب..." : user ? `تأكيد الطلب · ${formatIQD(totals.total)}` : "سجّل دخولك لتأكيد الطلب"}</button>
           <button className="clear" type="button" onClick={clearCart} disabled={saving}>تفريغ السلة</button>
         </>
