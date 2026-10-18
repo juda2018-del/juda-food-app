@@ -32,6 +32,7 @@ type RestaurantDoc = {
   deliveryTime?: string;
   deliveryFee?: number;
   minOrder?: number;
+  minimumOrder?: number;
   rating?: number;
 };
 
@@ -186,6 +187,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
       name: item.name || item.title || "صنف",
       restaurant: restaurantName,
       restaurantId: restaurant?.documentId || restaurantId,
+      minimumOrder: Number(restaurant?.minOrder || restaurant?.minimumOrder || 0),
       category: item.category || "عام",
       price: Number(item.price || 0),
       qty: 1,
