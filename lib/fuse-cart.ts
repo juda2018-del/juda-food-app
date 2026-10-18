@@ -3,6 +3,7 @@ export type FuseCartItem = {
   name: string;
   restaurant: string;
   restaurantId?: string;
+  minimumOrder?: number;
   category?: string;
   price: number;
   qty: number;
@@ -31,6 +32,7 @@ export function normalizeCartItem(item: Partial<FuseCartItem>): FuseCartItem | n
   const restaurant = String(item.restaurant || "FUSE").trim();
   const restaurantId = String(item.restaurantId || "").trim() || undefined;
   const price = safeNumber(item.price, 0);
+  const minimumOrder = Math.max(0, Math.min(1_000_000_000, safeNumber(item.minimumOrder, 0)));
   const qty = Math.min(50, Math.max(1, Math.round(safeNumber(item.qty, 1))));
 
   if (!id || !Number.isFinite(price) || price <= 0) return null;
@@ -41,6 +43,7 @@ export function normalizeCartItem(item: Partial<FuseCartItem>): FuseCartItem | n
     name,
     restaurant,
     restaurantId,
+    minimumOrder,
     category: item.category || "عام",
     price,
     qty,

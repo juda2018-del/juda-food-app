@@ -32,6 +32,7 @@ type RestaurantDoc = {
   deliveryTime?: string;
   deliveryFee?: number;
   minOrder?: number;
+  minimumOrder?: number;
   rating?: number;
 };
 
@@ -186,6 +187,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
       name: item.name || item.title || "صنف",
       restaurant: restaurantName,
       restaurantId: restaurant?.documentId || restaurantId,
+      minimumOrder: Number(restaurant?.minOrder || restaurant?.minimumOrder || 0),
       category: item.category || "عام",
       price: Number(item.price || 0),
       qty: 1,
@@ -202,6 +204,14 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
 
   const isOpen = isFuseRestaurantOpen(restaurant);
   const image = restaurant?.image || restaurant?.cover || restaurant?.logo || "";
+  const minimumOrderValue = Number(restaurant?.minOrder || restaurant?.minimumOrder || 0);
+  const minimumOrderLabel = minimumOrderValue > 0
+    ? formatIQD(minimumOrderValue)
+    : loading
+      ? "جاري التحميل"
+      : connectionWarning
+        ? "غير متاح مؤقتاً"
+        : "لا يوجد حد أدنى";
 
   return (
     <main dir="rtl" className="page restaurant-detail-page dynamic-restaurant-page">
@@ -228,7 +238,7 @@ export default function DynamicRestaurantClient({ restaurantId: restaurantIdProp
           <div><span>الحالة</span><b className={isOpen ? "green" : "red"}>{isOpen ? "مفتوح" : "مغلق"}</b></div>
           <div><span>التوصيل</span><b>{restaurant?.deliveryTime || "25 - 35 دقيقة"}</b></div>
           <div><span>التقييم</span><div className="rating-row"><FuseIcon name="star" size="sm" /><b>{Number(restaurant?.rating || 5).toFixed(1)}</b></div></div>
-          <div><span>الأدنى</span><b>{formatIQD(restaurant?.minOrder)}</b></div>
+          <div><span>الحد الأدنى</span><b>{minimumOrderLabel}</b></div>
         </section>
 
         <div className="title"><div><small>المنيو</small><h2>اختار وجبتك</h2></div><span>{items.length} صنف</span></div>

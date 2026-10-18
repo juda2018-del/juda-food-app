@@ -184,7 +184,9 @@ export default function CartPage() {
   }, []);
 
   const totals = fuseCartTotals(items, deliveryFee);
-  const minimumOrderShortfall = Math.max(0, minimumOrder - totals.subtotal);
+  const itemMinimumOrder = Number(items[0]?.minimumOrder || 0);
+  const minimumOrderForDisplay = Math.max(minimumOrder, Number.isFinite(itemMinimumOrder) ? itemMinimumOrder : 0);
+  const minimumOrderShortfall = Math.max(0, minimumOrderForDisplay - totals.subtotal);
   const restaurant = items[0]?.restaurant || "FUSE";
 
   function changeQty(item: FuseCartItem, nextQty: number) {
