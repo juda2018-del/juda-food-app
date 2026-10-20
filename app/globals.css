@@ -76,3 +76,12 @@ textarea {
   background: rgba(255, 106, 10, 0.25);
   color: #15171a;
 }
+
+
+/* Design-system polish: keyboard, touch and motion preferences */
+:where(a,button,input,textarea,select,[tabindex]):focus-visible{outline:3px solid #ff8a3d;outline-offset:3px}
+:where(button,a,[role="button"]){-webkit-tap-highlight-color:transparent}
+:where(input,textarea,select){scroll-margin-top:7rem}
+::selection{background:rgba(255,138,61,.28)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media(max-width:640px){:where(button,a,[role="button"]){touch-action:manipulation} :where(input,textarea,select){font-size:16px}}
