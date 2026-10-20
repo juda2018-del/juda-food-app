@@ -312,7 +312,7 @@ export default function HomePage() {
   const [category, setCategory] = useState("الكل");
   const [cartCount, setCartCount] = useState(0);
   const [notice, setNotice] = useState("");
-  const [locationNotice, setLocationNotice] = useState("بغداد - المنصور");
+
 
   useEffect(() => {
     setSession(readSession());
@@ -476,13 +476,10 @@ export default function HomePage() {
 
           <div className="brand-location">
             <strong>FUSE Iraq</strong>
-            <button className="location" type="button" onClick={() => {
-              setLocationNotice((current) => current === "بغداد - المنصور" ? "بغداد - زيونة" : "بغداد - المنصور");
-              showNotice("تم تحديث منطقة التوصيل");
-            }}>
+            <div className="location" aria-label="منطقة التوصيل: بغداد">
               <FuseIcon name="pin" />
-              <b>{locationNotice}</b>
-            </button>
+              <b>بغداد</b>
+            </div>
           </div>
 
           <div className="top-actions">
